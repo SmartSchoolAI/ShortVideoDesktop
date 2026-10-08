@@ -12,10 +12,10 @@ importers:
   .:
     dependencies:
       '@remotion/cli':
-        specifier: ^4.0.520
+        specifier: 4.0.534
         version: 4.0.534(postcss@8.5.29)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)
       '@remotion/renderer':
-        specifier: ^4.0.520
+        specifier: 4.0.534
         version: 4.0.534(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       electron-updater:
         specifier: ^6.3.9
@@ -24,7 +24,7 @@ importers:
         specifier: ^1.49.0
         version: 1.64.0
       remotion:
-        specifier: ^4.0.520
+        specifier: 4.0.534
         version: 4.0.534(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       ws:
         specifier: ^8.18.0
@@ -3094,7 +3094,7 @@ snapshots:
 
   '@svgr/hast-util-to-babel-ast@8.0.0':
     dependencies:
-      '@babel/types': 7.24.0
+      '@babel/types': 7.29.8
       entities: 4.5.0
 
   '@svgr/plugin-jsx@8.1.0(@svgr/core@8.1.0(typescript@5.9.3))':
@@ -4186,11 +4186,11 @@ snapshots:
 
   node-abi@4.37.0:
     dependencies:
-      semver: 7.7.4
+      semver: 7.8.5
 
   node-api-version@0.2.1:
     dependencies:
-      semver: 7.7.4
+      semver: 7.8.5
 
   node-gyp@12.4.0:
     dependencies:
@@ -4199,7 +4199,7 @@ snapshots:
       graceful-fs: 4.2.11
       nopt: 9.0.0
       proc-log: 6.1.0
-      semver: 7.7.4
+      semver: 7.8.5
       tar: 7.5.22
       tinyglobby: 0.2.17
       undici: 6.29.0
