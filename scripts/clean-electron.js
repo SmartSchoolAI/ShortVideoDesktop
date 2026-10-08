@@ -53,6 +53,7 @@ killProcess('ShortVideo.exe');
 killProcess('electron.exe');
 
 // 2. 清理 release 产物目录与 dist-electron 编译目录
+removeDirSafe('dist-release');
 removeDirSafe('release');
 removeDirSafe('dist-electron');
 

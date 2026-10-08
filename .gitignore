@@ -6,6 +6,7 @@ node_modules/
 dist/
 dist-electron/
 release/
+dist-release/
 build/*
 !build/icon.ico
 !build/icon.png
@@ -37,3 +38,6 @@ Thumbs.db
 *.swp
 *.swo
 
+
+# IDE Agents & Rules
+.agents/
