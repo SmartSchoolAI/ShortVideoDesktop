@@ -388,11 +388,11 @@ jobs:
           name: release-linux
           retention-days: 1
           path: |
-            release/*.AppImage
-            release/*.deb
-            release/*.rpm
-            release/*.blockmap
-            release/*.yml
+            dist-release/*.AppImage
+            dist-release/*.deb
+            dist-release/*.rpm
+            dist-release/*.blockmap
+            dist-release/*.yml
           if-no-files-found: warn
 
       - name: Publish Linux Assets to GitHub Release
@@ -402,11 +402,11 @@ jobs:
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           files: |
-            release/*.AppImage
-            release/*.deb
-            release/*.rpm
-            release/*.blockmap
-            release/*.yml
+            dist-release/*.AppImage
+            dist-release/*.deb
+            dist-release/*.rpm
+            dist-release/*.blockmap
+            dist-release/*.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -424,11 +424,11 @@ jobs:
             VERSION="${APP_VERSION}"
             echo "📦 Current release version: $VERSION"
             echo "📦 Generated release items:"
-            ls -lh release/
+            ls -lh dist-release/
             echo "Uploading Linux release packages to Cloudflare R2 (archive: website/${VERSION}/ & root: website/)..."
             upload_count=0
             shopt -s nocasematch
-            for file in release/*; do
+            for file in dist-release/*; do
               if [ -f "$file" ]; then
                 filename=$(basename "$file")
                 case "$filename" in
