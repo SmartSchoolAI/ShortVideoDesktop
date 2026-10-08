@@ -1,0 +1,518 @@
+name: Build Electron Multiplatform
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Target platform to build'
+        required: true
+        type: choice
+        default: 'all'
+        options:
+          - all
+          - windows
+          - macos
+          - linux
+      create_release:
+        description: 'Publish to GitHub Releases'
+        required: false
+        type: boolean
+        default: false
+      tag_name:
+        description: 'Release Tag (optional, defaults to v<package.json version>)'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  cleanup-previous-runs:
+    name: Clean Previous Workflow Runs & Artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Purge Historical Workflow Runs & Artifacts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/delete-all-workflow-runs.js
+
+  build-windows:
+    name: Build Windows
+    needs: [cleanup-previous-runs]
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'windows'))
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8.15.4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync package.json version with Tag
+        shell: bash
+        run: |
+          RAW_TAG="${{ github.ref_type == 'tag' && github.ref_name || inputs.tag_name }}"
+          TAG_VER="${RAW_TAG%-all}"
+          if [ -n "$TAG_VER" ]; then
+            CLEAN_VER="${TAG_VER#v}"
+            echo "⚡ Syncing package.json version to: $CLEAN_VER"
+            npm version "$CLEAN_VER" --no-git-tag-version --allow-same-version
+          else
+            CLEAN_VER=$(node -p "require('./package.json').version")
+            echo "⚡ No tag specified, using current version: $CLEAN_VER"
+          fi
+          FINAL_TAG="v${CLEAN_VER}"
+          echo "APP_VERSION=${CLEAN_VER}" >> $GITHUB_ENV
+          echo "RELEASE_TAG=${FINAL_TAG}" >> $GITHUB_ENV
+
+      - name: Clean previous builds
+        run: pnpm run clean:electron
+
+      - name: Compile Electron scripts
+        run: pnpm run electron:compile
+
+      - name: Build Windows Package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: pnpm exec electron-builder --win --x64 --publish never
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: release-windows
+          retention-days: 1
+          path: |
+            release/*.exe
+            release/*.zip
+            release/*.blockmap
+            release/*.yml
+          if-no-files-found: warn
+
+      - name: Publish Windows Assets to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release == true)
+        uses: softprops/action-gh-release@v2
+        continue-on-error: true
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          files: |
+            release/*.exe
+            release/*.zip
+            release/*.blockmap
+            release/*.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload to Cloudflare R2 (shortvideo/website/{version}/)
+        if: success()
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME || 'shortvideo' }}
+          MSYS_NO_PATHCONV: 1
+        shell: bash
+        run: |
+          if [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$R2_ACCOUNT_ID" ]; then
+            VERSION="${APP_VERSION}"
+            echo "📦 Current release version: $VERSION"
+            echo "📦 Generated release items:"
+            ls -lh release/
+            echo "Uploading Windows release packages to Cloudflare R2 (archive: website/${VERSION}/ & root: website/)..."
+            upload_count=0
+            shopt -s nocasematch
+            for file in release/*; do
+              if [ -f "$file" ]; then
+                filename=$(basename "$file")
+                case "$filename" in
+                  latest*.yml|latest*.yaml)
+                    node -e "
+                      const fs = require('fs');
+                      const f = process.argv[1];
+                      const v = process.argv[2];
+                      let s = fs.readFileSync(f, 'utf8');
+                      s = s.replace(/(\burl:\s*)([^\r\n\/]+)/g, '\$1' + v + '/\$2');
+                      s = s.replace(/(\bpath:\s*)([^\r\n\/]+)/g, '\$1' + v + '/\$2');
+                      fs.writeFileSync(f, s);
+                    " "$file" "${VERSION}"
+
+                    echo "🚀 Uploading metadata: $filename to version directory"
+                    aws s3 cp "$file" "s3://${R2_BUCKET_NAME}/website/${VERSION}/${filename}" \
+                      --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+                      --cache-control "no-cache, no-store, must-revalidate"
+                    echo "🚀 Uploading metadata: $filename to latest root directory for auto-updater"
+                    aws s3 cp "$file" "s3://${R2_BUCKET_NAME}/website/${filename}" \
+                      --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+                      --cache-control "no-cache, no-store, must-revalidate"
+                    upload_count=$((upload_count + 2))
+                    ;;
+                  *.zip|*.exe|*.dmg|*.deb|*.rpm|*.appimage|*.blockmap|*.tar.gz|*.tar.xz|*.sha256)
+                    echo "🚀 Uploading package to version directory: website/${VERSION}/${filename}"
+                    aws s3 cp "$file" "s3://${R2_BUCKET_NAME}/website/${VERSION}/${filename}" \
+                      --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+                    upload_count=$((upload_count + 1))
+                    ;;
+                esac
+              fi
+            done
+            shopt -u nocasematch
+            echo "✅ Successfully uploaded $upload_count file(s) to Cloudflare R2 (archived in website/${VERSION}/ & published to website/)!"
+          else
+            echo "⚠️ R2 credentials not found in secrets, skipping R2 upload."
+          fi
+
+  build-macos:
+    name: Build macOS
+    needs: [cleanup-previous-runs]
+    if: contains(github.ref_name, '-all') || contains(github.ref, '-all') || (github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'macos'))
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8.15.4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync package.json version with Tag
+        shell: bash
+        run: |
+          RAW_TAG="${{ github.ref_type == 'tag' && github.ref_name || inputs.tag_name }}"
+          TAG_VER="${RAW_TAG%-all}"
+          if [ -n "$TAG_VER" ]; then
+            CLEAN_VER="${TAG_VER#v}"
+            echo "⚡ Syncing package.json version to: $CLEAN_VER"
+            npm version "$CLEAN_VER" --no-git-tag-version --allow-same-version
+          else
+            CLEAN_VER=$(node -p "require('./package.json').version")
+            echo "⚡ No tag specified, using current version: $CLEAN_VER"
+          fi
+          FINAL_TAG="v${CLEAN_VER}"
+          echo "APP_VERSION=${CLEAN_VER}" >> $GITHUB_ENV
+          echo "RELEASE_TAG=${FINAL_TAG}" >> $GITHUB_ENV
+
+      - name: Clean previous builds
+        run: pnpm run clean:electron
+
+      - name: Compile Electron scripts
+        run: pnpm run electron:compile
+
+      - name: Build macOS Package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: pnpm exec electron-builder --mac --x64 --arm64 --publish never
+
+      - name: Upload macOS Artifacts
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: release-macos
+          retention-days: 1
+          path: |
+            release/*.dmg
+            release/*.zip
+            release/*.blockmap
+            release/*.yml
+          if-no-files-found: warn
+
+      - name: Publish macOS Assets to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release == true)
+        uses: softprops/action-gh-release@v2
+        continue-on-error: true
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          files: |
+            release/*.dmg
+            release/*.zip
+            release/*.blockmap
+            release/*.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload to Cloudflare R2 (shortvideo/website/{version}/)
+        if: success()
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME || 'shortvideo' }}
+        shell: bash
+        run: |
+          if [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$R2_ACCOUNT_ID" ]; then
+            VERSION="${APP_VERSION}"
+            echo "📦 Current release version: $VERSION"
+            echo "📦 Generated release items:"
+            ls -lh release/
+            echo "Uploading macOS release packages to Cloudflare R2 (archive: website/${VERSION}/ & root: website/)..."
+            upload_count=0
+            shopt -s nocasematch
+            for file in release/*; do
+              if [ -f "$file" ]; then
+                filename=$(basename "$file")
+                case "$filename" in
+                  latest*.yml|latest*.yaml)
+                    node -e "
+                      const fs = require('fs');
+                      const f = process.argv[1];
+                      const v = process.argv[2];
+                      let s = fs.readFileSync(f, 'utf8');
+                      s = s.replace(/(\burl:\s*)([^\r\n\/]+)/g, '\$1' + v + '/\$2');
+                      s = s.replace(/(\bpath:\s*)([^\r\n\/]+)/g, '\$1' + v + '/\$2');
+                      fs.writeFileSync(f, s);
+                    " "$file" "${VERSION}"
+
+                    echo "🚀 Uploading metadata: $filename to version directory"
+                    aws s3 cp "$file" "s3://${R2_BUCKET_NAME}/website/${VERSION}/${filename}" \
+                      --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+                      --cache-control "no-cache, no-store, must-revalidate"
+                    echo "🚀 Uploading metadata: $filename to latest root directory for auto-updater"
+                    aws s3 cp "$file" "s3://${R2_BUCKET_NAME}/website/${filename}" \
+                      --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+                      --cache-control "no-cache, no-store, must-revalidate"
+                    upload_count=$((upload_count + 2))
+                    ;;
+                  *.zip|*.exe|*.dmg|*.deb|*.rpm|*.appimage|*.blockmap|*.tar.gz|*.tar.xz|*.sha256)
+                    echo "🚀 Uploading package to version directory: website/${VERSION}/${filename}"
+                    aws s3 cp "$file" "s3://${R2_BUCKET_NAME}/website/${VERSION}/${filename}" \
+                      --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+                    upload_count=$((upload_count + 1))
+                    ;;
+                esac
+              fi
+            done
+            shopt -u nocasematch
+            echo "✅ Successfully uploaded $upload_count file(s) to Cloudflare R2 (archived in website/${VERSION}/ & published to website/)!"
+          else
+            echo "⚠️ R2 credentials not found in secrets, skipping R2 upload."
+          fi
+
+  build-linux:
+    name: Build Linux
+    needs: [cleanup-previous-runs]
+    if: contains(github.ref_name, '-all') || contains(github.ref, '-all') || (github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'linux'))
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8.15.4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Linux build dependencies (rpm)
+        run: sudo apt-get update && sudo apt-get install -y rpm
+
+      - name: Sync package.json version with Tag
+        shell: bash
+        run: |
+          RAW_TAG="${{ github.ref_type == 'tag' && github.ref_name || inputs.tag_name }}"
+          TAG_VER="${RAW_TAG%-all}"
+          if [ -n "$TAG_VER" ]; then
+            CLEAN_VER="${TAG_VER#v}"
+            echo "⚡ Syncing package.json version to: $CLEAN_VER"
+            npm version "$CLEAN_VER" --no-git-tag-version --allow-same-version
+          else
+            CLEAN_VER=$(node -p "require('./package.json').version")
+            echo "⚡ No tag specified, using current version: $CLEAN_VER"
+          fi
+          FINAL_TAG="v${CLEAN_VER}"
+          echo "APP_VERSION=${CLEAN_VER}" >> $GITHUB_ENV
+          echo "RELEASE_TAG=${FINAL_TAG}" >> $GITHUB_ENV
+
+      - name: Clean previous builds
+        run: pnpm run clean:electron
+
+      - name: Compile Electron scripts
+        run: pnpm run electron:compile
+
+      - name: Build Linux Package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm exec electron-builder --linux --x64 --publish never
+
+      - name: Upload Linux Artifacts
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: release-linux
+          retention-days: 1
+          path: |
+            release/*.AppImage
+            release/*.deb
+            release/*.rpm
+            release/*.blockmap
+            release/*.yml
+          if-no-files-found: warn
+
+      - name: Publish Linux Assets to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release == true)
+        uses: softprops/action-gh-release@v2
+        continue-on-error: true
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          files: |
+            release/*.AppImage
+            release/*.deb
+            release/*.rpm
+            release/*.blockmap
+            release/*.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload to Cloudflare R2 (shortvideo/website/{version}/)
+        if: success()
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME || 'shortvideo' }}
+        shell: bash
+        run: |
+          if [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$R2_ACCOUNT_ID" ]; then
+            VERSION="${APP_VERSION}"
+            echo "📦 Current release version: $VERSION"
+            echo "📦 Generated release items:"
+            ls -lh release/
+            echo "Uploading Linux release packages to Cloudflare R2 (archive: website/${VERSION}/ & root: website/)..."
+            upload_count=0
+            shopt -s nocasematch
+            for file in release/*; do
+              if [ -f "$file" ]; then
+                filename=$(basename "$file")
+                case "$filename" in
+                  latest*.yml|latest*.yaml)
+                    node -e "
+                      const fs = require('fs');
+                      const f = process.argv[1];
+                      const v = process.argv[2];
+                      let s = fs.readFileSync(f, 'utf8');
+                      s = s.replace(/(\burl:\s*)([^\r\n\/]+)/g, '\$1' + v + '/\$2');
+                      s = s.replace(/(\bpath:\s*)([^\r\n\/]+)/g, '\$1' + v + '/\$2');
+                      fs.writeFileSync(f, s);
+                    " "$file" "${VERSION}"
+
+                    echo "🚀 Uploading metadata: $filename to version directory"
+                    aws s3 cp "$file" "s3://${R2_BUCKET_NAME}/website/${VERSION}/${filename}" \
+                      --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+                      --cache-control "no-cache, no-store, must-revalidate"
+                    echo "🚀 Uploading metadata: $filename to latest root directory for auto-updater"
+                    aws s3 cp "$file" "s3://${R2_BUCKET_NAME}/website/${filename}" \
+                      --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+                      --cache-control "no-cache, no-store, must-revalidate"
+                    upload_count=$((upload_count + 2))
+                    ;;
+                  *.zip|*.exe|*.dmg|*.deb|*.rpm|*.appimage|*.blockmap|*.tar.gz|*.tar.xz|*.sha256)
+                    echo "🚀 Uploading package to version directory: website/${VERSION}/${filename}"
+                    aws s3 cp "$file" "s3://${R2_BUCKET_NAME}/website/${VERSION}/${filename}" \
+                      --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+                    upload_count=$((upload_count + 1))
+                    ;;
+                esac
+              fi
+            done
+            shopt -u nocasematch
+            echo "✅ Successfully uploaded $upload_count file(s) to Cloudflare R2 (archived in website/${VERSION}/ & published to website/)!"
+          else
+            echo "⚠️ R2 credentials not found in secrets, skipping R2 upload."
+          fi
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: [build-windows, build-macos, build-linux]
+    if: always() && (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release == true))
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve Release Tag
+        shell: bash
+        run: |
+          TAG_VER="${{ github.ref_type == 'tag' && github.ref_name || inputs.tag_name }}"
+          if [ -z "$TAG_VER" ]; then
+            TAG_VER="v$(node -p "require('./package.json').version")"
+          fi
+          echo "FINAL_RELEASE_TAG=${TAG_VER}" >> $GITHUB_ENV
+          echo "🏷️ Target Release Tag: ${TAG_VER}"
+
+      - name: Download all release artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          path: collected-releases
+
+      - name: Flatten and verify release files
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p final-release-files
+          if [ -d "collected-releases" ]; then
+            echo "📦 Collecting files from all platforms:"
+            find collected-releases -type f -exec cp {} final-release-files/ \;
+            ls -lh final-release-files
+          fi
+
+      - name: Publish Consolidated GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.FINAL_RELEASE_TAG }}
+          files: final-release-files/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          make_latest: "legacy"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
