@@ -21,11 +21,11 @@
     "release": "node scripts/github-release.js"
   },
   "dependencies": {
-    "@remotion/cli": "^4.0.520",
-    "@remotion/renderer": "^4.0.520",
+    "@remotion/cli": "4.0.534",
+    "@remotion/renderer": "4.0.534",
     "electron-updater": "^6.3.9",
     "playwright-core": "^1.49.0",
-    "remotion": "^4.0.520",
+    "remotion": "4.0.534",
     "ws": "^8.18.0"
   },
   "devDependencies": {
