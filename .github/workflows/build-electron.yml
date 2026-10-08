@@ -45,6 +45,7 @@ jobs:
           node-version: 20
 
       - name: Purge Historical Workflow Runs & Artifacts
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/delete-all-workflow-runs.js
@@ -62,7 +63,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 8.15.4
+          version: 9
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -71,7 +72,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Sync package.json version with Tag
         shell: bash
@@ -201,7 +202,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 8.15.4
+          version: 9
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -210,7 +211,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Sync package.json version with Tag
         shell: bash
@@ -339,7 +340,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 8.15.4
+          version: 9
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -348,7 +349,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Install Linux build dependencies (rpm)
         run: sudo apt-get update && sudo apt-get install -y rpm
