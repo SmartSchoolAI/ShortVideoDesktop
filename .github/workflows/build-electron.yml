@@ -159,8 +159,8 @@ jobs:
                       const f = process.argv[1];
                       const v = process.argv[2];
                       let s = fs.readFileSync(f, 'utf8');
-                      s = s.replace(/(\burl:\s*)([^\r\n\/]+)/g, '\$1' + v + '/\$2');
-                      s = s.replace(/(\bpath:\s*)([^\r\n\/]+)/g, '\$1' + v + '/\$2');
+                      s = s.replace(/(\burl:\s*)([^\r\n\/]+)/g, (m, p1, p2) => p1 + v + '/' + p2);
+                      s = s.replace(/(\bpath:\s*)([^\r\n\/]+)/g, (m, p1, p2) => p1 + v + '/' + p2);
                       fs.writeFileSync(f, s);
                     " "$file" "${VERSION}"
 
@@ -297,8 +297,8 @@ jobs:
                       const f = process.argv[1];
                       const v = process.argv[2];
                       let s = fs.readFileSync(f, 'utf8');
-                      s = s.replace(/(\burl:\s*)([^\r\n\/]+)/g, '\$1' + v + '/\$2');
-                      s = s.replace(/(\bpath:\s*)([^\r\n\/]+)/g, '\$1' + v + '/\$2');
+                      s = s.replace(/(\burl:\s*)([^\r\n\/]+)/g, (m, p1, p2) => p1 + v + '/' + p2);
+                      s = s.replace(/(\bpath:\s*)([^\r\n\/]+)/g, (m, p1, p2) => p1 + v + '/' + p2);
                       fs.writeFileSync(f, s);
                     " "$file" "${VERSION}"
 
@@ -439,8 +439,8 @@ jobs:
                       const f = process.argv[1];
                       const v = process.argv[2];
                       let s = fs.readFileSync(f, 'utf8');
-                      s = s.replace(/(\burl:\s*)([^\r\n\/]+)/g, '\$1' + v + '/\$2');
-                      s = s.replace(/(\bpath:\s*)([^\r\n\/]+)/g, '\$1' + v + '/\$2');
+                      s = s.replace(/(\burl:\s*)([^\r\n\/]+)/g, (m, p1, p2) => p1 + v + '/' + p2);
+                      s = s.replace(/(\bpath:\s*)([^\r\n\/]+)/g, (m, p1, p2) => p1 + v + '/' + p2);
                       fs.writeFileSync(f, s);
                     " "$file" "${VERSION}"
 
