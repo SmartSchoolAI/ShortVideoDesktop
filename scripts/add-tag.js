@@ -69,7 +69,7 @@ function getGitHubRepoUrl(remote) {
     if (url.startsWith('https://github.com/')) {
       return url.replace(/\.git$/, '');
     }
-  } catch {}
+  } catch { }
   return '';
 }
 
@@ -206,7 +206,7 @@ function main() {
       // 本地与远程权威双重冲突防御 (基于 Set 高速内存对比)
       while (true) {
         const candidate = `v${nextMajor}.${nextMinor}.${nextPatch}`;
-        const candidateAll = `v${nextMajor}.${nextMinor}.${nextPatch}-all`;
+        const candidateAll = `v${nextMajor}.${nextMinor}.${nextPatch}`;
         const localExists = localTags.has(candidate) || localTags.has(candidateAll);
         const remoteExists = remoteTags.has(candidate) || remoteTags.has(candidateAll);
 
@@ -226,7 +226,7 @@ function main() {
         try {
           const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
           if (pkg.version) defaultVer = pkg.version;
-        } catch {}
+        } catch { }
       }
       const parts = defaultVer.split('.').map((n) => parseInt(n, 10) || 0);
       const nextPatch = (parts[2] || 0) + 1;
