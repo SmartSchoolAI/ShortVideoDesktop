@@ -245,8 +245,28 @@ function uploadReleaseAsset(owner, repo, releaseId, filePath, token) {
   });
 }
 
+function getReleaseOutputDir() {
+  try {
+    const builderConfigPath = path.resolve(process.cwd(), 'electron-builder.json');
+    if (fs.existsSync(builderConfigPath)) {
+      const config = JSON.parse(fs.readFileSync(builderConfigPath, 'utf8'));
+      if (config.directories && config.directories.output) {
+        return config.directories.output;
+      }
+    }
+  } catch {}
+  return 'dist-release';
+}
+
 function getReleaseAssets() {
-  const releaseDir = path.resolve(process.cwd(), 'release');
+  const configuredDirName = getReleaseOutputDir();
+  let releaseDir = path.resolve(process.cwd(), configuredDirName);
+  if (!fs.existsSync(releaseDir) && configuredDirName !== 'release') {
+    const fallbackDir = path.resolve(process.cwd(), 'release');
+    if (fs.existsSync(fallbackDir)) {
+      releaseDir = fallbackDir;
+    }
+  }
   if (!fs.existsSync(releaseDir)) return [];
 
   const files = fs.readdirSync(releaseDir);
