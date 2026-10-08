@@ -1,0 +1,95 @@
+{
+  "appId": "com.smartschoolai.shortvideo",
+  "productName": "ShortVideo",
+  "directories": {
+    "output": "release"
+  },
+  "publish": [
+    {
+      "provider": "generic",
+      "url": "https://download.shortvideo.ca/website/",
+      "updaterCacheDirName": "shortvideo/update"
+    }
+  ],
+  "protocols": [
+    {
+      "name": "ShortVideo Protocol",
+      "schemes": ["shortvideo"]
+    }
+  ],
+  "files": [
+    "dist-electron/**/*",
+    "build/**/*",
+    ".env.desktop",
+    "!**/.env",
+    "!**/.env.local",
+    "!**/.env.*.local",
+    "!**/.env.production",
+    "!**/.env.development",
+    "!**/*.pem",
+    "!**/*.key"
+  ],
+  "asarUnpack": [
+    "**/node_modules/@remotion/**/*",
+    "**/node_modules/@esbuild/**/*"
+  ],
+  "extraMetadata": {
+    "main": "dist-electron/main.js"
+  },
+  "mac": {
+    "icon": "build/icon.png",
+    "hardenedRuntime": false,
+    "gatekeeperAssess": false,
+    "target": [
+      {
+        "target": "dmg",
+        "arch": ["x64", "arm64"]
+      },
+      {
+        "target": "zip",
+        "arch": ["x64", "arm64"]
+      }
+    ],
+    "category": "public.app-category.video"
+  },
+  "win": {
+    "icon": "build/icon.ico",
+    "artifactName": "${productName}-Setup-${version}.${ext}",
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ]
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "differentialPackage": true
+  },
+  "linux": {
+    "icon": "build/icon.png",
+    "target": [
+      {
+        "target": "AppImage",
+        "arch": ["x64"]
+      },
+      {
+        "target": "deb",
+        "arch": ["x64"]
+      },
+      {
+        "target": "rpm",
+        "arch": ["x64"]
+      }
+    ],
+    "maintainer": "ShortVideo Team <support@shortvideo.ca>",
+    "category": "Video",
+    "mimeTypes": [
+      "x-scheme-handler/shortvideo"
+    ],
+    "syncDesktopName": true
+  }
+}

@@ -1,0 +1,2480 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShortVideo Native Bar</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: #f8fafc;
+      color: #334155;
+      height: 76px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    }
+
+    /* 顶栏可拖拽区域 */
+    .drag-region {
+      -webkit-app-region: drag;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 38px;
+      z-index: 1;
+    }
+
+    /* 第一行：标签页与导航栏 */
+    .tabbar-row {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      width: 100%;
+      height: 38px;
+      padding: 0 12px;
+      background: #f8fafc;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      -webkit-app-region: no-drag;
+    }
+
+    /* 左侧现代化圆形微导航控件 */
+    .nav-controls {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      margin-right: 12px;
+      flex-shrink: 0;
+    }
+
+    .nav-btn {
+      width: 26px;
+      height: 26px;
+      border-radius: 7px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .nav-btn:hover {
+      background: #ffffff;
+      color: #0f172a;
+      border-color: rgba(0, 0, 0, 0.08);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    }
+
+    .nav-btn:active {
+      transform: scale(0.92);
+      background: #e2e8f0;
+    }
+
+    .nav-btn svg {
+      width: 13px;
+      height: 13px;
+      stroke: currentColor;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
+    /* 标签页列表容器 */
+    .tabs-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+      height: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: none;
+      padding-right: 8px;
+    }
+
+    .tabs-wrapper::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* 现代极简卡片式标签页 */
+    .tab-item {
+      display: inline-flex;
+      align-items: center;
+      height: 29px;
+      padding: 0 10px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 500;
+      color: #64748b;
+      background: rgba(255, 255, 255, 0.6);
+      border: 1px solid rgba(0, 0, 0, 0.05);
+      cursor: pointer;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      max-width: 210px;
+      min-width: 110px;
+      position: relative;
+    }
+
+    .tab-item:hover {
+      background: #ffffff;
+      color: #1e293b;
+      border-color: rgba(0, 0, 0, 0.1);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+
+    .tab-item.active {
+      background: #ffffff;
+      color: #0f172a;
+      font-weight: 600;
+      border-color: rgba(0, 0, 0, 0.08);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.03);
+    }
+
+    /* 标签底部彩色指示胶囊条 */
+    .tab-item.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 10px;
+      right: 10px;
+      height: 2.5px;
+      background: #6366f1;
+      border-radius: 3px;
+    }
+
+    .tab-item.tab-wechat.active::after {
+      background: #07c160;
+    }
+
+    .tab-item.tab-xiaohongshu.active::after {
+      background: #ff2442;
+    }
+
+    .tab-item.tab-syslogs.active::after {
+      background: #6366f1;
+    }
+
+    .tab-icon {
+      width: 15px;
+      height: 15px;
+      margin-right: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .tab-title {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      letter-spacing: 0.1px;
+    }
+
+    .tab-close {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 6px;
+      margin-right: -2px;
+      color: #94a3b8;
+      font-size: 11px;
+      opacity: 0.6;
+      transition: all 0.15s ease;
+    }
+
+    .tab-item:hover .tab-close {
+      opacity: 0.85;
+    }
+
+    .tab-close:hover {
+      background: #fee2e2;
+      color: #ef4444;
+      opacity: 1;
+      transform: scale(1.08);
+    }
+
+    /* 右侧快捷工具栏 */
+    .quick-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    .badge-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5.5px;
+      height: 26px;
+      padding: 0 9.5px;
+      border-radius: 7px;
+      font-size: 11.5px;
+      font-weight: 600;
+      border: 1px solid transparent;
+      cursor: pointer;
+      flex-shrink: 0;
+      -webkit-font-smoothing: antialiased;
+      transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .badge-btn:active {
+      transform: scale(0.94);
+    }
+
+    .badge-btn-wechat {
+      background: #edfcf2;
+      color: #059669;
+      border-color: rgba(7, 193, 96, 0.25);
+    }
+    .badge-btn-wechat:hover {
+      background: #daf8e4;
+      border-color: rgba(7, 193, 96, 0.45);
+      color: #047857;
+      box-shadow: 0 1px 3px rgba(7, 193, 96, 0.18);
+    }
+    .badge-btn-wechat.active {
+      background: #d1fae5;
+      border-color: #059669;
+      color: #065f46;
+      box-shadow: 0 0 0 1px #059669, 0 1px 4px rgba(7, 193, 96, 0.25);
+    }
+
+    .badge-btn-xhs {
+      background: #fff1f2;
+      color: #e11d48;
+      border-color: rgba(255, 36, 66, 0.25);
+    }
+    .badge-btn-xhs:hover {
+      background: #ffe4e6;
+      border-color: rgba(255, 36, 66, 0.45);
+      color: #be123c;
+      box-shadow: 0 1px 3px rgba(255, 36, 66, 0.18);
+    }
+    .badge-btn-xhs.active {
+      background: #ffe4e6;
+      border-color: #e11d48;
+      color: #9f1239;
+      box-shadow: 0 0 0 1px #e11d48, 0 1px 4px rgba(255, 36, 66, 0.25);
+    }
+
+    .badge-btn-render {
+      background: #ecfdf5;
+      color: #059669;
+      border-color: rgba(16, 185, 129, 0.25);
+      position: relative;
+    }
+    .badge-btn-render:hover {
+      background: #d1fae5;
+      border-color: rgba(16, 185, 129, 0.5);
+      color: #047857;
+      box-shadow: 0 1px 3px rgba(16, 185, 129, 0.18);
+    }
+    .badge-btn-render.active {
+      background: #ccfbf1;
+      border-color: #0d9488;
+      color: #0f766e;
+      box-shadow: 0 0 0 1px #0d9488, 0 1px 4px rgba(13, 148, 136, 0.25);
+    }
+    .badge-btn-render.rendering {
+      background: #fef3c7;
+      border-color: #f59e0b;
+      color: #b45309;
+      animation: renderGlow 2s infinite;
+    }
+    @keyframes renderGlow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+      50% { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.2); }
+    }
+    .render-pulse-dot {
+      width: 6px;
+      height: 6px;
+      background: #f59e0b;
+      border-radius: 50%;
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      box-shadow: 0 0 4px #f59e0b;
+    }
+
+    .badge-btn-update {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      box-shadow: 0 1px 3px rgba(16, 185, 129, 0.3);
+      animation: updateGlow 2s infinite ease-in-out;
+      font-weight: 700;
+    }
+    .badge-btn-update:hover {
+      background: linear-gradient(135deg, #059669, #047857);
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.7);
+      transform: translateY(-1px);
+    }
+    @keyframes updateGlow {
+      0%, 100% { box-shadow: 0 0 4px rgba(16, 185, 129, 0.4); }
+      50% { box-shadow: 0 0 12px rgba(16, 185, 129, 0.85); }
+    }
+    .update-pulse-dot {
+      width: 7px;
+      height: 7px;
+      background: #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 0 4px #ffffff;
+    }
+
+    .badge-btn-logs {
+      background: #f8f7ff;
+      color: #4f46e5;
+      border-color: rgba(99, 102, 241, 0.25);
+      box-shadow: 0 1px 2px rgba(99, 102, 241, 0.04);
+    }
+    .badge-btn-logs:hover {
+      background: #eef2ff;
+      border-color: rgba(99, 102, 241, 0.5);
+      color: #3730a3;
+      box-shadow: 0 1px 4px rgba(99, 102, 241, 0.18);
+    }
+    .badge-btn-logs.active {
+      background: #ede9fe;
+      border-color: #4f46e5;
+      color: #312e81;
+      box-shadow: 0 0 0 1px #4f46e5, 0 1px 4px rgba(99, 102, 241, 0.25);
+    }
+
+    .badge-btn-lang {
+      background: #ffffff;
+      color: #334155;
+      border-color: rgba(148, 163, 184, 0.45);
+      gap: 5px;
+      padding: 0 9.5px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+    .badge-btn-lang:hover {
+      background: #f1f5f9;
+      color: #0f172a;
+      border-color: rgba(99, 102, 241, 0.4);
+      box-shadow: 0 1px 4px rgba(99, 102, 241, 0.12);
+    }
+    .lang-icon {
+      font-size: 13px;
+      line-height: 1;
+    }
+    .lang-caret {
+      font-size: 9px;
+      color: #94a3b8;
+      margin-left: 1px;
+    }
+
+    .badge-btn-devtools {
+      background: #ffffff;
+      color: #475569;
+      border-color: rgba(0, 0, 0, 0.08);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    }
+    .badge-btn-devtools:hover {
+      background: #f1f5f9;
+      color: #0f172a;
+      border-color: rgba(0, 0, 0, 0.16);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+    }
+
+    .badge-btn-info {
+      background: #ffffff;
+      color: #0284c7;
+      border-color: rgba(2, 132, 199, 0.25);
+      box-shadow: 0 1px 2px rgba(2, 132, 199, 0.04);
+    }
+    .badge-btn-info:hover {
+      background: #f0f9ff;
+      border-color: rgba(2, 132, 199, 0.5);
+      color: #0369a1;
+      box-shadow: 0 1px 4px rgba(2, 132, 199, 0.18);
+    }
+
+    .badge-btn svg {
+      width: 13px;
+      height: 13px;
+      fill: currentColor;
+      flex-shrink: 0;
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       第二行：原生操作步骤流水线与状态提示栏 (对应用户红框标记区域)
+       固定布局机制：
+       1. 步骤条起始位置绝对恒定锚定在左侧徽章右侧，杜绝任何左右位移；
+       2. 右侧信息提示容器固定 440px 宽度，无论文字多少均不影响中间步骤条！
+       ───────────────────────────────────────────────────────────── */
+    .statusbar-row {
+      width: 100%;
+      height: 38px;
+      background: #0f172a; /* 科技深蓝黑背景，高对比度 */
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25);
+      font-size: 12px;
+      letter-spacing: 0.1px;
+      gap: 16px;
+    }
+
+    /* 左侧整体固定组合（徽章 + 步骤条），绝对靠左锚定 */
+    .status-left-group {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    /* 左侧：平台标签徽章固定容器 */
+    .status-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 172px; /* 固定宽度，严格占满 */
+      flex-shrink: 0;
+    }
+
+    .platform-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2.5px 8px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #ffffff;
+      background: #2563eb;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      transition: background 0.3s ease;
+      white-space: nowrap;
+    }
+
+    .platform-pill.wechat {
+      background: linear-gradient(135deg, #059669, #047857);
+    }
+
+    .platform-pill.xiaohongshu {
+      background: linear-gradient(135deg, #e11d48, #be123c);
+    }
+
+    .pipeline-title {
+      color: #94a3b8;
+      font-size: 11.5px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    /* 中间：流水线步骤序列（起始坐标绝对固定，禁止发生任何偏移） */
+    .steps-container {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      flex-shrink: 0;
+    }
+
+    .step-item {
+      display: flex;
+      align-items: center;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .step-node {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: default;
+    }
+
+    .step-badge {
+      width: 19px;
+      height: 19px;
+      border-radius: 50%;
+      background: #334155;
+      color: #94a3b8;
+      font-size: 10.5px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .step-label {
+      font-size: 11.5px;
+      font-weight: 500;
+      color: #64748b;
+      transition: color 0.3s ease;
+    }
+
+    /* 步骤进行中状态：蓝色脉冲发光 */
+    @keyframes pulse-ring {
+      0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7); }
+      70% { box-shadow: 0 0 0 5px rgba(56, 189, 248, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+    }
+
+    .step-item.active .step-badge {
+      background: #0284c7;
+      color: #ffffff;
+      animation: pulse-ring 1.8s infinite;
+    }
+
+    .step-item.active .step-label {
+      color: #38bdf8;
+      font-weight: 700;
+    }
+
+    /* 步骤完成状态：翠绿色对勾 */
+    .step-item.done .step-badge {
+      background: #059669;
+      color: #ffffff;
+    }
+
+    .step-item.done .step-label {
+      color: #10b981;
+      font-weight: 600;
+    }
+
+    /* 步骤异常状态：红色叉号 */
+    .step-item.error .step-badge {
+      background: #dc2626;
+      color: #ffffff;
+    }
+
+    .step-item.error .step-label {
+      color: #f87171;
+      font-weight: 700;
+    }
+
+    /* 步骤间连接线 */
+    .step-line {
+      width: 20px;
+      height: 2px;
+      background: #334155;
+      margin: 0 8px;
+      border-radius: 1px;
+      transition: background 0.3s ease;
+    }
+
+    .step-line.done {
+      background: #059669;
+    }
+
+    /* 系统日志分类筛选组 (顶栏第二行红框区域) */
+    .status-syslogs-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .syslogs-filter-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2.5px 8px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #ffffff;
+      background: linear-gradient(135deg, #4f46e5, #4338ca);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .syslogs-cat-buttons {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: nowrap;
+    }
+
+    .syslog-cat-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5.5px;
+      height: 25px;
+      padding: 0 9px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #94a3b8;
+      background: rgba(30, 41, 59, 0.85);
+      border: 1px solid rgba(71, 85, 105, 0.45);
+      cursor: pointer;
+      transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    .syslog-cat-btn:hover {
+      background: rgba(51, 65, 85, 0.95);
+      color: #f1f5f9;
+      border-color: rgba(148, 163, 184, 0.45);
+    }
+
+    .syslog-cat-btn:active {
+      transform: scale(0.95);
+    }
+
+    .cat-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .dot-all { background: #94a3b8; }
+    .dot-wechat { background: #10b981; }
+    .dot-xhs { background: #f43f5e; }
+    .dot-sys { background: #60a5fa; }
+
+    .cat-num {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 0.5px 5px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.35);
+      color: #cbd5e1;
+    }
+
+    .syslog-cat-btn.active {
+      color: #ffffff;
+      background: #334155;
+      border-color: rgba(255, 255, 255, 0.3);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .syslog-cat-btn[data-cat="wechat"].active {
+      background: linear-gradient(135deg, rgba(5, 150, 105, 0.5), rgba(4, 120, 87, 0.7));
+      border-color: #059669;
+      color: #34d399;
+    }
+    .syslog-cat-btn[data-cat="wechat"].active .dot-wechat {
+      box-shadow: 0 0 6px #10b981;
+    }
+
+    .syslog-cat-btn[data-cat="xiaohongshu"].active {
+      background: linear-gradient(135deg, rgba(225, 29, 72, 0.5), rgba(190, 18, 60, 0.7));
+      border-color: #e11d48;
+      color: #fb7185;
+    }
+    .syslog-cat-btn[data-cat="xiaohongshu"].active .dot-xhs {
+      box-shadow: 0 0 6px #f43f5e;
+    }
+
+    .syslog-cat-btn[data-cat="system"].active {
+      background: linear-gradient(135deg, rgba(37, 99, 235, 0.5), rgba(30, 64, 175, 0.7));
+      border-color: #2563eb;
+      color: #60a5fa;
+    }
+    .syslog-cat-btn[data-cat="system"].active .dot-sys {
+      box-shadow: 0 0 6px #60a5fa;
+    }
+
+    /* 右侧：实时状态信息胶囊容器（固定宽度 440px 绝对不晃动） */
+    .status-right {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      margin-left: auto; /* 靠右贴齐 */
+      width: 440px;      /* 占位恒定 440px */
+      min-width: 440px;
+      max-width: 440px;
+      flex-shrink: 0;    /* 严禁被压缩 */
+    }
+
+    .status-capsule {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      width: 100%;       /* 占满 440px 固定宽度 */
+      padding: 3.5px 12px;
+      border-radius: 20px;
+      background: rgba(30, 41, 59, 0.85);
+      border: 1px solid rgba(71, 85, 105, 0.5);
+      color: #e2e8f0;
+      font-size: 11.5px;
+      font-weight: 500;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+      transition: background 0.25s ease, border-color 0.25s ease;
+      overflow: hidden;
+    }
+
+    .status-capsule.success {
+      background: rgba(6, 95, 70, 0.35);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #34d399;
+    }
+
+    .status-capsule.warning {
+      background: rgba(146, 64, 14, 0.35);
+      border-color: rgba(245, 158, 11, 0.4);
+      color: #fbbf24;
+    }
+
+    .status-capsule.error {
+      background: rgba(153, 27, 27, 0.35);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #f87171;
+    }
+
+    .status-icon {
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    .status-text {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #10b981;
+      display: inline-block;
+      box-shadow: 0 0 6px #10b981;
+      animation: pulse-ring 1.5s infinite;
+      flex-shrink: 0;
+    }
+
+    .status-capsule.publishing {
+      background: rgba(30, 58, 138, 0.7);
+      border-color: rgba(56, 189, 248, 0.65);
+      color: #38bdf8;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
+    }
+
+    /* 顶层全屏宽悬浮发布提示横幅 (自动发布启动时醒目展开) */
+    .publish-banner {
+      position: absolute;
+      top: 38px;
+      left: 0;
+      right: 0;
+      height: 38px;
+      background: linear-gradient(90deg, #1e1b4b 0%, #0f172a 45%, #064e3b 100%);
+      border-top: 1px solid rgba(56, 189, 248, 0.5);
+      border-bottom: 1px solid rgba(16, 185, 129, 0.5);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      z-index: 99;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+      transform: translateY(0);
+      opacity: 1;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .publish-banner.hidden {
+      transform: translateY(-100%);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .banner-inner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .banner-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2.5px 8px;
+      background: #0284c7;
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 4px;
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+      white-space: nowrap;
+      animation: pulse-ring 1.8s infinite;
+    }
+
+    .banner-text {
+      font-size: 12px;
+      font-weight: 600;
+      color: #e0f2fe;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      letter-spacing: 0.2px;
+    }
+
+    .banner-close {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      cursor: pointer;
+      flex-shrink: 0;
+      margin-left: 12px;
+      transition: all 0.15s ease;
+    }
+
+    .banner-close:hover {
+      background: rgba(239, 68, 68, 0.3);
+      color: #ffffff;
+      border-color: rgba(239, 68, 68, 0.6);
+    }
+
+    /* 主站专属：多语言操作说明指引栏 */
+    .status-main-guide {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      height: 100%;
+      gap: 12px;
+      overflow: hidden;
+    }
+
+    .guide-badge-box {
+      flex-shrink: 0;
+    }
+
+    .guide-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2.5px 8px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #ffffff;
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      box-shadow: 0 1px 3px rgba(79, 70, 229, 0.3);
+      white-space: nowrap;
+    }
+
+    .guide-content-box {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow: hidden;
+    }
+
+    .guide-icon {
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    .guide-text {
+      color: #e2e8f0;
+      font-size: 11.5px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      letter-spacing: 0.1px;
+    }
+  </style>
+</head>
+<body>
+  <div class="drag-region"></div>
+
+  <!-- 第一行：顶层导航控制与标签页 -->
+  <div class="tabbar-row">
+    <!-- 导航按钮 -->
+    <div class="nav-controls">
+      <button class="nav-btn" id="btn-back" title="后退">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <button class="nav-btn" id="btn-forward" title="前进">
+        <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
+      <button class="nav-btn" id="btn-reload" title="刷新页面">
+        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+      </button>
+    </div>
+
+    <!-- 标签列表 -->
+    <div class="tabs-wrapper" id="tabs-container"></div>
+
+    <!-- 快捷平台按钮与 F12 调试按钮 -->
+    <div class="quick-actions">
+      <!-- 客户端新版本自动更新就绪提示 (方案一：静默下载完成后点亮) -->
+      <button class="badge-btn badge-btn-update" id="btn-app-update" style="display: none;" title="新版本已准备就绪，点击立即重启完成升级">
+        <span class="update-pulse-dot"></span>
+        <span id="btn-app-update-text">🚀 发现新版本</span>
+      </button>
+
+      <!-- 多语言切换选择器 (覆盖全量 9 种语言) -->
+      <button class="badge-btn badge-btn-lang" id="btn-language-selector" title="切换应用与主站语言 / Switch Language">
+        <span class="lang-icon">🌐</span>
+        <span id="btn-current-lang-text">中文</span>
+        <span class="lang-caret">▾</span>
+      </button>
+      <!-- 视频渲染控制台快捷入口 (执行 pnpm run render) -->
+      <button class="badge-btn badge-btn-render" id="btn-video-render" title="视频渲染控制台 (执行 pnpm run render)">
+        <svg viewBox="0 0 24 24"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4zM8 17H6v-2h2v2zm0-4H6v-2h2v2zm0-4H6V7h2v2zm10 8h-8v-2h8v2zm0-4h-8v-2h8v2zm0-4h-8V7h8v2z"/></svg>
+        <span id="btn-video-render-text">视频渲染</span>
+        <span class="render-pulse-dot" id="render-pulse-dot" style="display: none;"></span>
+      </button>
+      <button class="badge-btn badge-btn-logs" id="btn-system-logs" title="查看系统运行实时日志 (开发/生产安装包均可监控)">
+        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+        <span id="btn-system-logs-text">系统日志</span>
+      </button>
+      <button class="badge-btn badge-btn-wechat" id="btn-open-wechat" title="在当前窗口打开微信视频号">
+        <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+        <span id="btn-open-wechat-text">视频号</span>
+      </button>
+      <button class="badge-btn badge-btn-xhs" id="btn-open-xhs" title="在当前窗口打开小红书创作者平台">
+        <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        <span id="btn-open-xhs-text">小红书</span>
+      </button>
+      <button class="badge-btn badge-btn-devtools" id="btn-devtools" title="打开/关闭调试窗口 (快捷键: F12)">
+        <svg viewBox="0 0 24 24"><path d="M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z"/></svg>
+        F12
+      </button>
+      <!-- 系统说明与关于图标按钮 (对应右上角红框位置) -->
+      <button class="badge-btn badge-btn-info" id="btn-system-info" title="系统说明与关于 (About & System Info)">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+        <span id="btn-system-info-text">系统说明</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 第二行：原生操作步骤流水线与状态提示栏 (对应用户红框标记区域) -->
+  <div class="statusbar-row" id="statusbar-row">
+    <!-- 1. 微信/小红书平台专属：流水线步骤组 -->
+    <div class="status-left-group" id="status-pipeline-group">
+      <div class="status-left">
+        <span class="platform-pill wechat" id="pipeline-pill">微信视频号</span>
+        <span class="pipeline-title">自动化流水线</span>
+      </div>
+
+      <!-- 步骤流水线：紧随其后，坐标起始位置绝对恒定 -->
+      <div class="steps-container" id="steps-container">
+        <!-- 动态填充步骤 -->
+      </div>
+    </div>
+
+    <!-- 2. 系统日志专属：分类筛选微徽章与胶囊按钮组 (对应用户红框标记区域) -->
+    <div class="status-syslogs-group" id="status-syslogs-group" style="display: none;">
+      <div class="syslogs-filter-pill">
+        <span>📊</span>
+        <span id="syslog-filter-title">日志分类</span>
+      </div>
+      <div class="syslogs-cat-buttons">
+        <button class="syslog-cat-btn active" data-cat="all" id="tb-cat-all">
+          <span class="cat-dot dot-all"></span>
+          <span id="tb-cat-all-text">全部</span>
+          <span class="cat-num" id="tb-cat-all-num">0</span>
+        </button>
+        <button class="syslog-cat-btn" data-cat="wechat" id="tb-cat-wechat">
+          <span class="cat-dot dot-wechat"></span>
+          <span id="tb-cat-wechat-text">视频号</span>
+          <span class="cat-num" id="tb-cat-wechat-num">0</span>
+        </button>
+        <button class="syslog-cat-btn" data-cat="xiaohongshu" id="tb-cat-xhs">
+          <span class="cat-dot dot-xhs"></span>
+          <span id="tb-cat-xhs-text">小红书</span>
+          <span class="cat-num" id="tb-cat-xhs-num">0</span>
+        </button>
+        <button class="syslog-cat-btn" data-cat="system" id="tb-cat-sys">
+          <span class="cat-dot dot-sys"></span>
+          <span id="tb-cat-sys-text">系统日志</span>
+          <span class="cat-num" id="tb-cat-sys-num">0</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 3. 主站专属：多语言操作说明指引栏 (仅在 activeTabId === 'main' 时展示) -->
+    <div class="status-main-guide" id="status-main-guide" style="display: none;">
+      <div class="guide-badge-box">
+        <span class="guide-pill" id="guide-badge-pill">自动化发布说明</span>
+      </div>
+      <div class="guide-content-box">
+        <span class="guide-icon">💡</span>
+        <span class="guide-text" id="guide-tip-text">若要实现微信视频号与小红书的自动发布视频功能，请先在客户端打开对应页面并扫码完成登录。然后在单个视频的“社交媒体”版权进行发布，或是在专职的设置页面进行批量管理。</span>
+      </div>
+    </div>
+
+    <!-- 4. 右侧区域：实时信息状态胶囊，固定占位 440px 绝对不晃动 -->
+    <div class="status-right" id="status-capsule-group">
+      <div class="status-capsule" id="status-capsule">
+        <span class="live-dot" id="status-live-dot"></span>
+        <span class="status-icon" id="status-icon">⚡</span>
+        <span class="status-text" id="status-text" title="系统就绪，等待触发自动化任务">系统就绪，等待触发自动化任务</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 顶层全屏宽悬浮发布提示横幅 (单视频发布启动时醒目提示预计花费1-3分钟) -->
+  <div class="publish-banner hidden" id="publish-banner">
+    <div class="banner-inner">
+      <span class="banner-badge" id="publish-banner-badge">🚀 自动发布中</span>
+      <span class="banner-text" id="publish-banner-text">视频已进入自动发布流程，预计花费 1-3 分钟，正在自动为您填表与发布，请勿关闭窗口...</span>
+    </div>
+    <div class="banner-close" id="publish-banner-close" title="收起提示">✕</div>
+  </div>
+
+  <script>
+    // 立即从 URL 参数或缓存恢复语言，避免初始化闪烁
+    let currentLanguage = 'zh';
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      currentLanguage = urlParams.get('lang') || localStorage.getItem('shortvideo_lang') || 'zh';
+    } catch (_) {}
+
+    const I18N_CONFIG = {
+      "zh": {
+            "langName": "中文",
+            "systemInfo": "系统说明",
+            "badge": "自动化发布说明",
+            "tip": "若要实现微信视频号与小红书的自动发布视频功能，请先在客户端打开对应页面并扫码完成登录。然后在单个视频的“社交媒体”版权进行发布，或是在专职的设置页面进行批量管理。",
+            "logs": "系统日志",
+            "render": "视频渲染",
+            "renderTab": "视频渲染控制台",
+            "wechat": "视频号",
+            "xhs": "小红书",
+            "wechatFullName": "微信视频号",
+            "xhsFullName": "小红书",
+            "pipeline": "自动化流水线",
+            "syslogsTab": "系统日志",
+            "mainTab": "ShortVideo 主站",
+            "ready": "系统就绪，等待触发自动化任务",
+            "syslogReady": "系统运行日志监控面板已连接并实时更新",
+            "publishBadge": "🚀 自动发布中",
+            "publishBannerTip": "🚀 视频已进入【{platform}】自动发布流程，预计花费 1-3 分钟，正在自动为您填表与发布，请勿关闭窗口...",
+            "logFilter": "日志分类",
+            "catAll": "全部",
+            "catWechat": "视频号",
+            "catXhs": "小红书",
+            "catSys": "系统日志",
+            "btnBack": "后退",
+            "btnForward": "前进",
+            "btnReload": "刷新页面",
+            "btnDevtools": "打开/关闭调试窗口 (快捷键: F12)",
+            "btnLangTitle": "切换应用与主站语言 / Switch Language",
+            "btnRenderTitle": "视频渲染控制台 (执行 pnpm run render)",
+            "btnLogsTitle": "查看系统运行实时日志 (开发/生产安装包均可监控)",
+            "btnWechatTitle": "在当前窗口打开微信视频号",
+            "btnXhsTitle": "在当前窗口打开小红书创作者平台",
+            "closeTab": "关闭标签",
+            "bannerClose": "收起提示",
+            "updateBtn": "🚀 升级至 v{version}",
+            "updateDownloading": "⚡ 正在下载更新 {percent}%",
+            "updateReadyTip": "🚀 客户端新版本 (v{version}) 已在后台静默下载完毕，点击顶栏升级按钮即可完成更新！",
+            "updateConfirm": "新版本 (v{version}) 已下载完毕，是否立即重启客户端完成升级？",
+            "updateBusyWarning": "⚠️ 警告：当前自动化发布任务正在进行中，重启将中断任务！建议等待发布完毕后再升级。\n\n是否仍要立即重启？",
+            "wechatSteps": [
+                  "页面就绪",
+                  "视频上传",
+                  "短标题录入",
+                  "简介与话题",
+                  "高级设置",
+                  "转码与发布"
+            ],
+            "xhsSteps": [
+                  "页面就绪",
+                  "视频上传",
+                  "笔记标题",
+                  "正文与话题",
+                  "高级设置",
+                  "校验与发布"
+            ]
+      },
+      "en": {
+            "langName": "English",
+            "systemInfo": "About",
+            "badge": "Auto-Publish Guide",
+            "tip": "To enable automated video publishing for WeChat Channels and Xiaohongshu, please open their pages and scan the QR code to log in first. Then publish from the \"Social Media\" section of an individual video, or manage in bulk on the dedicated settings page.",
+            "logs": "Logs",
+            "render": "Render",
+            "renderTab": "Video Rendering",
+            "wechat": "Channels",
+            "xhs": "Xiaohongshu",
+            "wechatFullName": "WeChat Channels",
+            "xhsFullName": "Xiaohongshu",
+            "pipeline": "Pipeline",
+            "syslogsTab": "System Logs",
+            "mainTab": "ShortVideo Main",
+            "ready": "System ready, waiting for tasks",
+            "syslogReady": "System real-time log monitoring connected and active",
+            "publishBadge": "🚀 Auto-Publishing",
+            "publishBannerTip": "🚀 Video entered auto-publishing for 【{platform}】, estimated 1-3 minutes. Filling and publishing in progress, please do not close the window...",
+            "logFilter": "Log Filter",
+            "catAll": "All",
+            "catWechat": "Channels",
+            "catXhs": "Xiaohongshu",
+            "catSys": "System Logs",
+            "btnBack": "Back",
+            "btnForward": "Forward",
+            "btnReload": "Reload Page",
+            "btnDevtools": "Toggle Developer Tools (F12)",
+            "btnLangTitle": "Switch Application Language",
+            "btnRenderTitle": "Video Rendering Console (Run pnpm run render)",
+            "btnLogsTitle": "View Real-Time System Logs",
+            "btnWechatTitle": "Open WeChat Channels",
+            "btnXhsTitle": "Open Xiaohongshu Creator Platform",
+            "closeTab": "Close Tab",
+            "bannerClose": "Dismiss",
+            "updateBtn": "🚀 Upgrade to v{version}",
+            "updateDownloading": "⚡ Downloading update {percent}%",
+            "updateReadyTip": "🚀 New version (v{version}) downloaded in background. Click to restart and update!",
+            "updateConfirm": "New version (v{version}) is ready. Do you want to restart now to apply the update?",
+            "updateBusyWarning": "⚠️ Warning: Publishing task is running, restarting will interrupt the task! It is recommended to wait until publishing completes.\n\nRestart now anyway?",
+            "wechatSteps": [
+                  "Page Ready",
+                  "Video Upload",
+                  "Short Title",
+                  "Description & Tags",
+                  "Advanced Settings",
+                  "Transcode & Publish"
+            ],
+            "xhsSteps": [
+                  "Page Ready",
+                  "Video Upload",
+                  "Post Title",
+                  "Content & Tags",
+                  "Advanced Settings",
+                  "Verify & Publish"
+            ]
+      },
+      "ja": {
+            "langName": "日本語",
+            "systemInfo": "システム説明",
+            "badge": "自動投稿ガイド",
+            "tip": "WeChatチャンネルと小紅書(RED)の自動動画投稿機能を利用するには、まず各ページを開いてQRコードでログインしてください。その後、各動画の「ソーシャルメディア」セクションから投稿するか、専用の設定ページで一括管理できます。",
+            "logs": "ログ",
+            "render": "レンダリング",
+            "renderTab": "動画レンダリング",
+            "wechat": "WeChat",
+            "xhs": "小紅書",
+            "wechatFullName": "WeChat チャンネル",
+            "xhsFullName": "小紅書 (RED)",
+            "pipeline": "自動化パイプライン",
+            "syslogsTab": "システムログ",
+            "mainTab": "ShortVideo トップ",
+            "ready": "システム準備完了、タスク待机中",
+            "syslogReady": "システム稼働ログモニターに接続しました",
+            "publishBadge": "🚀 自動投稿中",
+            "publishBannerTip": "🚀 動画が【{platform}】の自動投稿プロセスに入りました。所要時間は約1〜3分です。ウィンドウを閉じないでください...",
+            "logFilter": "ログ分類",
+            "catAll": "すべて",
+            "catWechat": "WeChat",
+            "catXhs": "小紅書",
+            "catSys": "システム",
+            "btnBack": "戻る",
+            "btnForward": "進む",
+            "btnReload": "ページ再読み込み",
+            "btnDevtools": "開発者ツール切替 (F12)",
+            "btnLangTitle": "言語を切り替える / Switch Language",
+            "btnRenderTitle": "動画レンダリングコンソール",
+            "btnLogsTitle": "システムリアルタイムログを表示",
+            "btnWechatTitle": "WeChatチャンネルを開く",
+            "btnXhsTitle": "小紅書クリエイターを開く",
+            "closeTab": "タブを閉じる",
+            "bannerClose": "閉じる",
+            "updateBtn": "🚀 v{version} にアップグレード",
+            "updateDownloading": "⚡ 更新をダウンロード中 {percent}%",
+            "updateReadyTip": "🚀 新バージョン (v{version}) のダウンロードが完了しました。再起動して適用してください！",
+            "updateConfirm": "新バージョン (v{version}) が準備できました。今すぐ再起動してアップグレードしますか？",
+            "updateBusyWarning": "⚠️ 警告: 自動投稿タスクが実行中です。再起動するとタスクが中断されます！完了するまで待つことを推奨します。\n\n今すぐ再起動しますか？",
+            "wechatSteps": [
+                  "ページ準備完了",
+                  "動画アップロード",
+                  "タイトル入力",
+                  "説明とタグ",
+                  "詳細設定",
+                  "変換と投稿"
+            ],
+            "xhsSteps": [
+                  "ページ準備完了",
+                  "動画アップロード",
+                  "ノートタイトル",
+                  "本文とハッシュタグ",
+                  "詳細設定",
+                  "検証と投稿"
+            ]
+      },
+      "ko": {
+            "langName": "한국어",
+            "systemInfo": "시스템 설명",
+            "badge": "자동 발행 가이드",
+            "tip": "위챗 채널(WeChat Channels) 및 샤오홍슈(Xiaohongshu) 동영상 자동 발행을 위해 먼저 각 페이지를 열고 QR 코드로 로그인해 주세요. 그런 다음 개별 동영상의 \"소셜 미디어\" 섹션에서 발행하거나 전용 설정 페이지에서 일괄 관리할 수 있습니다.",
+            "logs": "로그",
+            "render": "렌더링",
+            "renderTab": "동영상 렌더링 콘솔",
+            "wechat": "위챗 채널",
+            "xhs": "샤오홍슈",
+            "wechatFullName": "위챗 채널",
+            "xhsFullName": "샤오홍슈",
+            "pipeline": "자동화 파이프라인",
+            "syslogsTab": "시스템 로그",
+            "mainTab": "ShortVideo 홈",
+            "ready": "시스템 준비 완료, 대기 중",
+            "syslogReady": "시스템 실시간 로그 모니터에 연결되었습니다",
+            "publishBadge": "🚀 자동 발행 중",
+            "publishBannerTip": "🚀 동영상이 【{platform}】 자동 발행 프로세스에 진입했습니다. 약 1-3분 소요 예정이며, 창을 닫지 마세요...",
+            "logFilter": "로그 분류",
+            "catAll": "전체",
+            "catWechat": "위챗 채널",
+            "catXhs": "샤오홍슈",
+            "catSys": "시스템",
+            "btnBack": "뒤로",
+            "btnForward": "앞으로",
+            "btnReload": "페이지 새로고침",
+            "btnDevtools": "개발자 도구 (F12)",
+            "btnLangTitle": "언어 전환 / Switch Language",
+            "btnRenderTitle": "동영상 렌더링 콘솔",
+            "btnLogsTitle": "시스템 실시간 로그 보기",
+            "btnWechatTitle": "위챗 채널 열기",
+            "btnXhsTitle": "샤오홍슈 열기",
+            "closeTab": "탭 닫기",
+            "bannerClose": "닫기",
+            "updateBtn": "🚀 v{version} 버전으로 업그레이드",
+            "updateDownloading": "⚡ 업데이트 다운로드 중 {percent}%",
+            "updateReadyTip": "🚀 새 버전 (v{version}) 다운로드가 완료되었습니다. 지금 재시작하여 적용하세요!",
+            "updateConfirm": "새 버전 (v{version}) 준비가 완료되었습니다. 지금 재시작하시겠습니까?",
+            "updateBusyWarning": "⚠️ 경고: 자동 발행 작업이 진행 중입니다. 재시작하면 작업이 중단됩니다! 완료 후 업그레이드를 권장합니다.\n\n그래도 지금 재시작하시겠습니까?",
+            "wechatSteps": [
+                  "페이지 준비",
+                  "동영상 업로드",
+                  "제목 입력",
+                  "설명 및 태그",
+                  "고급 설정",
+                  "변환 및 게시"
+            ],
+            "xhsSteps": [
+                  "페이지 준비",
+                  "동영상 업로드",
+                  "노트 제목",
+                  "본문 및 태그",
+                  "고급 설정",
+                  "검증 및 게시"
+            ]
+      },
+      "vi": {
+            "langName": "Tiếng Việt",
+            "systemInfo": "Thông tin",
+            "badge": "Hướng dẫn tự động",
+            "tip": "Để bật tính năng tự động đăng video lên WeChat Channels và Xiaohongshu, vui lòng mở trang tương ứng và quét mã QR đăng nhập trước. Sau đó đăng từ mục \"Mạng xã hội\" của từng video, hoặc quản lý hàng loạt trên trang cài đặt chuyên dụng.",
+            "logs": "Nhật ký",
+            "render": "Xuất video",
+            "renderTab": "Bảng xuất video",
+            "wechat": "WeChat",
+            "xhs": "Xiaohongshu",
+            "wechatFullName": "WeChat Channels",
+            "xhsFullName": "Xiaohongshu",
+            "pipeline": "Quy trình tự động",
+            "syslogsTab": "Nhật ký hệ thống",
+            "mainTab": "ShortVideo Trang chủ",
+            "ready": "Hệ thống sẵn sàng, chờ tác vụ",
+            "syslogReady": "Bảng nhật ký hệ thống đã kết nối theo thời gian thực",
+            "publishBadge": "🚀 Đang tự động đăng",
+            "publishBannerTip": "🚀 Video đã vào quy trình tự động đăng cho 【{platform}】, dự kiến mất 1-3 phút. Vui lòng không đóng cửa sổ...",
+            "logFilter": "Phân loại",
+            "catAll": "Tất cả",
+            "catWechat": "WeChat",
+            "catXhs": "Xiaohongshu",
+            "catSys": "Hệ thống",
+            "btnBack": "Quay lại",
+            "btnForward": "Tiến lên",
+            "btnReload": "Tải lại trang",
+            "btnDevtools": "Công cụ cho nhà phát triển (F12)",
+            "btnLangTitle": "Đổi ngôn ngữ ứng dụng",
+            "btnRenderTitle": "Bảng xuất video Remotion",
+            "btnLogsTitle": "Xem nhật ký hệ thống theo thời gian thực",
+            "btnWechatTitle": "Mở WeChat Channels",
+            "btnXhsTitle": "Mở nền tảng Xiaohongshu",
+            "closeTab": "Đóng thẻ",
+            "bannerClose": "Đóng",
+            "updateBtn": "🚀 Nâng cấp lên v{version}",
+            "updateDownloading": "⚡ Đang tải bản cập nhật {percent}%",
+            "updateReadyTip": "🚀 Đã tải xong bản mới (v{version}). Khởi động lại để cập nhật ngay!",
+            "updateConfirm": "Phiên bản mới (v{version}) đã sẵn sàng. Bạn có muốn khởi động lại ngay không?",
+            "updateBusyWarning": "⚠️ Cảnh báo: Tác vụ tự động đăng đang chạy, khởi động lại sẽ làm gián đoạn tác vụ!\n\nBạn có chắc chắn muốn khởi động lại ngay bây giờ không?",
+            "wechatSteps": [
+                  "Trang sẵn sàng",
+                  "Tải video lên",
+                  "Tiêu đề ngắn",
+                  "Mô tả & Thẻ",
+                  "Cài đặt nâng cao",
+                  "Chuyển mã & Đăng"
+            ],
+            "xhsSteps": [
+                  "Trang sẵn sàng",
+                  "Tải video lên",
+                  "Tiêu đề bài viết",
+                  "Nội dung & Thẻ",
+                  "Cài đặt nâng cao",
+                  "Xác thực & Đăng"
+            ]
+      },
+      "th": {
+            "langName": "ไทย",
+            "systemInfo": "ข้อมูลระบบ",
+            "badge": "คำแนะนำการเผยแพร่",
+            "tip": "เพื่อเปิดใช้การเผยแพร่วิดีโออัตโนมัติสำหรับ WeChat Channels และ Xiaohongshu โปรดเปิดหน้าและสแกนคิวอาร์โค้ดเพื่อเข้าสู่ระบบก่อน จากนั้นเผยแพร่จากส่วน \"โซเชียลมีเดีย\" ของแต่ละวิดีโอ หรือจัดการเป็นชุดในหน้าการตั้งค่าเฉพาะ",
+            "logs": "บันทึก",
+            "render": "เรนเดอร์",
+            "renderTab": "คอนโซลเรนเดอร์",
+            "wechat": "WeChat",
+            "xhs": "Xiaohongshu",
+            "wechatFullName": "WeChat Channels",
+            "xhsFullName": "เสี่ยวหงซู",
+            "pipeline": "กระบวนการอัตโนมัติ",
+            "syslogsTab": "บันทึกระบบ",
+            "mainTab": "ShortVideo หน้าหลัก",
+            "ready": "ระบบพร้อม รอรับงาน",
+            "syslogReady": "เชื่อมต่อแผงบันทึกระบบแบบเรียลไทม์แล้ว",
+            "publishBadge": "🚀 กำลังเผยแพร่อัตโนมัติ",
+            "publishBannerTip": "🚀 วิดีโอเข้าสู่กระบวนการเผยแพร่อัตโนมัติสำหรับ 【{platform}】 แล้ว ใช้เวลาประมาณ 1-3 นาที โปรดอย่าปิดหน้าต่าง...",
+            "logFilter": "หมวดหมู่บันทึก",
+            "catAll": "ทั้งหมด",
+            "catWechat": "WeChat",
+            "catXhs": "Xiaohongshu",
+            "catSys": "ระบบ",
+            "btnBack": "ย้อนกลับ",
+            "btnForward": "ไปข้างหน้า",
+            "btnReload": "โหลดหน้านี้ใหม่",
+            "btnDevtools": "สลับเครื่องมือนักพัฒนา (F12)",
+            "btnLangTitle": "เปลี่ยนภาษา / Switch Language",
+            "btnRenderTitle": "คอนโซลเรนเดอร์วิดีโอ",
+            "btnLogsTitle": "ดูบันทึกระบบแบบเรียลไทม์",
+            "btnWechatTitle": "เปิด WeChat Channels",
+            "btnXhsTitle": "เปิดเสี่ยวหงซู",
+            "closeTab": "ปิดแท็บ",
+            "bannerClose": "ปิด",
+            "updateBtn": "🚀 อัปเกรดเป็น v{version}",
+            "updateDownloading": "⚡ กำลังดาวน์โหลดอัปเดต {percent}%",
+            "updateReadyTip": "🚀 ดาวน์โหลดเวอร์ชันใหม่ (v{version}) เรียบร้อยแล้ว รีสตาร์ตเพื่ออัปเกรดทันที!",
+            "updateConfirm": "เวอร์ชันใหม่ (v{version}) พร้อมแล้ว คุณต้องการรีสตาร์ตเพื่ออัปเดตทันทีหรือไม่?",
+            "updateBusyWarning": "⚠️ คำเตือน: งานเผยแพร่อัตโนมัติกำลังทำงานอยู่ การเริ่มใหม่จะขัดจังหวะการทำงาน!\n\nคุณยังต้องการรีสตาร์ตทันทีหรือไม่?",
+            "wechatSteps": [
+                  "หน้าพร้อมใช้งาน",
+                  "อัปโหลดวิดีโอ",
+                  "ระบุชื่อเรื่อง",
+                  "คำอธิบายและแท็ก",
+                  "การตั้งค่าขั้นสูง",
+                  "แปลงรหัสและเผยแพร่"
+            ],
+            "xhsSteps": [
+                  "หน้าพร้อมใช้งาน",
+                  "อัปโหลดวิดีโอ",
+                  "ชื่อโน้ต",
+                  "เนื้อหาและแท็ก",
+                  "การตั้งค่าขั้นสูง",
+                  "ตรวจสอบและเผยแพร่"
+            ]
+      },
+      "id": {
+            "langName": "Indonesia",
+            "systemInfo": "Info Sistem",
+            "badge": "Panduan Publikasi",
+            "tip": "Untuk mengaktifkan publikasi video otomatis ke WeChat Channels dan Xiaohongshu, silakan buka halaman dan pindai kode QR untuk login terlebih dahulu. Kemudian publikasikan dari bagian \"Media Sosial\" pada masing-masing video, atau kelola secara massal di halaman pengaturan khusus.",
+            "logs": "Log",
+            "render": "Render",
+            "renderTab": "Konsol Render",
+            "wechat": "WeChat",
+            "xhs": "Xiaohongshu",
+            "wechatFullName": "WeChat Channels",
+            "xhsFullName": "Xiaohongshu",
+            "pipeline": "Pipeline Otomatis",
+            "syslogsTab": "Log Sistem",
+            "mainTab": "ShortVideo Beranda",
+            "ready": "Sistem siap, menunggu tugas",
+            "syslogReady": "Panel log real-time sistem telah terhubung",
+            "publishBadge": "🚀 Mempublikasikan Otomatis",
+            "publishBannerTip": "🚀 Video telah memasuki proses publikasi otomatis untuk 【{platform}】, perkiraan 1-3 menit. Mohon jangan tutup jendela...",
+            "logFilter": "Kategori Log",
+            "catAll": "Semua",
+            "catWechat": "WeChat",
+            "catXhs": "Xiaohongshu",
+            "catSys": "Sistem",
+            "btnBack": "Kembali",
+            "btnForward": "Maju",
+            "btnReload": "Muat Ulang Halaman",
+            "btnDevtools": "Alat Pengembang (F12)",
+            "btnLangTitle": "Ganti Bahasa Aplikasi",
+            "btnRenderTitle": "Konsol Render Video",
+            "btnLogsTitle": "Lihat Log Real-Time Sistem",
+            "btnWechatTitle": "Buka WeChat Channels",
+            "btnXhsTitle": "Buka Platform Xiaohongshu",
+            "closeTab": "Tutup Tab",
+            "bannerClose": "Tutup",
+            "updateBtn": "🚀 Tingkatkan ke v{version}",
+            "updateDownloading": "⚡ Mengunduh pembaruan {percent}%",
+            "updateReadyTip": "🚀 Versi baru (v{version}) telah diunduh di latar belakang. Mulai ulang untuk menerapkan!",
+            "updateConfirm": "Versi baru (v{version}) telah siap. Apakah Anda ingin memulai ulang sekarang untuk memperbarui?",
+            "updateBusyWarning": "⚠️ Peringatan: Tugas penerbitan otomatis sedang berjalan, memulai ulang akan menghentikan tugas!\n\nApakah Anda tetap ingin memulai ulang sekarang?",
+            "wechatSteps": [
+                  "Halaman Siap",
+                  "Unggah Video",
+                  "Judul Singkat",
+                  "Deskripsi & Tag",
+                  "Pengaturan Lanjutan",
+                  "Transkode & Publikasikan"
+            ],
+            "xhsSteps": [
+                  "Halaman Siap",
+                  "Unggah Video",
+                  "Judul Catatan",
+                  "Konten & Tag",
+                  "Pengaturan Lanjutan",
+                  "Verifikasi & Publikasikan"
+            ]
+      },
+      "es": {
+            "langName": "Español",
+            "systemInfo": "Acerca de",
+            "badge": "Guía de auto-publicación",
+            "tip": "Para habilitar la publicación automática en WeChat Channels y Xiaohongshu, abra las páginas e inicie sesión con código QR primero. Luego publique desde la sección de redes sociales.",
+            "logs": "Registros",
+            "render": "Renderizar",
+            "renderTab": "Consola de video",
+            "wechat": "Channels",
+            "xhs": "Xiaohongshu",
+            "wechatFullName": "WeChat Channels",
+            "xhsFullName": "Xiaohongshu",
+            "pipeline": "Flujo automático",
+            "syslogsTab": "Registros",
+            "mainTab": "ShortVideo Principal",
+            "ready": "Sistema listo, esperando tareas",
+            "syslogReady": "Panel de registros conectado en tiempo real",
+            "publishBadge": "🚀 Publicando",
+            "publishBannerTip": "🚀 Publicación automática iniciada para 【{platform}】, estimado 1-3 minutos...",
+            "logFilter": "Categoría",
+            "catAll": "Todos",
+            "catWechat": "Channels",
+            "catXhs": "Xiaohongshu",
+            "catSys": "Sistema",
+            "btnBack": "Atrás",
+            "btnForward": "Adelante",
+            "btnReload": "Recargar",
+            "btnDevtools": "Herramientas Dev (F12)",
+            "btnLangTitle": "Cambiar idioma",
+            "btnRenderTitle": "Consola de renderizado",
+            "btnLogsTitle": "Ver registros en tiempo real",
+            "btnWechatTitle": "Abrir WeChat Channels",
+            "btnXhsTitle": "Abrir Xiaohongshu",
+            "closeTab": "Cerrar pestaña",
+            "bannerClose": "Cerrar",
+            "updateBtn": "🚀 Actualizar a v{version}",
+            "updateDownloading": "⚡ Descargando {percent}%",
+            "updateReadyTip": "🚀 Nueva versión descargada. ¡Reinicie para actualizar!",
+            "updateConfirm": "¿Desea reiniciar ahora para aplicar la actualización?",
+            "updateBusyWarning": "⚠️ Advertencia: ¡Hay tareas activas! ¿Reiniciar de todos modos?",
+            "wechatSteps": [
+                  "Página lista",
+                  "Subir video",
+                  "Título corto",
+                  "Descripción & Tags",
+                  "Configuración",
+                  "Publicar"
+            ],
+            "xhsSteps": [
+                  "Página lista",
+                  "Subir video",
+                  "Título",
+                  "Contenido & Tags",
+                  "Configuración",
+                  "Publicar"
+            ]
+      },
+      "fr": {
+            "langName": "Français",
+            "systemInfo": "À propos",
+            "badge": "Guide de publication",
+            "tip": "Pour activer la publication automatique, connectez-vous d'abord via QR code sur WeChat Channels et Xiaohongshu.",
+            "logs": "Journaux",
+            "render": "Rendu",
+            "renderTab": "Console de rendu",
+            "wechat": "Channels",
+            "xhs": "Xiaohongshu",
+            "wechatFullName": "WeChat Channels",
+            "xhsFullName": "Xiaohongshu",
+            "pipeline": "Pipeline automatique",
+            "syslogsTab": "Journaux système",
+            "mainTab": "ShortVideo Accueil",
+            "ready": "Système prêt, en attente",
+            "syslogReady": "Panneau de journaux connecté en temps réel",
+            "publishBadge": "🚀 Publication auto",
+            "publishBannerTip": "🚀 Publication en cours pour 【{platform}】, durée estimée 1-3 min...",
+            "logFilter": "Filtre",
+            "catAll": "Tous",
+            "catWechat": "Channels",
+            "catXhs": "Xiaohongshu",
+            "catSys": "Système",
+            "btnBack": "Précédent",
+            "btnForward": "Suivant",
+            "btnReload": "Recharger",
+            "btnDevtools": "Outils Dév (F12)",
+            "btnLangTitle": "Changer la langue",
+            "btnRenderTitle": "Console de rendu vidéo",
+            "btnLogsTitle": "Voir les journaux système",
+            "btnWechatTitle": "Ouvrir WeChat Channels",
+            "btnXhsTitle": "Ouvrir Xiaohongshu",
+            "closeTab": "Fermer l'onglet",
+            "bannerClose": "Fermer",
+            "updateBtn": "🚀 Mettre à niveau v{version}",
+            "updateDownloading": "⚡ Téléchargement {percent}%",
+            "updateReadyTip": "🚀 Mise à jour téléchargée. Redémarrez pour appliquer !",
+            "updateConfirm": "Voulez-vous redémarrer maintenant pour installer la mise à jour ?",
+            "updateBusyWarning": "⚠️ Attention : Tâche en cours ! Redémarrer quand même ?",
+            "wechatSteps": [
+                  "Page prête",
+                  "Téléverser",
+                  "Titre court",
+                  "Description & Tags",
+                  "Paramètres",
+                  "Publier"
+            ],
+            "xhsSteps": [
+                  "Page prête",
+                  "Téléverser",
+                  "Titre",
+                  "Contenu & Tags",
+                  "Paramètres",
+                  "Publier"
+            ]
+      },
+      "pt": {
+            "langName": "Português",
+            "systemInfo": "Sobre",
+            "badge": "Guia de publicação",
+            "tip": "Para ativar a publicação automática, escaneie o código QR e faça login no WeChat Channels e Xiaohongshu primeiro.",
+            "logs": "Registros",
+            "render": "Renderizar",
+            "renderTab": "Console de render",
+            "wechat": "Channels",
+            "xhs": "Xiaohongshu",
+            "wechatFullName": "WeChat Channels",
+            "xhsFullName": "Xiaohongshu",
+            "pipeline": "Pipeline automático",
+            "syslogsTab": "Registros do sistema",
+            "mainTab": "ShortVideo Início",
+            "ready": "Sistema pronto, aguardando",
+            "syslogReady": "Painel de registros conectado em tempo real",
+            "publishBadge": "🚀 Publicação automática",
+            "publishBannerTip": "🚀 Publicação iniciada para 【{platform}】, cerca de 1-3 minutos...",
+            "logFilter": "Filtrar",
+            "catAll": "Todos",
+            "catWechat": "Channels",
+            "catXhs": "Xiaohongshu",
+            "catSys": "Sistema",
+            "btnBack": "Voltar",
+            "btnForward": "Avançar",
+            "btnReload": "Recarregar",
+            "btnDevtools": "Ferramentas Dev (F12)",
+            "btnLangTitle": "Mudar idioma",
+            "btnRenderTitle": "Console de renderização",
+            "btnLogsTitle": "Ver registros em tempo real",
+            "btnWechatTitle": "Abrir WeChat Channels",
+            "btnXhsTitle": "Abrir Xiaohongshu",
+            "closeTab": "Fechar aba",
+            "bannerClose": "Fechar",
+            "updateBtn": "🚀 Atualizar para v{version}",
+            "updateDownloading": "⚡ Baixando {percent}%",
+            "updateReadyTip": "🚀 Nova versão baixada. Reinicie para atualizar!",
+            "updateConfirm": "Deseja reiniciar agora para aplicar a atualização?",
+            "updateBusyWarning": "⚠️ Aviso: Tarefas em andamento! Reiniciar mesmo assim?",
+            "wechatSteps": [
+                  "Página pronta",
+                  "Enviar vídeo",
+                  "Título curto",
+                  "Descrição & Tags",
+                  "Configurações",
+                  "Publicar"
+            ],
+            "xhsSteps": [
+                  "Página pronta",
+                  "Enviar vídeo",
+                  "Título",
+                  "Conteúdo & Tags",
+                  "Configurações",
+                  "Publicar"
+            ]
+      },
+      "de": {
+            "langName": "Deutsch",
+            "systemInfo": "Über",
+            "badge": "Veröffentlichungsanleitung",
+            "tip": "Um die automatische Veröffentlichung zu aktivieren, melden Sie sich bitte zuerst per QR-Code bei WeChat Channels und Xiaohongshu an.",
+            "logs": "Protokolle",
+            "render": "Rendern",
+            "renderTab": "Rendering-Konsole",
+            "wechat": "Channels",
+            "xhs": "Xiaohongshu",
+            "wechatFullName": "WeChat Channels",
+            "xhsFullName": "Xiaohongshu",
+            "pipeline": "Automatisierte Pipeline",
+            "syslogsTab": "Systemprotokolle",
+            "mainTab": "ShortVideo Start",
+            "ready": "System bereit, wartet auf Aufgaben",
+            "syslogReady": "Echtzeit-Protokollüberwachung aktiv",
+            "publishBadge": "🚀 Automatische Veröffentlichung",
+            "publishBannerTip": "🚀 Veröffentlichung für 【{platform}】 gestartet, ca. 1-3 Minuten...",
+            "logFilter": "Kategorie",
+            "catAll": "Alle",
+            "catWechat": "Channels",
+            "catXhs": "Xiaohongshu",
+            "catSys": "System",
+            "btnBack": "Zurück",
+            "btnForward": "Vorwärts",
+            "btnReload": "Seite neu laden",
+            "btnDevtools": "Entwicklertools (F12)",
+            "btnLangTitle": "Sprache wechseln",
+            "btnRenderTitle": "Videorendering-Konsole",
+            "btnLogsTitle": "Systemprotokolle anzeigen",
+            "btnWechatTitle": "WeChat Channels öffnen",
+            "btnXhsTitle": "Xiaohongshu öffnen",
+            "closeTab": "Tab schließen",
+            "bannerClose": "Schließen",
+            "updateBtn": "🚀 Auf v{version} aktualisieren",
+            "updateDownloading": "⚡ Herunterladen {percent}%",
+            "updateReadyTip": "🚀 Update heruntergeladen. Starten Sie neu!",
+            "updateConfirm": "Möchten Sie jetzt neu starten, um das Update anzuwenden?",
+            "updateBusyWarning": "⚠️ Warnung: Laufende Aufgabe! Trotzdem neu starten?",
+            "wechatSteps": [
+                  "Seite bereit",
+                  "Video hochladen",
+                  "Kurzer Titel",
+                  "Beschreibung & Tags",
+                  "Einstellungen",
+                  "Veröffentlichen"
+            ],
+            "xhsSteps": [
+                  "Seite bereit",
+                  "Video hochladen",
+                  "Titel",
+                  "Inhalt & Tags",
+                  "Einstellungen",
+                  "Veröffentlichen"
+            ]
+      },
+      "it": {
+            "langName": "Italiano",
+            "systemInfo": "Info",
+            "badge": "Guida pubblicazione",
+            "tip": "Per abilitare la pubblicazione automatica, accedi prima tramite codice QR su WeChat Channels e Xiaohongshu.",
+            "logs": "Registri",
+            "render": "Rendering",
+            "renderTab": "Console rendering",
+            "wechat": "Channels",
+            "xhs": "Xiaohongshu",
+            "wechatFullName": "WeChat Channels",
+            "xhsFullName": "Xiaohongshu",
+            "pipeline": "Pipeline automatica",
+            "syslogsTab": "Registri di sistema",
+            "mainTab": "ShortVideo Home",
+            "ready": "Sistema pronto, in attesa",
+            "syslogReady": "Pannello registri connesso in tempo reale",
+            "publishBadge": "🚀 Pubblicazione automatica",
+            "publishBannerTip": "🚀 Pubblicazione avviata per 【{platform}】, tempo stimato 1-3 min...",
+            "logFilter": "Filtro",
+            "catAll": "Tutti",
+            "catWechat": "Channels",
+            "catXhs": "Xiaohongshu",
+            "catSys": "Sistema",
+            "btnBack": "Indietro",
+            "btnForward": "Avanti",
+            "btnReload": "Ricarica",
+            "btnDevtools": "Strumenti Dev (F12)",
+            "btnLangTitle": "Cambia lingua",
+            "btnRenderTitle": "Console rendering video",
+            "btnLogsTitle": "Visualizza registri di sistema",
+            "btnWechatTitle": "Apri WeChat Channels",
+            "btnXhsTitle": "Apri Xiaohongshu",
+            "closeTab": "Chiudi scheda",
+            "bannerClose": "Chiudi",
+            "updateBtn": "🚀 Aggiorna a v{version}",
+            "updateDownloading": "⚡ Download in corso {percent}%",
+            "updateReadyTip": "🚀 Nuovo aggiornamento scaricato. Riavvia per applicare!",
+            "updateConfirm": "Vuoi riavviare ora per completare l'aggiornamento?",
+            "updateBusyWarning": "⚠️ Attenzione: Attività in corso! Riavviare comunque?",
+            "wechatSteps": [
+                  "Pagina pronta",
+                  "Carica video",
+                  "Titolo breve",
+                  "Descrizione & Tag",
+                  "Impostazioni",
+                  "Pubblica"
+            ],
+            "xhsSteps": [
+                  "Pagina pronta",
+                  "Carica video",
+                  "Titolo",
+                  "Contenuto & Tag",
+                  "Impostazioni",
+                  "Pubblica"
+            ]
+      },
+      "ru": {
+            "langName": "Русский",
+            "systemInfo": "О программе",
+            "badge": "Инструкция по автопубликации",
+            "tip": "Для автоматической публикации войдите по QR-коду в WeChat Channels и Xiaohongshu.",
+            "logs": "Журналы",
+            "render": "Рендеринг",
+            "renderTab": "Консоль рендеринга",
+            "wechat": "Channels",
+            "xhs": "Xiaohongshu",
+            "wechatFullName": "WeChat Channels",
+            "xhsFullName": "Xiaohongshu",
+            "pipeline": "Автоматический пайплайн",
+            "syslogsTab": "Системные журналы",
+            "mainTab": "ShortVideo Главная",
+            "ready": "Система готова к работе",
+            "syslogReady": "Журналы подключены в реальном времени",
+            "publishBadge": "🚀 Автопубликация",
+            "publishBannerTip": "🚀 Начата публикация в 【{platform}】, расчетное время 1-3 мин...",
+            "logFilter": "Категория",
+            "catAll": "Все",
+            "catWechat": "Channels",
+            "catXhs": "Xiaohongshu",
+            "catSys": "Система",
+            "btnBack": "Назад",
+            "btnForward": "Вперед",
+            "btnReload": "Обновить",
+            "btnDevtools": "Инструменты разработчика (F12)",
+            "btnLangTitle": "Переключить язык",
+            "btnRenderTitle": "Консоль рендеринга видео",
+            "btnLogsTitle": "Просмотр системных журналов",
+            "btnWechatTitle": "Открыть WeChat Channels",
+            "btnXhsTitle": "Открыть Xiaohongshu",
+            "closeTab": "Закрыть вкладку",
+            "bannerClose": "Закрыть",
+            "updateBtn": "🚀 Обновить до v{version}",
+            "updateDownloading": "⚡ Загрузка {percent}%",
+            "updateReadyTip": "🚀 Обновление загружено. Перезапустите приложение!",
+            "updateConfirm": "Перезапустить сейчас для применения обновления?",
+            "updateBusyWarning": "⚠️ Внимание: Идет публикация! Перезапустить все равно?",
+            "wechatSteps": [
+                  "Страница готова",
+                  "Загрузка видео",
+                  "Короткий заголовок",
+                  "Описание и теги",
+                  "Настройки",
+                  "Публикация"
+            ],
+            "xhsSteps": [
+                  "Страница готова",
+                  "Загрузка видео",
+                  "Заголовок",
+                  "Текст и теги",
+                  "Настройки",
+                  "Публикация"
+            ]
+      },
+      "tr": {
+            "langName": "Türkçe",
+            "systemInfo": "Hakkında",
+            "badge": "Otomatik Yayınlama Kılavuzu",
+            "tip": "Otomatik yayınlamayı etkinleştirmek için lütfen önce WeChat Channels ve Xiaohongshu hesaplarınıza QR kod ile giriş yapın.",
+            "logs": "Günlükler",
+            "render": "İşleme",
+            "renderTab": "Video İşleme Konsolu",
+            "wechat": "Channels",
+            "xhs": "Xiaohongshu",
+            "wechatFullName": "WeChat Channels",
+            "xhsFullName": "Xiaohongshu",
+            "pipeline": "Otomatik İş Akışı",
+            "syslogsTab": "Sistem Günlükleri",
+            "mainTab": "ShortVideo Ana Sayfa",
+            "ready": "Sistem hazır, görev bekleniyor",
+            "syslogReady": "Gerçek zamanlı günlük paneli bağlandı",
+            "publishBadge": "🚀 Otomatik Yayınlanıyor",
+            "publishBannerTip": "🚀 【{platform}】 için otomatik yayın başladı, tahmini 1-3 dakika...",
+            "logFilter": "Kategori",
+            "catAll": "Tümü",
+            "catWechat": "Channels",
+            "catXhs": "Xiaohongshu",
+            "catSys": "Sistem",
+            "btnBack": "Geri",
+            "btnForward": "İleri",
+            "btnReload": "Yenile",
+            "btnDevtools": "Geliştirici Araçları (F12)",
+            "btnLangTitle": "Dili Değiştir",
+            "btnRenderTitle": "Video İşleme Konsolu",
+            "btnLogsTitle": "Sistem Günlüklerini Gör",
+            "btnWechatTitle": "WeChat Channels Aç",
+            "btnXhsTitle": "Xiaohongshu Aç",
+            "closeTab": "Sekmeyi Kapat",
+            "bannerClose": "Kapat",
+            "updateBtn": "🚀 v{version} Sürümüne Yükselt",
+            "updateDownloading": "⚡ İndiriliyor {percent}%",
+            "updateReadyTip": "🚀 Yeni sürüm indirildi. Yeniden başlatın!",
+            "updateConfirm": "Güncellemeyi uygulamak için şimdi yeniden başlatmak istiyor musunuz?",
+            "updateBusyWarning": "⚠️ Uyarı: Devam eden yayınlama görevi var! Yine de yeniden başlatılsın mı?",
+            "wechatSteps": [
+                  "Sayfa Hazır",
+                  "Video Yükleme",
+                  "Kısa Başlık",
+                  "Açıklama & Etiketler",
+                  "Ayarlar",
+                  "Yayınla"
+            ],
+            "xhsSteps": [
+                  "Sayfa Hazır",
+                  "Video Yükleme",
+                  "Başlık",
+                  "İçerik & Etiketler",
+                  "Ayarlar",
+                  "Yayınla"
+            ]
+      }
+};
+
+    const initialConfig = I18N_CONFIG[currentLanguage] || I18N_CONFIG.zh;
+
+    let tabs = [];
+    let activeTabId = 'main';
+    let currentSyslogCat = 'all';
+
+    // 默认流水线步骤定义（根据当前语言自适应初始化）
+    const defaultSteps = {
+      wechat: initialConfig.wechatSteps || ['Page Ready', 'Upload', 'Title', 'Desc', 'Settings', 'Publish'],
+      xiaohongshu: initialConfig.xhsSteps || ['Page Ready', 'Upload', 'Title', 'Desc', 'Settings', 'Publish'],
+    };
+
+    // 核心：微信视频号与小红书各自维护独立的状态存储
+    const platformStore = {
+      wechat: {
+        platformName: initialConfig.wechatFullName || initialConfig.wechat || 'WeChat Channels',
+        steps: defaultSteps.wechat,
+        currentStep: 0,
+        state: 'pending',
+        statusData: {
+          message: initialConfig.ready || 'System ready, waiting for tasks',
+          type: 'info'
+        }
+      },
+      xiaohongshu: {
+        platformName: initialConfig.xhsFullName || initialConfig.xhs || 'Xiaohongshu',
+        steps: defaultSteps.xiaohongshu,
+        currentStep: 0,
+        state: 'pending',
+        statusData: {
+          message: initialConfig.ready || 'System ready, waiting for tasks',
+          type: 'info'
+        }
+      }
+    };
+
+    const tabsContainer = document.getElementById('tabs-container');
+    const stepsContainer = document.getElementById('steps-container');
+    const pipelinePill = document.getElementById('pipeline-pill');
+    const statusCapsule = document.getElementById('status-capsule');
+    const statusIcon = document.getElementById('status-icon');
+    const statusText = document.getElementById('status-text');
+
+    const publishBanner = document.getElementById('publish-banner');
+    const publishBannerText = document.getElementById('publish-banner-text');
+    const publishBannerClose = document.getElementById('publish-banner-close');
+    let bannerHideTimer = null;
+
+    function showPublishBanner(msg, durationMs = 9000) {
+      if (!publishBanner || !publishBannerText) return;
+      publishBannerText.textContent = msg;
+      publishBannerText.title = msg;
+      publishBanner.classList.remove('hidden');
+
+      if (bannerHideTimer) clearTimeout(bannerHideTimer);
+      if (durationMs > 0) {
+        bannerHideTimer = setTimeout(() => {
+          hidePublishBanner();
+        }, durationMs);
+      }
+    }
+
+    function hidePublishBanner() {
+      if (!publishBanner) return;
+      publishBanner.classList.add('hidden');
+      if (bannerHideTimer) {
+        clearTimeout(bannerHideTimer);
+        bannerHideTimer = null;
+      }
+    }
+
+    if (publishBannerClose) {
+      publishBannerClose.addEventListener('click', () => {
+        hidePublishBanner();
+      });
+    }
+
+    // 平台识别器
+    function normalizePlatform(input) {
+      if (!input) return null;
+      const str = String(input).toLowerCase();
+      if (str.includes('xiao') || str.includes('red') || str.includes('红书')) {
+        return 'xiaohongshu';
+      }
+      if (str.includes('wechat') || str.includes('weixin') || str.includes('视频号') || str.includes('微信')) {
+        return 'wechat';
+      }
+      return null;
+    }
+
+    function renderTabs() {
+      tabsContainer.innerHTML = '';
+      tabs.forEach(tab => {
+        const item = document.createElement('div');
+        item.className = `tab-item tab-${tab.id} ${tab.id === activeTabId ? 'active' : ''}`;
+
+        let iconHtml = '';
+        if (tab.id === 'main') {
+          iconHtml = `<svg viewBox="0 0 24 24" width="14" height="14" fill="#6366f1"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>`;
+        } else if (tab.id === 'wechat') {
+          iconHtml = `<svg viewBox="0 0 24 24" width="14" height="14" fill="#07c160"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>`;
+        } else if (tab.id === 'xiaohongshu') {
+          iconHtml = `<svg viewBox="0 0 24 24" width="14" height="14" fill="#ff2442"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
+        } else if (tab.id === 'syslogs') {
+          iconHtml = `<svg viewBox="0 0 24 24" width="14" height="14" fill="#6366f1"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>`;
+        } else if (tab.id === 'render') {
+          iconHtml = `<svg viewBox="0 0 24 24" width="14" height="14" fill="#059669"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4zM8 17H6v-2h2v2zm0-4H6v-2h2v2zm0-4H6V7h2v2zm10 8h-8v-2h8v2zm0-4h-8v-2h8v2zm0-4h-8V7h8v2z"/></svg>`;
+        } else {
+          iconHtml = `<svg viewBox="0 0 24 24" width="14" height="14" fill="#64748b"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6z"/></svg>`;
+        }
+
+        let tabTitle = tab.title;
+        const config = I18N_CONFIG[currentLanguage] || I18N_CONFIG.zh;
+        if (tab.id === 'main' && config.mainTab) tabTitle = config.mainTab;
+        else if (tab.id === 'syslogs' && config.syslogsTab) tabTitle = config.syslogsTab;
+        else if (tab.id === 'render' && config.renderTab) tabTitle = config.renderTab;
+        else if (tab.id === 'wechat' && (config.wechatFullName || config.wechat)) tabTitle = config.wechatFullName || config.wechat;
+        else if (tab.id === 'xiaohongshu' && (config.xhsFullName || config.xhs)) tabTitle = config.xhsFullName || config.xhs;
+
+        item.title = tabTitle;
+
+        const closeTitle = config.closeTab || '关闭标签';
+        const closeHtml = tab.closable ? `<span class="tab-close" data-close-id="${tab.id}" title="${closeTitle}">✕</span>` : '';
+
+        item.innerHTML = `
+          <div class="tab-icon">${iconHtml}</div>
+          <span class="tab-title">${tabTitle}</span>
+          ${closeHtml}
+        `;
+
+        item.addEventListener('click', (e) => {
+          if (e.target.dataset.closeId) {
+            e.stopPropagation();
+            window.tabBarAPI?.closeTab(e.target.dataset.closeId);
+          } else {
+            window.tabBarAPI?.switchTab(tab.id);
+          }
+        });
+
+        tabsContainer.appendChild(item);
+      });
+
+      updatePipelineForActiveTab();
+    }
+
+    // 覆盖全量 9 种语言的操作指引字典与界面文案
+    // I18N_CONFIG moved to top of script
+
+    function setLanguage(lang) {
+      if (!lang) return;
+      currentLanguage = String(lang).toLowerCase();
+      const config = I18N_CONFIG[currentLanguage] || I18N_CONFIG.zh;
+
+      // 1. 刷新当前语言切换按钮文案
+      const currentLangText = document.getElementById('btn-current-lang-text');
+      if (currentLangText && config.langName) {
+        currentLangText.textContent = config.langName;
+      }
+
+      // 2. 刷新顶部控制按钮文案与 Tooltip
+      const btnBack = document.getElementById('btn-back');
+      if (btnBack && config.btnBack) btnBack.title = config.btnBack;
+      const btnForward = document.getElementById('btn-forward');
+      if (btnForward && config.btnForward) btnForward.title = config.btnForward;
+      const btnReload = document.getElementById('btn-reload');
+      if (btnReload && config.btnReload) btnReload.title = config.btnReload;
+
+      const btnDevtools = document.getElementById('btn-devtools');
+      if (btnDevtools && config.btnDevtools) btnDevtools.title = config.btnDevtools;
+
+      const btnLang = document.getElementById('btn-language-selector');
+      if (btnLang && config.btnLangTitle) btnLang.title = config.btnLangTitle;
+
+      const btnBannerClose = document.getElementById('publish-banner-close');
+      if (btnBannerClose && config.bannerClose) btnBannerClose.title = config.bannerClose;
+
+      const renderBtn = document.getElementById('btn-video-render');
+      const renderBtnText = document.getElementById('btn-video-render-text');
+      if (renderBtnText && config.render) renderBtnText.textContent = config.render;
+      if (renderBtn && config.btnRenderTitle) renderBtn.title = config.btnRenderTitle;
+
+      const logsBtn = document.getElementById('btn-system-logs');
+      const logsBtnText = document.getElementById('btn-system-logs-text');
+      if (logsBtnText && config.logs) logsBtnText.textContent = config.logs;
+      if (logsBtn && config.btnLogsTitle) logsBtn.title = config.btnLogsTitle;
+
+      const wechatBtn = document.getElementById('btn-open-wechat');
+      const wechatText = document.getElementById('btn-open-wechat-text');
+      if (wechatText && config.wechat) wechatText.textContent = config.wechat;
+      if (wechatBtn && config.btnWechatTitle) wechatBtn.title = config.btnWechatTitle;
+
+      const xhsBtn = document.getElementById('btn-open-xhs');
+      const xhsText = document.getElementById('btn-open-xhs-text');
+      if (xhsText && config.xhs) xhsText.textContent = config.xhs;
+      if (xhsBtn && config.btnXhsTitle) xhsBtn.title = config.btnXhsTitle;
+
+      const infoBtn = document.getElementById('btn-system-info');
+      const infoText = document.getElementById('btn-system-info-text');
+      if (infoText && config.systemInfo) infoText.textContent = config.systemInfo;
+      if (infoBtn && config.systemInfo) infoBtn.title = config.systemInfo;
+
+      // 3. 刷新流水线标题
+      const pipeTitle = document.querySelector('.pipeline-title');
+      if (pipeTitle && config.pipeline) pipeTitle.textContent = config.pipeline;
+
+      // 4. 刷新日志分类筛选栏文案
+      const filterTitle = document.getElementById('syslog-filter-title');
+      if (filterTitle && config.logFilter) filterTitle.textContent = config.logFilter;
+      const catAllText = document.getElementById('tb-cat-all-text');
+      if (catAllText && config.catAll) catAllText.textContent = config.catAll;
+      const catWechatText = document.getElementById('tb-cat-wechat-text');
+      if (catWechatText && config.catWechat) catWechatText.textContent = config.catWechat;
+      const catXhsText = document.getElementById('tb-cat-xhs-text');
+      if (catXhsText && config.catXhs) catXhsText.textContent = config.catXhs;
+      const catSysText = document.getElementById('tb-cat-sys-text');
+      if (catSysText && config.catSys) catSysText.textContent = config.catSys;
+
+      // 5. 刷新发布横幅徽章文案
+      const bannerBadge = document.getElementById('publish-banner-badge');
+      if (bannerBadge && config.publishBadge) bannerBadge.textContent = config.publishBadge;
+
+      // 6. 流水线步骤与平台名称多语言同步
+      if (config.wechatSteps && platformStore.wechat) {
+        platformStore.wechat.steps = config.wechatSteps;
+      }
+      if (config.xhsSteps && platformStore.xiaohongshu) {
+        platformStore.xiaohongshu.steps = config.xhsSteps;
+      }
+      if (config.wechatFullName && platformStore.wechat) {
+        platformStore.wechat.platformName = config.wechatFullName;
+      }
+      if (config.xhsFullName && platformStore.xiaohongshu) {
+        platformStore.xiaohongshu.platformName = config.xhsFullName;
+      }
+
+      if (platformStore.wechat && platformStore.wechat.state === 'pending') {
+        platformStore.wechat.statusData.message = config.ready;
+      }
+      if (platformStore.xiaohongshu && platformStore.xiaohongshu.state === 'pending') {
+        platformStore.xiaohongshu.statusData.message = config.ready;
+      }
+
+      // 7. 刷新操作说明
+      renderMainGuide();
+
+      // 8. 重新渲染 Tab 标签文字与步骤
+      renderTabs();
+
+      // 9. 实时刷新新版本升级按钮的多语言文案
+      if (typeof window.refreshUpdateUII18n === 'function') {
+        window.refreshUpdateUII18n();
+      }
+    }
+
+    function renderMainGuide() {
+      const config = I18N_CONFIG[currentLanguage] || I18N_CONFIG.zh;
+      const badgePill = document.getElementById('guide-badge-pill');
+      const tipText = document.getElementById('guide-tip-text');
+      const logsBtnText = document.getElementById('btn-system-logs-text');
+
+      if (badgePill) badgePill.textContent = config.badge;
+      if (tipText) {
+        tipText.textContent = config.tip;
+        tipText.title = config.tip;
+      }
+      if (logsBtnText && config.logs) logsBtnText.textContent = config.logs;
+    }
+
+    function updatePipelineForActiveTab() {
+      const statusbarRow = document.getElementById('statusbar-row');
+      const pipelineGroup = document.getElementById('status-pipeline-group');
+      const syslogsGroup = document.getElementById('status-syslogs-group');
+      const capsuleGroup = document.getElementById('status-capsule-group');
+      const mainGuide = document.getElementById('status-main-guide');
+
+      if (statusbarRow) statusbarRow.style.display = 'flex';
+
+      if (activeTabId === 'xiaohongshu' || activeTabId === 'wechat') {
+        if (pipelineGroup) pipelineGroup.style.display = 'flex';
+        if (syslogsGroup) syslogsGroup.style.display = 'none';
+        if (capsuleGroup) capsuleGroup.style.display = 'flex';
+        if (mainGuide) mainGuide.style.display = 'none';
+
+        const pKey = activeTabId;
+        const pData = platformStore[pKey];
+
+        pipelinePill.textContent = pData.platformName;
+        pipelinePill.className = `platform-pill ${pKey}`;
+
+        renderSteps(pData);
+        renderStatusCapsule(pData.statusData);
+      } else if (activeTabId === 'syslogs') {
+        hidePublishBanner();
+        if (pipelineGroup) pipelineGroup.style.display = 'none';
+        if (syslogsGroup) syslogsGroup.style.display = 'flex';
+        if (capsuleGroup) capsuleGroup.style.display = 'flex';
+        if (mainGuide) mainGuide.style.display = 'none';
+
+        const config = I18N_CONFIG[currentLanguage] || I18N_CONFIG.zh;
+        renderStatusCapsule({
+          message: config.syslogReady || '系统运行日志监控面板已连接并实时更新',
+          type: 'success'
+        });
+      } else {
+        hidePublishBanner();
+        // 在首页主站时，展示多语言指引说明栏
+        if (pipelineGroup) pipelineGroup.style.display = 'none';
+        if (syslogsGroup) syslogsGroup.style.display = 'none';
+        if (capsuleGroup) capsuleGroup.style.display = 'none';
+        if (mainGuide) mainGuide.style.display = 'flex';
+        renderMainGuide();
+      }
+
+      // 同步顶部快捷按钮的激活态高亮
+      document.getElementById('btn-open-wechat')?.classList.toggle('active', activeTabId === 'wechat');
+      document.getElementById('btn-open-xhs')?.classList.toggle('active', activeTabId === 'xiaohongshu');
+      document.getElementById('btn-system-logs')?.classList.toggle('active', activeTabId === 'syslogs');
+      document.getElementById('btn-video-render')?.classList.toggle('active', activeTabId === 'render');
+    }
+
+    function renderSteps(pData) {
+      stepsContainer.innerHTML = '';
+      const steps = (pData && pData.steps) || [];
+      const curIdx = (pData && typeof pData.currentStep === 'number') ? pData.currentStep : 0;
+      const state = (pData && pData.state) || 'pending';
+
+      steps.forEach((name, i) => {
+        let stepStatus = 'pending';
+        let badgeContent = (i + 1).toString();
+
+        if (i < curIdx) {
+          stepStatus = 'done';
+          badgeContent = '✓';
+        } else if (i === curIdx) {
+          stepStatus = state === 'error' ? 'error' : 'active';
+          badgeContent = state === 'error' ? '✕' : (i + 1).toString();
+        }
+
+        const item = document.createElement('div');
+        item.className = `step-item ${stepStatus}`;
+
+        item.innerHTML = `
+          <div class="step-node">
+            <span class="step-badge">${badgeContent}</span>
+            <span class="step-label">${name}</span>
+          </div>
+          ${i < steps.length - 1 ? `<div class="step-line ${i < curIdx ? 'done' : ''}"></div>` : ''}
+        `;
+
+        stepsContainer.appendChild(item);
+      });
+    }
+
+    function renderStatusCapsule(statusData) {
+      const config = I18N_CONFIG[currentLanguage] || I18N_CONFIG.zh;
+      if (!statusData || !statusData.message) {
+        const defaultMsg = config.ready || '系统就绪，等待触发自动化任务';
+        statusText.textContent = defaultMsg;
+        statusText.title = defaultMsg;
+        statusCapsule.className = 'status-capsule';
+        statusIcon.textContent = '⚡';
+        return;
+      }
+
+      const msg = statusData.message;
+      statusText.textContent = msg;
+      statusText.title = msg;
+
+      let type = statusData.type || 'info';
+      const isPublishing = /自动发布流程|预计|正在下载|正在上传|正在发布|auto-publish/i.test(msg);
+      if (/✅|成功/.test(msg)) type = 'success';
+      else if (/⚠️|警告/.test(msg)) type = 'warning';
+      else if (/❌|失败|错误/.test(msg)) type = 'error';
+      else if (isPublishing) type = 'publishing';
+
+      statusCapsule.className = `status-capsule ${type}`;
+
+      if (type === 'success') {
+        statusIcon.textContent = '✅';
+      } else if (type === 'warning') {
+        statusIcon.textContent = '⚠️';
+      } else if (type === 'error') {
+        statusIcon.textContent = '❌';
+      } else if (type === 'publishing') {
+        statusIcon.textContent = '🚀';
+      } else {
+        statusIcon.textContent = '⚡';
+      }
+    }
+
+    // 系统日志分类按钮切换交互
+    document.querySelectorAll('.syslog-cat-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const cat = btn.dataset.cat || 'all';
+        currentSyslogCat = cat;
+        document.querySelectorAll('.syslog-cat-btn').forEach((b) => {
+          b.classList.toggle('active', (b.dataset.cat || 'all') === cat);
+        });
+        window.tabBarAPI?.switchSyslogCategory?.(cat);
+      });
+    });
+
+    // 绑定导航与功能操作
+    document.getElementById('btn-back').addEventListener('click', () => {
+      window.tabBarAPI?.goBack();
+    });
+    document.getElementById('btn-forward').addEventListener('click', () => {
+      window.tabBarAPI?.goForward();
+    });
+    document.getElementById('btn-reload').addEventListener('click', () => {
+      window.tabBarAPI?.reload();
+    });
+
+    document.getElementById('btn-open-wechat').addEventListener('click', () => {
+      window.tabBarAPI?.openTab('wechat');
+    });
+    document.getElementById('btn-open-xhs').addEventListener('click', () => {
+      window.tabBarAPI?.openTab('xiaohongshu');
+    });
+
+    document.getElementById('btn-devtools').addEventListener('click', () => {
+      window.tabBarAPI?.toggleDevTools();
+    });
+
+    document.getElementById('btn-system-info')?.addEventListener('click', () => {
+      window.tabBarAPI?.openAbout();
+    });
+
+    document.getElementById('btn-system-logs')?.addEventListener('click', () => {
+      window.tabBarAPI?.openLogs();
+    });
+
+    document.getElementById('btn-video-render')?.addEventListener('click', () => {
+      window.tabBarAPI?.openRender();
+    });
+
+    document.getElementById('btn-language-selector')?.addEventListener('click', (e) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      window.tabBarAPI?.openLanguageMenu(rect.left, rect.bottom + 2);
+    });
+
+    // 接收主进程状态同步
+    if (window.tabBarAPI) {
+      window.tabBarAPI.onTabsUpdated((data) => {
+        tabs = data.tabs;
+        activeTabId = data.activeTabId;
+        if (data.lang) setLanguage(data.lang);
+        renderTabs();
+      });
+
+      // 实时语言切换监听
+      window.tabBarAPI.onLanguageChanged?.((lang) => {
+        setLanguage(lang);
+      });
+
+      // 实时视频渲染状态监听（联动顶栏渲染按钮脉冲小红点）
+      window.tabBarAPI.onRenderStatusUpdated?.((state) => {
+        const dot = document.getElementById('render-pulse-dot');
+        if (dot && state) {
+          dot.style.display = state.status === 'running' ? 'inline-block' : 'none';
+        }
+      });
+
+      // 实时监听日志分类计数与当前分类变更
+      window.tabBarAPI.onSyslogCountsUpdated?.((data) => {
+        if (!data) return;
+        if (data.counts) {
+          const c = data.counts;
+          const numAll = document.getElementById('tb-cat-all-num');
+          const numWechat = document.getElementById('tb-cat-wechat-num');
+          const numXhs = document.getElementById('tb-cat-xhs-num');
+          const numSys = document.getElementById('tb-cat-sys-num');
+
+          if (numAll && typeof c.all === 'number') numAll.textContent = c.all;
+          if (numWechat && typeof c.wechat === 'number') numWechat.textContent = c.wechat;
+          if (numXhs && typeof c.xiaohongshu === 'number') numXhs.textContent = c.xiaohongshu;
+          if (numSys && typeof c.system === 'number') numSys.textContent = c.system;
+        }
+
+        if (data.category) {
+          currentSyslogCat = data.category;
+          document.querySelectorAll('.syslog-cat-btn').forEach((b) => {
+            b.classList.toggle('active', (b.dataset.cat || 'all') === data.category);
+          });
+        }
+      });
+
+      // 监听步骤更新：严格隔离到对应平台，仅在当前处于该平台页面时才刷新界面
+      window.tabBarAPI.onStepsUpdated((data) => {
+        if (!data) return;
+        const normPlatform = normalizePlatform(data.platform) || activeTabId;
+        if (!platformStore[normPlatform]) return;
+
+        const pData = platformStore[normPlatform];
+        if (data.steps && Array.isArray(data.steps)) pData.steps = data.steps;
+        if (typeof data.currentStep === 'number') pData.currentStep = data.currentStep;
+        if (data.state) pData.state = data.state;
+
+        if (activeTabId === normPlatform) {
+          pipelinePill.textContent = pData.platformName;
+          pipelinePill.className = `platform-pill ${normPlatform}`;
+          renderSteps(pData);
+        }
+      });
+
+      // 监听状态文本更新：微信视频号只在微信视频号展示，小红书只在小红书展示
+      window.tabBarAPI.onStatusUpdated((data) => {
+        if (!data) return;
+        const msg = data.message || data.status || '';
+        if (!msg) return;
+
+        // 优先根据 data.platform，其次根据文本内容推断目标平台
+        let targetPlatform = normalizePlatform(data.platform) || normalizePlatform(msg);
+
+        // 若无法明确判定且当前正处于某个平台页，则归入当前平台
+        if (!targetPlatform && (activeTabId === 'wechat' || activeTabId === 'xiaohongshu')) {
+          targetPlatform = activeTabId;
+        }
+
+        if (targetPlatform && platformStore[targetPlatform]) {
+          platformStore[targetPlatform].statusData = {
+            message: msg,
+            type: data.type || data.level || 'info'
+          };
+
+          // 核心隔离：仅在当前激活的标签页与消息所属平台一致时才显示
+          if (activeTabId === targetPlatform) {
+            renderStatusCapsule(platformStore[targetPlatform].statusData);
+
+            // 核心：若进入自动发布流程或收到明确横幅指令，立即从顶部滑出高对比度醒目横幅
+            const isStartNotice = /自动发布流程|预计花费|预计.*分钟/.test(msg) || Boolean(data.banner);
+            if (isStartNotice) {
+              const bannerText = data.banner?.detail
+                ? `🚀 ${data.banner.title || '已进入自动发布流程'}：${data.banner.detail}`
+                : msg;
+              showPublishBanner(bannerText, 10000);
+            } else if (/✅|已成功发布|发布完成/.test(msg)) {
+              showPublishBanner(`🎉 ${platformStore[targetPlatform].platformName}：${msg}`, 3500);
+            }
+          }
+        }
+      });
+
+      // 监听客户端静默自动更新状态 (方案一：标准全量/差量无感自动更新)
+      const btnAppUpdate = document.getElementById('btn-app-update');
+      const btnAppUpdateText = document.getElementById('btn-app-update-text');
+      let latestUpdateInfo = null;
+
+      function renderAutoUpdateUI(info) {
+        if (!info || !btnAppUpdate) return;
+        latestUpdateInfo = info;
+        const config = I18N_CONFIG[currentLanguage] || I18N_CONFIG.zh;
+        const ver = info.info?.version || info.version || '';
+
+        if (info.status === 'downloaded') {
+          btnAppUpdate.style.display = 'inline-flex';
+          if (btnAppUpdateText) {
+            btnAppUpdateText.textContent = (config.updateBtn || '🚀 升级至 v{version}').replace('{version}', ver || 'latest');
+          }
+          const tipText = (config.updateReadyTip || '🚀 客户端新版本 (v{version}) 已在后台静默下载完毕，点击顶栏升级按钮即可完成更新！').replace('{version}', ver || '');
+          showPublishBanner(tipText, 12000);
+        } else if (info.status === 'downloading') {
+          btnAppUpdate.style.display = 'inline-flex';
+          const pct = typeof info.progressPercent === 'number' ? info.progressPercent : '';
+          if (btnAppUpdateText) {
+            btnAppUpdateText.textContent = (config.updateDownloading || '⚡ 正在下载更新 {percent}%').replace('{percent}', String(pct));
+          }
+        } else if (info.status === 'error') {
+          console.warn('[AutoUpdater] 更新异常状态:', info.error);
+        }
+      }
+
+      // 将 renderAutoUpdateUI 挂载至 window 供 setLanguage 切换语言时即时刷新
+      window.refreshUpdateUII18n = () => {
+        if (latestUpdateInfo) renderAutoUpdateUI(latestUpdateInfo);
+      };
+
+      if (btnAppUpdate && window.tabBarAPI) {
+        if (window.tabBarAPI.onUpdateStatus) {
+          window.tabBarAPI.onUpdateStatus((info) => {
+            renderAutoUpdateUI(info);
+          });
+        }
+
+        // 初始化时主动获取一次当前更新状态缓存，确保刷新后不丢失
+        if (window.tabBarAPI.getUpdateStatus) {
+          window.tabBarAPI.getUpdateStatus().then((state) => {
+            if (state && (state.status === 'downloaded' || state.status === 'downloading')) {
+              renderAutoUpdateUI(state);
+            }
+          }).catch(() => {});
+        }
+
+        btnAppUpdate.addEventListener('click', () => {
+          const config = I18N_CONFIG[currentLanguage] || I18N_CONFIG.zh;
+          const ver = latestUpdateInfo?.info?.version || latestUpdateInfo?.version || '';
+          const isWechatBusy = platformStore.wechat?.state === 'running';
+          const isXhsBusy = platformStore.xiaohongshu?.state === 'running';
+          let tip = (config.updateConfirm || '新版本 (v{version}) 已下载完毕，是否立即重启客户端完成升级？').replace('{version}', ver);
+          if (isWechatBusy || isXhsBusy) {
+            tip = (currentLanguage === 'zh'
+              ? '⚠️ 警告：当前自动化发布任务正在进行中，重启将中断任务！建议等待发布完毕后再升级。\n\n是否仍要立即重启？'
+              : '⚠️ Warning: Publishing task is running, restarting will interrupt the task!\n\nAre you sure you want to restart now?');
+          }
+          if (confirm(tip)) {
+            window.tabBarAPI?.quitAndInstall?.();
+          }
+        });
+      }
+
+      window.tabBarAPI.notifyReady();
+    }
+
+    // 初始渲染
+    updatePipelineForActiveTab();
+  </script>
+</body>
+</html>

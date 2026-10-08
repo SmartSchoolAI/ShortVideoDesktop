@@ -1,0 +1,2929 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>视频渲染控制台 (Video Rendering Console)</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #0b0f19;
+      color: #cbd5e1;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      font-size: 13px;
+    }
+
+    /* 顶部工具栏 */
+    .toolbar {
+      height: 50px;
+      background: #111827;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 12px;
+      flex-shrink: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .app-icon {
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .title-text {
+      font-weight: 700;
+      font-size: 14px;
+      color: #f8fafc;
+      letter-spacing: 0.2px;
+    }
+
+    /* 状态徽章 */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 9px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      transition: all 0.2s ease;
+    }
+
+    .status-badge.idle {
+      background: rgba(148, 163, 184, 0.12);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      color: #94a3b8;
+    }
+
+    .status-badge.running {
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.35);
+      color: #60a5fa;
+    }
+
+    .status-badge.success {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #34d399;
+    }
+
+    .status-badge.error {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      color: #f87171;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .status-badge.running .status-dot {
+      box-shadow: 0 0 8px #3b82f6;
+      animation: pulse 1.2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(0.85); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+
+    /* 控制操作按钮组 */
+    .actions-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 28px;
+      padding: 0 11px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .btn:active {
+      transform: scale(0.96);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      color: #ffffff;
+      border-color: rgba(99, 102, 241, 0.4);
+      box-shadow: 0 1px 3px rgba(79, 70, 229, 0.25);
+    }
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #4f46e5, #4338ca);
+      box-shadow: 0 2px 6px rgba(79, 70, 229, 0.35);
+    }
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.12);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.22);
+      border-color: rgba(239, 68, 68, 0.5);
+      color: #ef4444;
+    }
+    .btn-danger:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-ghost {
+      background: rgba(255, 255, 255, 0.05);
+      color: #94a3b8;
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+    .btn-ghost:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #f1f5f9;
+      border-color: rgba(255, 255, 255, 0.16);
+    }
+    .btn-ghost.active {
+      background: rgba(99, 102, 241, 0.15);
+      border-color: rgba(99, 102, 241, 0.4);
+      color: #818cf8;
+    }
+
+    /* 搜索栏 */
+    .search-box {
+      display: flex;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      padding: 0 9px;
+      height: 28px;
+      gap: 6px;
+      width: 170px;
+      transition: all 0.2s ease;
+    }
+    .search-box:focus-within {
+      border-color: #6366f1;
+      width: 220px;
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+    }
+    .search-box svg {
+      width: 13px;
+      height: 13px;
+      fill: #64748b;
+      flex-shrink: 0;
+    }
+    .search-input {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #e2e8f0;
+      font-size: 12px;
+      width: 100%;
+    }
+    .search-input::placeholder {
+      color: #64748b;
+    }
+
+    /* 日志控制台主体 */
+    .console-container {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 12px 16px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12.5px;
+      line-height: 1.6;
+      background: #0b0f19;
+    }
+
+    /* 自定义滚动条 */
+    .console-container::-webkit-scrollbar {
+      width: 8px;
+    }
+    .console-container::-webkit-scrollbar-track {
+      background: #0b0f19;
+    }
+    .console-container::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 4px;
+    }
+    .console-container::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+
+    .log-line {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      padding: 2px 4px;
+      border-radius: 3px;
+      word-break: break-all;
+      white-space: pre-wrap;
+    }
+    .log-line:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .log-time {
+      color: #475569;
+      font-size: 11px;
+      user-select: none;
+      flex-shrink: 0;
+      font-family: inherit;
+    }
+
+    .log-type {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 3px;
+      user-select: none;
+      flex-shrink: 0;
+      text-transform: uppercase;
+      line-height: 1.2;
+    }
+    .log-type.stdout {
+      background: rgba(148, 163, 184, 0.1);
+      color: #94a3b8;
+    }
+    .log-type.stderr {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+    }
+    .log-type.system {
+      background: rgba(99, 102, 241, 0.15);
+      color: #818cf8;
+    }
+    .log-type.success {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+    }
+    .log-type.error {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+    }
+
+    .log-content {
+      flex: 1;
+      color: #e2e8f0;
+    }
+
+    /* 合并日志次数徽标 */
+    .repeat-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 6px;
+      height: 16px;
+      line-height: 15px;
+      border-radius: 8px;
+      font-size: 10px;
+      font-weight: 700;
+      background: rgba(99, 102, 241, 0.2);
+      color: #a5b4fc;
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      user-select: none;
+      flex-shrink: 0;
+      margin-left: 6px;
+    }
+
+    @keyframes log-flash {
+      0% { background: rgba(99, 102, 241, 0.22); }
+      100% { background: transparent; }
+    }
+    .log-line.flash-update {
+      animation: log-flash 0.35s ease-out;
+    }
+
+    /* 顶部实时渲染进度条 */
+    .render-progress-wrap {
+      background: #0f172a;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 6px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex-shrink: 0;
+      transition: all 0.3s ease;
+    }
+
+    .progress-info {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11.5px;
+    }
+
+    .progress-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .progress-title {
+      color: #38bdf8;
+      font-weight: 700;
+    }
+
+    .progress-pct {
+      color: #f8fafc;
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .progress-frames {
+      color: #94a3b8;
+      font-size: 11px;
+    }
+
+    .progress-eta {
+      color: #fbbf24;
+      font-size: 11px;
+      margin-left: auto;
+    }
+
+    .progress-track {
+      height: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #6366f1, #38bdf8, #34d399);
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+    }
+
+    /* 空状态 */
+    .empty-state {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #64748b;
+      gap: 12px;
+      user-select: none;
+    }
+    .empty-icon {
+      font-size: 40px;
+      opacity: 0.7;
+    }
+    .empty-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #94a3b8;
+    }
+    .empty-desc {
+      font-size: 12px;
+      color: #64748b;
+      text-align: center;
+      max-width: 360px;
+      line-height: 1.5;
+    }
+
+    /* 底部状态栏 */
+    .statusbar {
+      height: 28px;
+      background: #0d1321;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      font-size: 11px;
+      color: #64748b;
+      gap: 16px;
+      flex-shrink: 0;
+      user-select: none;
+    }
+
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .stat-val {
+      color: #94a3b8;
+      font-weight: 600;
+    }
+
+    /* ANSI 颜色模拟类 */
+    .ansi-black { color: #475569; }
+    .ansi-red { color: #f87171; }
+    .ansi-green { color: #34d399; }
+    .ansi-yellow { color: #fbbf24; }
+    .ansi-blue { color: #60a5fa; }
+    .ansi-magenta { color: #c084fc; }
+    .ansi-cyan { color: #38bdf8; }
+    .ansi-white { color: #f8fafc; }
+    .ansi-bold { font-weight: 700; }
+  </style>
+</head>
+<body>
+  <!-- 顶部工具栏 -->
+  <div class="toolbar">
+    <div class="title-group">
+      <span class="app-icon">🎬</span>
+      <span class="title-text" id="render-title-text">视频渲染控制台</span>
+      <span class="status-badge idle" id="status-badge">
+        <span class="status-dot"></span>
+        <span id="status-text">就绪</span>
+      </span>
+    </div>
+
+
+    <div class="actions-group">
+      <!-- 搜索框 -->
+      <div class="search-box">
+        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input type="text" class="search-input" id="search-input" placeholder="搜索输出内容 (Ctrl+F)">
+      </div>
+
+      <!-- 控制按钮 -->
+      <button class="btn btn-primary" id="btn-start" title="执行 pnpm run render">
+        <span>▶</span> <span id="btn-start-text">开始渲染</span>
+      </button>
+      <button class="btn btn-danger" id="btn-stop" title="强制终止当前正在运行的渲染任务" disabled>
+        <span>⏹</span> <span id="btn-stop-text">终止</span>
+      </button>
+      <button class="btn btn-ghost" id="btn-restart" title="重新执行渲染任务">
+        <span>🔄</span> <span id="btn-restart-text">重新运行</span>
+      </button>
+      <button class="btn btn-ghost" id="btn-clear" title="清空当前控制台日志 (Ctrl+L)">
+        <span>🧹</span> <span id="btn-clear-text">清空</span>
+      </button>
+      <button class="btn btn-ghost" id="btn-copy" title="复制所有渲染日志">
+        <span>📋</span> <span id="btn-copy-text">复制</span>
+      </button>
+      <button class="btn btn-ghost" id="btn-export" title="导出当前完整渲染日志到本地文件">
+        <span>💾</span> <span id="btn-export-text">导出</span>
+      </button>
+      <button class="btn btn-ghost" id="btn-open-dir" title="在系统文件管理器中打开已渲染的视频文件夹">
+        <span>📂</span> <span id="btn-open-dir-text">视频目录</span>
+      </button>
+      <button class="btn btn-ghost active" id="btn-autoscroll" title="切换是否自动滚动到底部">
+        <span>⬇</span> <span id="btn-autoscroll-text">自动滚底: 开</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 发光渲染进度条 (有进度时自动展开) -->
+  <div class="render-progress-wrap" id="render-progress-wrap" style="display: none;">
+    <div class="progress-info">
+      <div class="progress-left">
+        <span class="progress-title" id="progress-title-text">⚡ 帧渲染进度:</span>
+        <span class="progress-pct" id="progress-pct-text">0%</span>
+        <span class="progress-frames" id="progress-frames-text"></span>
+      </div>
+      <span class="progress-eta" id="progress-eta-text"></span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+  </div>
+
+  <!-- 日志输出容器 -->
+  <div class="console-container" id="console-container">
+    <div class="empty-state" id="empty-state">
+      <div class="empty-icon">🎬</div>
+      <div class="empty-title" id="empty-title">视频渲染任务就绪</div>
+      <div class="empty-desc" id="empty-desc">
+        <span id="empty-ver-lbl">软件版本:</span> <span id="empty-app-version" style="color: #38bdf8; font-weight: 600;">--</span><br>
+        <span id="empty-desc-p1">点击上方【开始渲染】按钮即可启动</span> <code>pnpm run render</code> <span id="empty-desc-p2">(生成 CompareEnglishWord 视频素材)。</span><br>
+        <span id="empty-desc-p3">控制台将实时流式输出渲染进度、音画合成与导出状态。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部状态栏 -->
+  <div class="statusbar">
+    <div class="stat-item">
+      <span id="stat-lbl-cmd">指令:</span>
+      <span class="stat-val">pnpm run render (scripts/CompareEnglishWord.ts)</span>
+    </div>
+    <div class="stat-item">
+      <span id="stat-lbl-version">版本:</span>
+      <span class="stat-val" id="stat-version" style="color: #a855f7;">--</span>
+    </div>
+    <div class="stat-item">
+      <span id="stat-lbl-status">状态:</span>
+      <span class="stat-val" id="stat-status">就绪</span>
+    </div>
+    <div class="stat-item" id="stat-progress-item" style="display: none;">
+      <span id="stat-lbl-progress">进度:</span>
+      <span class="stat-val" id="stat-progress-val" style="color: #38bdf8;">0%</span>
+    </div>
+    <div class="stat-item">
+      <span id="stat-lbl-duration">耗时:</span>
+      <span class="stat-val" id="stat-duration">0s</span>
+    </div>
+    <div class="stat-item">
+      <span id="stat-lbl-lines">总日志行:</span>
+      <span class="stat-val" id="stat-lines">0</span>
+    </div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    const I18N_RENDER = {
+      "zh": {
+            "title": "视频渲染控制台",
+            "statusIdle": "就绪",
+            "statusRunning": "正在渲染中...",
+            "statusSuccess": "渲染成功",
+            "statusError": "渲染异常",
+            "statusCompleted": "已完成",
+            "searchPlaceholder": "搜索输出内容 (Ctrl+F)",
+            "start": "开始渲染",
+            "startTitle": "执行 pnpm run render",
+            "stop": "终止",
+            "stopTitle": "强制终止当前正在运行的渲染任务",
+            "restart": "重新运行",
+            "restartTitle": "重新执行渲染任务",
+            "clear": "清空",
+            "clearTitle": "清空当前控制台日志 (Ctrl+L)",
+            "copy": "复制",
+            "copyTitle": "复制所有渲染日志",
+            "copied": "已复制",
+            "exportLogs": "导出",
+            "exportLogsTitle": "导出当前完整渲染日志到本地文件",
+            "openDir": "视频目录",
+            "openDirTitle": "在系统文件管理器中打开已渲染的视频文件夹",
+            "autoScrollOn": "自动滚底: 开",
+            "autoScrollOff": "自动滚底: 关",
+            "autoScrollTitle": "切换是否自动滚动到底部",
+            "progressTitle": "⚡ 帧渲染进度:",
+            "framesUnit": "帧",
+            "etaPrefix": "预计剩余: ",
+            "emptyTitle": "视频渲染任务就绪",
+            "emptyVer": "软件版本: ",
+            "emptyP1": "点击上方【开始渲染】按钮即可启动",
+            "emptyP2": " (生成 CompareEnglishWord 视频素材)。",
+            "emptyP3": "控制台将实时流式输出渲染进度、音画合成与导出状态。",
+            "statCmd": "指令:",
+            "statVer": "版本:",
+            "statStatus": "状态:",
+            "statProg": "进度:",
+            "statDuration": "耗时:",
+            "statLines": "总日志行:"
+      },
+      "en": {
+            "title": "Video Rendering Console",
+            "statusIdle": "Ready",
+            "statusRunning": "Rendering in progress...",
+            "statusSuccess": "Render Successful",
+            "statusError": "Render Error",
+            "statusCompleted": "Completed",
+            "searchPlaceholder": "Search output content (Ctrl+F)...",
+            "start": "Start Render",
+            "startTitle": "Execute pnpm run render",
+            "stop": "Stop",
+            "stopTitle": "Force terminate the running render task",
+            "restart": "Rerun",
+            "restartTitle": "Restart the render task",
+            "clear": "Clear",
+            "clearTitle": "Clear console logs (Ctrl+L)",
+            "copy": "Copy",
+            "copyTitle": "Copy all render logs",
+            "copied": "Copied",
+            "exportLogs": "Export",
+            "exportLogsTitle": "Export full render log to local file",
+            "openDir": "Video Folder",
+            "openDirTitle": "Open rendered video folder in file manager",
+            "autoScrollOn": "Auto Scroll: ON",
+            "autoScrollOff": "Auto Scroll: OFF",
+            "autoScrollTitle": "Toggle auto scroll to bottom",
+            "progressTitle": "⚡ Frame Progress:",
+            "framesUnit": "frames",
+            "etaPrefix": "ETA: ",
+            "emptyTitle": "Video Render Task Ready",
+            "emptyVer": "App Version: ",
+            "emptyP1": "Click the [Start Render] button above to launch",
+            "emptyP2": " (generating CompareEnglishWord video materials).",
+            "emptyP3": "The console will stream render progress, audio-video synthesis, and export status in real time.",
+            "statCmd": "Command:",
+            "statVer": "Version:",
+            "statStatus": "Status:",
+            "statProg": "Progress:",
+            "statDuration": "Duration:",
+            "statLines": "Total Lines:"
+      },
+      "ja": {
+            "title": "動画レンダリングコンソール",
+            "statusIdle": "待機中",
+            "statusRunning": "レンダリング中...",
+            "statusSuccess": "レンダリング成功",
+            "statusError": "レンダリング異常",
+            "statusCompleted": "完了",
+            "searchPlaceholder": "出力を検索 (Ctrl+F)...",
+            "start": "レンダリング開始",
+            "startTitle": "pnpm run render を実行",
+            "stop": "停止",
+            "stopTitle": "実行中のレンダリングタスクを強制終了",
+            "restart": "再実行",
+            "restartTitle": "レンダリングタスクを再実行",
+            "clear": "クリア",
+            "clearTitle": "ログ出力をクリア (Ctrl+L)",
+            "copy": "コピー",
+            "copyTitle": "すべてのレンダリングログをコピー",
+            "copied": "コピー完了",
+            "exportLogs": "エクスポート",
+            "exportLogsTitle": "ログをファイルに出力",
+            "openDir": "動画フォルダ",
+            "openDirTitle": "動画出力フォルダをエクスプローラーで開く",
+            "autoScrollOn": "自動スクロール: オン",
+            "autoScrollOff": "自動スクロール: オフ",
+            "autoScrollTitle": "最下部への自動スクロールを切り替え",
+            "progressTitle": "⚡ フレーム進捗:",
+            "framesUnit": "フレーム",
+            "etaPrefix": "残り予測: ",
+            "emptyTitle": "レンダリングタスク準備完了",
+            "emptyVer": "バージョン: ",
+            "emptyP1": "上の「レンダリング開始」をクリックして",
+            "emptyP2": " を実行します（動画素材生成）。",
+            "emptyP3": "コンソールに進捗状況、音声合成、書き出し状態がリアルタイムで表示されます。",
+            "statCmd": "コマンド:",
+            "statVer": "バージョン:",
+            "statStatus": "状態:",
+            "statProg": "進捗:",
+            "statDuration": "所要時間:",
+            "statLines": "総ログ行数:"
+      },
+      "ko": {
+            "title": "비디오 렌더링 콘솔",
+            "statusIdle": "대기 중",
+            "statusRunning": "렌더링 진행 중...",
+            "statusSuccess": "렌더링 성공",
+            "statusError": "렌더링 오류",
+            "statusCompleted": "완료됨",
+            "searchPlaceholder": "출력 내용 검색 (Ctrl+F)...",
+            "start": "렌더링 시작",
+            "startTitle": "pnpm run render 실행",
+            "stop": "중지",
+            "stopTitle": "실행 중인 렌더링 작업 강제 종료",
+            "restart": "다시 실행",
+            "restartTitle": "렌더링 작업 다시 시작",
+            "clear": "지우기",
+            "clearTitle": "콘솔 로그 지우기 (Ctrl+L)",
+            "copy": "복사",
+            "copyTitle": "모든 렌더링 로그 복사",
+            "copied": "복사됨",
+            "exportLogs": "내보내기",
+            "exportLogsTitle": "로그 파일로 내보내기",
+            "openDir": "비디오 폴더",
+            "openDirTitle": "파일 탐색기에서 비디오 폴더 열기",
+            "autoScrollOn": "자동 스크롤: 켜짐",
+            "autoScrollOff": "자동 스크롤: 꺼짐",
+            "autoScrollTitle": "자동 아래로 스크롤 전환",
+            "progressTitle": "⚡ 프레임 진행률:",
+            "framesUnit": "프레임",
+            "etaPrefix": "예상 남은 시간: ",
+            "emptyTitle": "비디오 렌더링 준비 완료",
+            "emptyVer": "소프트웨어 버전: ",
+            "emptyP1": "위의 [렌더링 시작] 버튼을 눌러",
+            "emptyP2": " 를 실행하십시오.",
+            "emptyP3": "콘솔에 진행률, 오디오 합성 및 내보내기 상태가 실시간으로 스트리밍됩니다.",
+            "statCmd": "명령:",
+            "statVer": "버전:",
+            "statStatus": "상태:",
+            "statProg": "진행률:",
+            "statDuration": "소요 시간:",
+            "statLines": "총 로그 라인:"
+      },
+      "vi": {
+            "title": "Bảng Điều Khiển Xuất Video",
+            "statusIdle": "Sẵn sàng",
+            "statusRunning": "Đang kết xuất...",
+            "statusSuccess": "Kết xuất thành công",
+            "statusError": "Lỗi kết xuất",
+            "statusCompleted": "Hoàn tất",
+            "searchPlaceholder": "Tìm kiếm đầu ra (Ctrl+F)...",
+            "start": "Bắt đầu kết xuất",
+            "startTitle": "Chạy pnpm run render",
+            "stop": "Dừng",
+            "stopTitle": "Buộc dừng tác vụ kết xuất đang chạy",
+            "restart": "Chạy lại",
+            "restartTitle": "Khởi động lại tác vụ kết xuất",
+            "clear": "Xóa",
+            "clearTitle": "Xóa nhật ký (Ctrl+L)",
+            "copy": "Sao chép",
+            "copyTitle": "Sao chép toàn bộ nhật ký",
+            "copied": "Đã sao chép",
+            "exportLogs": "Xuất tệp",
+            "exportLogsTitle": "Xuất nhật ký ra tệp",
+            "openDir": "Thư mục video",
+            "openDirTitle": "Mở thư mục video trong trình quản lý tệp",
+            "autoScrollOn": "Tự động cuộn: BẬT",
+            "autoScrollOff": "Tự động cuộn: TẮT",
+            "autoScrollTitle": "Bật/tắt tự động cuộn xuống dưới cùng",
+            "progressTitle": "⚡ Tiến trình khung hình:",
+            "framesUnit": "khung hình",
+            "etaPrefix": "Còn lại: ",
+            "emptyTitle": "Tác vụ kết xuất đã sẵn sàng",
+            "emptyVer": "Phiên bản: ",
+            "emptyP1": "Nhấp nút [Bắt đầu kết xuất] ở trên để khởi chạy",
+            "emptyP2": " (tạo tài liệu video).",
+            "emptyP3": "Bảng điều khiển sẽ hiển thị tiến độ kết xuất và xuất file theo thời gian thực.",
+            "statCmd": "Lệnh:",
+            "statVer": "Phiên bản:",
+            "statStatus": "Trạng thái:",
+            "statProg": "Tiến độ:",
+            "statDuration": "Thời gian:",
+            "statLines": "Tổng số dòng:"
+      },
+      "th": {
+            "title": "คอนโซลเรนเดอร์วิดีโอ",
+            "statusIdle": "พร้อม",
+            "statusRunning": "กำลังเรนเดอร์...",
+            "statusSuccess": "เรนเดอร์สำเร็จ",
+            "statusError": "เรนเดอร์ล้มเหลว",
+            "statusCompleted": "เสร็จสิ้น",
+            "searchPlaceholder": "ค้นหาเอาต์พุต (Ctrl+F)...",
+            "start": "เริ่มเรนเดอร์",
+            "startTitle": "เรียกใช้ pnpm run render",
+            "stop": "หยุด",
+            "stopTitle": "บังคับหยุดงานเรนเดอร์ที่กำลังทำงานอยู่",
+            "restart": "เริ่มใหม่",
+            "restartTitle": "เริ่มงานเรนเดอร์ใหม่อีกครั้ง",
+            "clear": "ล้าง",
+            "clearTitle": "ล้างบันทึกคอนโซล (Ctrl+L)",
+            "copy": "คัดลอก",
+            "copyTitle": "คัดลอกบันทึกทั้งหมด",
+            "copied": "คัดลอกแล้ว",
+            "exportLogs": "ส่งออก",
+            "exportLogsTitle": "ส่งออกบันทึกไปยังไฟล์",
+            "openDir": "โฟลเดอร์วิดีโอ",
+            "openDirTitle": "เปิดโฟลเดอร์วิดีโอในตัวจัดการไฟล์",
+            "autoScrollOn": "เลื่อนอัตโนมัติ: เปิด",
+            "autoScrollOff": "เลื่อนอัตโนมัติ: ปิด",
+            "autoScrollTitle": "เปิด/ปิดการเลื่อนลงด้านล่างอัตโนมัติ",
+            "progressTitle": "⚡ ความคืบหน้าเฟรม:",
+            "framesUnit": "เฟรม",
+            "etaPrefix": "เวลาที่เหลือ: ",
+            "emptyTitle": "งานเรนเดอร์วิดีโอพร้อม",
+            "emptyVer": "เวอร์ชัน: ",
+            "emptyP1": "คลิกปุ่ม [เริ่มเรนเดอร์] ด้านบนเพื่อเริ่ม",
+            "emptyP2": " (สร้างวิดีโอ CompareEnglishWord)",
+            "emptyP3": "คอนโซลจะสตรีมความคืบหน้าการเรนเดอร์และการสังเคราะห์เสียงแบบเรียลไทม์",
+            "statCmd": "คำสั่ง:",
+            "statVer": "เวอร์ชัน:",
+            "statStatus": "สถานะ:",
+            "statProg": "ความคืบหน้า:",
+            "statDuration": "ระยะเวลา:",
+            "statLines": "จำนวนบรรทัด:"
+      },
+      "id": {
+            "title": "Konsol Render Video",
+            "statusIdle": "Siap",
+            "statusRunning": "Sedang merender...",
+            "statusSuccess": "Render Berhasil",
+            "statusError": "Kesalahan Render",
+            "statusCompleted": "Selesai",
+            "searchPlaceholder": "Cari konten output (Ctrl+F)...",
+            "start": "Mulai Render",
+            "startTitle": "Jalankan pnpm run render",
+            "stop": "Hentikan",
+            "stopTitle": "Hentikan paksa tugas render yang berjalan",
+            "restart": "Jalankan Ulang",
+            "restartTitle": "Mulai ulang tugas render",
+            "clear": "Bersihkan",
+            "clearTitle": "Bersihkan log konsol (Ctrl+L)",
+            "copy": "Salin",
+            "copyTitle": "Salin semua log render",
+            "copied": "Disalin",
+            "exportLogs": "Ekspor",
+            "exportLogsTitle": "Ekspor log ke berkas",
+            "openDir": "Folder Video",
+            "openDirTitle": "Buka folder video di file manager",
+            "autoScrollOn": "Gulir Otomatis: AKTIF",
+            "autoScrollOff": "Gulir Otomatis: NONAKTIF",
+            "autoScrollTitle": "Aktifkan/nonaktifkan gulir otomatis ke bawah",
+            "progressTitle": "⚡ Kemajuan Bingkai:",
+            "framesUnit": "bingkai",
+            "etaPrefix": "Sisa Waktu: ",
+            "emptyTitle": "Tugas Render Video Siap",
+            "emptyVer": "Versi Aplikasi: ",
+            "emptyP1": "Klik tombol [Mulai Render] di atas untuk meluncurkan",
+            "emptyP2": " (membuat materi video CompareEnglishWord).",
+            "emptyP3": "Konsol akan menampilkan kemajuan render dan ekspor video secara real time.",
+            "statCmd": "Perintah:",
+            "statVer": "Versi:",
+            "statStatus": "Status:",
+            "statProg": "Kemajuan:",
+            "statDuration": "Durasi:",
+            "statLines": "Total Baris:"
+      },
+      "es": {
+            "title": "Consola de Renderizado de Video",
+            "statusIdle": "Listo",
+            "statusRunning": "Renderizando...",
+            "statusSuccess": "Renderizado exitoso",
+            "statusError": "Error de renderizado",
+            "statusCompleted": "Completado",
+            "searchPlaceholder": "Buscar contenido (Ctrl+F)...",
+            "start": "Iniciar render",
+            "startTitle": "Ejecutar pnpm run render",
+            "stop": "Detener",
+            "stopTitle": "Detener forzadamente la tarea",
+            "restart": "Reiniciar",
+            "restartTitle": "Reiniciar tarea de renderizado",
+            "clear": "Limpiar",
+            "clearTitle": "Limpiar consola (Ctrl+L)",
+            "copy": "Copiar",
+            "copyTitle": "Copiar todos los registros",
+            "copied": "Copiado",
+            "exportLogs": "Exportar",
+            "exportLogsTitle": "Exportar registros a archivo",
+            "openDir": "Carpeta de video",
+            "openDirTitle": "Abrir carpeta de videos",
+            "autoScrollOn": "Auto-desplazamiento: ACTIVADO",
+            "autoScrollOff": "Auto-desplazamiento: DESACTIVADO",
+            "autoScrollTitle": "Alternar auto-desplazamiento",
+            "progressTitle": "⚡ Progreso de cuadros:",
+            "framesUnit": "cuadros",
+            "etaPrefix": "Tiempo restante: ",
+            "emptyTitle": "Tarea de renderizado lista",
+            "emptyVer": "Versión del software: ",
+            "emptyP1": "Haga clic en [Iniciar render] para comenzar",
+            "emptyP2": " (generando materiales de video CompareEnglishWord).",
+            "emptyP3": "La consola mostrará el progreso de renderizado y exportación en tiempo real.",
+            "statCmd": "Comando:",
+            "statVer": "Versión:",
+            "statStatus": "Estado:",
+            "statProg": "Progreso:",
+            "statDuration": "Duración:",
+            "statLines": "Líneas totales:"
+      },
+      "fr": {
+            "title": "Console de Rendu Vidéo",
+            "statusIdle": "Prêt",
+            "statusRunning": "Rendu en cours...",
+            "statusSuccess": "Rendu réussi",
+            "statusError": "Erreur de rendu",
+            "statusCompleted": "Terminé",
+            "searchPlaceholder": "Rechercher le contenu (Ctrl+F)...",
+            "start": "Démarrer le rendu",
+            "startTitle": "Exécuter pnpm run render",
+            "stop": "Arrêter",
+            "stopTitle": "Arrêter la tâche en cours",
+            "restart": "Relancer",
+            "restartTitle": "Relancer la tâche de rendu",
+            "clear": "Effacer",
+            "clearTitle": "Effacer la console (Ctrl+L)",
+            "copy": "Copier",
+            "copyTitle": "Copier tous les journaux",
+            "copied": "Copié",
+            "exportLogs": "Exporter",
+            "exportLogsTitle": "Exporter les journaux dans un fichier",
+            "openDir": "Dossier vidéo",
+            "openDirTitle": "Ouvrir le dossier vidéo",
+            "autoScrollOn": "Défilement auto : ACTIF",
+            "autoScrollOff": "Défilement auto : INACTIF",
+            "autoScrollTitle": "Basculer le défilement automatique",
+            "progressTitle": "⚡ Progression des images :",
+            "framesUnit": "images",
+            "etaPrefix": "Temps restant : ",
+            "emptyTitle": "Tâche de rendu prête",
+            "emptyVer": "Version du logiciel : ",
+            "emptyP1": "Cliquez sur [Démarrer le rendu] pour lancer",
+            "emptyP2": " (génération des fichiers vidéo CompareEnglishWord).",
+            "emptyP3": "La console affiche la progression du rendu et l'export en temps réel.",
+            "statCmd": "Commande :",
+            "statVer": "Version :",
+            "statStatus": "Statut :",
+            "statProg": "Progression :",
+            "statDuration": "Durée :",
+            "statLines": "Lignes totales :"
+      },
+      "pt": {
+            "title": "Console de Renderização de Vídeo",
+            "statusIdle": "Pronto",
+            "statusRunning": "Renderizando...",
+            "statusSuccess": "Renderização concluída",
+            "statusError": "Erro na renderização",
+            "statusCompleted": "Concluído",
+            "searchPlaceholder": "Buscar conteúdo (Ctrl+F)...",
+            "start": "Iniciar renderização",
+            "startTitle": "Executar pnpm run render",
+            "stop": "Parar",
+            "stopTitle": "Forçar parada da tarefa em execução",
+            "restart": "Reiniciar",
+            "restartTitle": "Reiniciar tarefa de renderização",
+            "clear": "Limpar",
+            "clearTitle": "Limpar console (Ctrl+L)",
+            "copy": "Copiar",
+            "copyTitle": "Copiar todos os registros",
+            "copied": "Copiado",
+            "exportLogs": "Exportar",
+            "exportLogsTitle": "Exportar registros para arquivo",
+            "openDir": "Pasta de vídeo",
+            "openDirTitle": "Abrir pasta de vídeos",
+            "autoScrollOn": "Rolagem automática: LIGADA",
+            "autoScrollOff": "Rolagem automática: DESLIGADA",
+            "autoScrollTitle": "Alternar rolagem automática para o fim",
+            "progressTitle": "⚡ Progresso de quadros:",
+            "framesUnit": "quadros",
+            "etaPrefix": "Tempo restante: ",
+            "emptyTitle": "Tarefa de renderização pronta",
+            "emptyVer": "Versão do software: ",
+            "emptyP1": "Clique em [Iniciar renderização] para iniciar",
+            "emptyP2": " (gerando materiais de vídeo CompareEnglishWord).",
+            "emptyP3": "O console exibirá o progresso da renderização e exportação em tempo real.",
+            "statCmd": "Comando:",
+            "statVer": "Versão:",
+            "statStatus": "Status:",
+            "statProg": "Progresso:",
+            "statDuration": "Duração:",
+            "statLines": "Total de linhas:"
+      },
+      "de": {
+            "title": "Videorendering-Konsole",
+            "statusIdle": "Bereit",
+            "statusRunning": "Rendering läuft...",
+            "statusSuccess": "Rendering erfolgreich",
+            "statusError": "Rendering-Fehler",
+            "statusCompleted": "Abgeschlossen",
+            "searchPlaceholder": "Ausgabe durchsuchen (Ctrl+F)...",
+            "start": "Rendering starten",
+            "startTitle": "pnpm run render ausführen",
+            "stop": "Stoppen",
+            "stopTitle": "Laufende Aufgabe abbrechen",
+            "restart": "Neu starten",
+            "restartTitle": "Rendering-Aufgabe neu starten",
+            "clear": "Löschen",
+            "clearTitle": "Konsolenausgabe leeren (Ctrl+L)",
+            "copy": "Kopieren",
+            "copyTitle": "Alle Protokolle kopieren",
+            "copied": "Kopiert",
+            "exportLogs": "Exportieren",
+            "exportLogsTitle": "Protokolle in Datei exportieren",
+            "openDir": "Video-Ordner",
+            "openDirTitle": "Videoordner im Dateimanager öffnen",
+            "autoScrollOn": "Automatisches Scrollen: EIN",
+            "autoScrollOff": "Automatisches Scrollen: AUS",
+            "autoScrollTitle": "Automatisches Scrollen umschalten",
+            "progressTitle": "⚡ Frame-Fortschritt:",
+            "framesUnit": "Frames",
+            "etaPrefix": "Verbleibend: ",
+            "emptyTitle": "Videorendering bereit",
+            "emptyVer": "Softwareversion: ",
+            "emptyP1": "Klicken Sie auf [Rendering starten], um zu beginnen",
+            "emptyP2": " (CompareEnglishWord-Videomaterialien generieren).",
+            "emptyP3": "Die Konsole zeigt Rendering-Fortschritt und Exportstatus in Echtzeit an.",
+            "statCmd": "Befehl:",
+            "statVer": "Version:",
+            "statStatus": "Status:",
+            "statProg": "Fortschritt:",
+            "statDuration": "Dauer:",
+            "statLines": "Gesamtzeilen:"
+      },
+      "it": {
+            "title": "Console di Rendering Video",
+            "statusIdle": "Pronto",
+            "statusRunning": "Rendering in corso...",
+            "statusSuccess": "Rendering completato",
+            "statusError": "Errore di rendering",
+            "statusCompleted": "Completato",
+            "searchPlaceholder": "Cerca contenuto (Ctrl+F)...",
+            "start": "Avvia rendering",
+            "startTitle": "Esegui pnpm run render",
+            "stop": "Arresta",
+            "stopTitle": "Arresta l'attività in corso",
+            "restart": "Riavvia",
+            "restartTitle": "Riavvia attività di rendering",
+            "clear": "Cancella",
+            "clearTitle": "Cancella console (Ctrl+L)",
+            "copy": "Copia",
+            "copyTitle": "Copia tutti i registri",
+            "copied": "Copiato",
+            "exportLogs": "Esporta",
+            "exportLogsTitle": "Esporta registri su file",
+            "openDir": "Cartella video",
+            "openDirTitle": "Apri cartella video",
+            "autoScrollOn": "Scorrimento automatico: ATTIVO",
+            "autoScrollOff": "Scorrimento automatico: DISATTIVO",
+            "autoScrollTitle": "Attiva/disattiva scorrimento automatico",
+            "progressTitle": "⚡ Avanzamento fotogrammi:",
+            "framesUnit": "fotogrammi",
+            "etaPrefix": "Tempo stimato: ",
+            "emptyTitle": "Attività di rendering pronta",
+            "emptyVer": "Versione software: ",
+            "emptyP1": "Fai clic su [Avvia rendering] per iniziare",
+            "emptyP2": " (generazione file video CompareEnglishWord).",
+            "emptyP3": "La console mostra lo stato di sintesi ed esportazione video in tempo reale.",
+            "statCmd": "Comando:",
+            "statVer": "Versione:",
+            "statStatus": "Stato:",
+            "statProg": "Avanzamento:",
+            "statDuration": "Durata:",
+            "statLines": "Righe totali:"
+      },
+      "ru": {
+            "title": "Консоль рендеринга видео",
+            "statusIdle": "Готово",
+            "statusRunning": "Идет рендеринг...",
+            "statusSuccess": "Рендеринг завершен",
+            "statusError": "Ошибка рендеринга",
+            "statusCompleted": "Завершено",
+            "searchPlaceholder": "Поиск по выводу (Ctrl+F)...",
+            "start": "Начать рендеринг",
+            "startTitle": "Выполнить pnpm run render",
+            "stop": "Остановить",
+            "stopTitle": "Принудительно остановить задачу",
+            "restart": "Перезапустить",
+            "restartTitle": "Перезапустить задачу рендеринга",
+            "clear": "Очистить",
+            "clearTitle": "Очистить консоль (Ctrl+L)",
+            "copy": "Копировать",
+            "copyTitle": "Копировать все журналы",
+            "copied": "Скопировано",
+            "exportLogs": "Экспорт",
+            "exportLogsTitle": "Экспортировать журналы в файл",
+            "openDir": "Папка с видео",
+            "openDirTitle": "Открыть папку с видео в проводнике",
+            "autoScrollOn": "Автопрокрутка: ВКЛ",
+            "autoScrollOff": "Автопрокрутка: ВЫКЛ",
+            "autoScrollTitle": "Переключить автопрокрутку вниз",
+            "progressTitle": "⚡ Прогресс кадров:",
+            "framesUnit": "кадров",
+            "etaPrefix": "Осталось: ",
+            "emptyTitle": "Задача рендеринга готова",
+            "emptyVer": "Версия ПО: ",
+            "emptyP1": "Нажмите [Начать рендеринг] выше для запуска",
+            "emptyP2": " (генерация видеоматериалов CompareEnglishWord).",
+            "emptyP3": "Консоль в реальном времени отображает прогресс синтеза и экспорта.",
+            "statCmd": "Команда:",
+            "statVer": "Версия:",
+            "statStatus": "Статус:",
+            "statProg": "Прогресс:",
+            "statDuration": "Время:",
+            "statLines": "Всего строк:"
+      },
+      "tr": {
+            "title": "Video İşleme Konsolu",
+            "statusIdle": "Hazır",
+            "statusRunning": "İşleniyor...",
+            "statusSuccess": "İşleme Başarılı",
+            "statusError": "İşleme Hatası",
+            "statusCompleted": "Tamamlandı",
+            "searchPlaceholder": "Çıktıda ara (Ctrl+F)...",
+            "start": "İşlemeyi Başlat",
+            "startTitle": "pnpm run render komutunu çalıştır",
+            "stop": "Durdur",
+            "stopTitle": "Çalışan görevi zorla durdur",
+            "restart": "Yeniden Başlat",
+            "restartTitle": "İşleme görevini yeniden başlat",
+            "clear": "Temizle",
+            "clearTitle": "Konsolu temizle (Ctrl+L)",
+            "copy": "Kopyala",
+            "copyTitle": "Tüm günlükleri kopyala",
+            "copied": "Kopyalandı",
+            "exportLogs": "Dışa Aktar",
+            "exportLogsTitle": "Günlükleri dosyaya aktar",
+            "openDir": "Video Klasörü",
+            "openDirTitle": "Video klasörünü aç",
+            "autoScrollOn": "Otomatik Kaydırma: AÇIK",
+            "autoScrollOff": "Otomatik Kaydırma: KAPALI",
+            "autoScrollTitle": "Otomatik kaydırmayı aç/kapat",
+            "progressTitle": "⚡ Kare İlerlemesi:",
+            "framesUnit": "kare",
+            "etaPrefix": "Kalan Süre: ",
+            "emptyTitle": "Video İşleme Görevi Hazır",
+            "emptyVer": "Yazılım Sürümü: ",
+            "emptyP1": "Başlatmak için yukarıdaki [İşlemeyi Başlat] butonuna tıklayın",
+            "emptyP2": " (CompareEnglishWord video materyalleri oluşturuluyor).",
+            "emptyP3": "Konsol, işleme ilerlemesini ve ses-görüntü sentezini gerçek zamanlı aktarır.",
+            "statCmd": "Komut:",
+            "statVer": "Sürüm:",
+            "statStatus": "Durum:",
+            "statProg": "İlerleme:",
+            "statDuration": "Süre:",
+            "statLines": "Toplam Satır:"
+      }
+};
+
+    let currentRenderLang = 'zh';
+
+    function getRenderLocale() {
+      return I18N_RENDER[currentRenderLang] || I18N_RENDER.zh;
+    }
+
+    function applyLanguage(lang) {
+      if (lang && I18N_RENDER[lang.toLowerCase()]) {
+        currentRenderLang = lang.toLowerCase();
+      } else {
+        currentRenderLang = 'zh';
+      }
+      const c = getRenderLocale();
+
+      document.title = `${c.title} (Video Rendering Console)`;
+      const titleEl = document.getElementById('render-title-text');
+      if (titleEl) titleEl.textContent = c.title;
+
+      const sInput = document.getElementById('search-input');
+      if (sInput) sInput.placeholder = c.searchPlaceholder;
+
+      const bStart = document.getElementById('btn-start');
+      const bStartText = document.getElementById('btn-start-text');
+      if (bStart) bStart.title = c.startTitle;
+      if (bStartText) bStartText.textContent = c.start;
+
+      const bStop = document.getElementById('btn-stop');
+      const bStopText = document.getElementById('btn-stop-text');
+      if (bStop) bStop.title = c.stopTitle;
+      if (bStopText) bStopText.textContent = c.stop;
+
+      const bRestart = document.getElementById('btn-restart');
+      const bRestartText = document.getElementById('btn-restart-text');
+      if (bRestart) bRestart.title = c.restartTitle;
+      if (bRestartText) bRestartText.textContent = c.restart;
+
+      const bClear = document.getElementById('btn-clear');
+      const bClearText = document.getElementById('btn-clear-text');
+      if (bClear) bClear.title = c.clearTitle;
+      if (bClearText) bClearText.textContent = c.clear;
+
+      const bCopy = document.getElementById('btn-copy');
+      const bCopyText = document.getElementById('btn-copy-text');
+      if (bCopy) bCopy.title = c.copyTitle;
+      if (bCopyText) bCopyText.textContent = c.copy;
+
+      const bExport = document.getElementById('btn-export');
+      const bExportText = document.getElementById('btn-export-text');
+      if (bExport) bExport.title = c.exportLogsTitle;
+      if (bExportText) bExportText.textContent = c.exportLogs;
+
+      const bOpenDir = document.getElementById('btn-open-dir');
+      const bOpenDirText = document.getElementById('btn-open-dir-text');
+      if (bOpenDir) bOpenDir.title = c.openDirTitle;
+      if (bOpenDirText) bOpenDirText.textContent = c.openDir;
+
+      const bAuto = document.getElementById('btn-autoscroll');
+      const bAutoText = document.getElementById('btn-autoscroll-text');
+      if (bAuto) bAuto.title = c.autoScrollTitle;
+      if (bAutoText) bAutoText.textContent = autoScroll ? c.autoScrollOn : c.autoScrollOff;
+
+      const progTitle = document.getElementById('progress-title-text');
+      if (progTitle) progTitle.textContent = c.progressTitle;
+
+      const emptyTitle = document.getElementById('empty-title');
+      if (emptyTitle) emptyTitle.textContent = c.emptyTitle;
+
+      const emptyVer = document.getElementById('empty-ver-lbl');
+      if (emptyVer) emptyVer.textContent = c.emptyVer;
+
+      const emptyP1 = document.getElementById('empty-desc-p1');
+      if (emptyP1) emptyP1.textContent = c.emptyP1;
+
+      const emptyP2 = document.getElementById('empty-desc-p2');
+      if (emptyP2) emptyP2.textContent = c.emptyP2;
+
+      const emptyP3 = document.getElementById('empty-desc-p3');
+      if (emptyP3) emptyP3.textContent = c.emptyP3;
+
+      const lblCmd = document.getElementById('stat-lbl-cmd');
+      if (lblCmd) lblCmd.textContent = c.statCmd;
+
+      const lblVer = document.getElementById('stat-lbl-version');
+      if (lblVer) lblVer.textContent = c.statVer;
+
+      const lblStat = document.getElementById('stat-lbl-status');
+      if (lblStat) lblStat.textContent = c.statStatus;
+
+      const lblProg = document.getElementById('stat-lbl-progress');
+      if (lblProg) lblProg.textContent = c.statProg;
+
+      const lblDur = document.getElementById('stat-lbl-duration');
+      if (lblDur) lblDur.textContent = c.statDuration;
+
+      const lblLines = document.getElementById('stat-lbl-lines');
+      if (lblLines) lblLines.textContent = c.statLines;
+
+      if (lastRenderState) {
+        updateStatus(lastRenderState);
+      } else {
+        const defaultStateTxt = c.statusIdle;
+        const statusTextEl = document.getElementById('status-text');
+        const statStatusEl = document.getElementById('stat-status');
+        if (statusTextEl) statusTextEl.textContent = defaultStateTxt;
+        if (statStatusEl) statStatusEl.textContent = defaultStateTxt;
+      }
+      if (lastRenderProgress) {
+        updateProgressBar(lastRenderProgress);
+      }
+    }
+
+    const container = document.getElementById('console-container');
+    const emptyState = document.getElementById('empty-state');
+    const statusBadge = document.getElementById('status-badge');
+    const statusText = document.getElementById('status-text');
+    const statStatus = document.getElementById('stat-status');
+    const statDuration = document.getElementById('stat-duration');
+    const statLines = document.getElementById('stat-lines');
+    const searchInput = document.getElementById('search-input');
+
+    const btnStart = document.getElementById('btn-start');
+    const btnStop = document.getElementById('btn-stop');
+    const btnRestart = document.getElementById('btn-restart');
+    const btnClear = document.getElementById('btn-clear');
+    const btnCopy = document.getElementById('btn-copy');
+    const btnAutoScroll = document.getElementById('btn-autoscroll');
+
+    const btnExport = document.getElementById('btn-export');
+    const progressWrap = document.getElementById('render-progress-wrap');
+    const progressPctText = document.getElementById('progress-pct-text');
+    const progressFramesText = document.getElementById('progress-frames-text');
+    const progressEtaText = document.getElementById('progress-eta-text');
+    const progressFill = document.getElementById('progress-fill');
+    const statProgressItem = document.getElementById('stat-progress-item');
+    const statProgressVal = document.getElementById('stat-progress-val');
+
+    let allLogs = [];
+    let autoScroll = true;
+    let searchQuery = '';
+    let currentStatus = 'idle';
+    let durationTimer = null;
+    let startTime = null;
+    let lastRenderState = null;
+    let lastRenderProgress = null;
+
+    // ANSI 颜色转 HTML 标记简易解析器与 URL 识别
+    function parseAnsiToHtml(str) {
+      if (!str) return '';
+      let text = String(str).replace(/\r/g, '');
+      text = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+      const ansiMap = {
+        '30': 'ansi-black',
+        '31': 'ansi-red',
+        '32': 'ansi-green',
+        '33': 'ansi-yellow',
+        '34': 'ansi-blue',
+        '35': 'ansi-magenta',
+        '36': 'ansi-cyan',
+        '37': 'ansi-white',
+        '90': 'ansi-black',
+        '91': 'ansi-red',
+        '92': 'ansi-green',
+        '93': 'ansi-yellow',
+        '94': 'ansi-blue',
+        '95': 'ansi-magenta',
+        '96': 'ansi-cyan',
+        '97': 'ansi-white',
+        '1': 'ansi-bold',
+      };
+
+      text = text.replace(/\x1b\[([0-9;]+)m/g, (match, p1) => {
+        const codes = p1.split(';');
+        if (codes.includes('0')) {
+          return '</span>';
+        }
+        const classes = codes.map(c => ansiMap[c]).filter(Boolean);
+        if (classes.length > 0) {
+          return `<span class="${classes.join(' ')}">`;
+        }
+        return '';
+      });
+
+      text = text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+      return text;
+    }
+
+    // 视频渲染控制台日志多语言规则表 (支持项目全量 14 种核心语言与兼容语种)
+    const RENDER_LOG_RULES = [
+      {
+        pattern: /(?:(?:🎯|🚀)s*)?拾取待渲染任务[:：]s*(.*)/i,
+        templates: {
+          zh: '🎯 拾取待渲染任务: $1',
+          en: '🎯 Picked pending video render task: $1',
+          ja: '🎯 レンダリング待ちタスクを取得: $1',
+          ko: '🎯 렌더링 대기 작업 선택: $1',
+          vi: '🎯 Đã nhận tác vụ kết xuất đang chờ: $1',
+          th: '🎯 ดึงงานเรนเดอร์ที่รอดำเนินการ: $1',
+          id: '🎯 Mengambil tugas render tertunda: $1',
+          es: '🎯 Tarea de renderizado pendiente seleccionada: $1',
+          fr: '🎯 Tâche de rendu en attente récupérée : $1',
+          pt: '🎯 Tarefa de renderização pendente selecionada: $1',
+          de: '🎯 Ausstehende Renderaufgabe übernommen: $1',
+          it: '🎯 Attività di rendering in sospeso acquisita: $1',
+          ru: '🎯 Взята ожидающая задача на рендеринг: $1',
+          tr: '🎯 Bekleyen işleme görevi alındı: $1',
+          bn: '🎯 অপেক্ষমাণ রেন্ডার কাজ গৃহীত হয়েছে: $1',
+          ur: '🎯 زیر التواء رینڈرنگ ٹاسک منتخب کیا گیا: $1',
+        }
+      },
+      {
+        pattern: /(?:(?:📂|📁)s*)?(?:存储目录路径|任务目录路径)[:：]s*(.*)/i,
+        templates: {
+          zh: '📁 任务目录路径: $1',
+          en: '📁 Task directory path: $1',
+          ja: '📁 タスクディレクトリパス: $1',
+          ko: '📁 작업 디렉터리 경로: $1',
+          vi: '📁 Đường dẫn thư mục tác vụ: $1',
+          th: '📁 เส้นทางไดเรกทอรีงาน: $1',
+          id: '📁 Jalur direktori tugas: $1',
+          es: '📁 Ruta del directorio de la tarea: $1',
+          fr: '📁 Chemin du dossier de la tâche : $1',
+          pt: '📁 Caminho do diretório da tarefa: $1',
+          de: '📁 Verzeichnispfad der Aufgabe: $1',
+          it: '📁 Percorso directory attività: $1',
+          ru: '📁 Путь к каталогу задачи: $1',
+          tr: '📁 Görev dizini yolu: $1',
+          bn: '📁 কাজের ডিরেক্টরি পাথ: $1',
+          ur: '📁 ٹاسک ڈائرکٹری کا راستہ: $1',
+        }
+      },
+      {
+        pattern: /(?:(?:💾|🎬)s*)?(?:本地存储位置|本次目标文件)[:：]s*(.*)/i,
+        templates: {
+          zh: '🎬 本次目标文件: $1',
+          en: '🎬 Target output file: $1',
+          ja: '🎬 ターゲット出力ファイル: $1',
+          ko: '🎬 대상 출력 파일: $1',
+          vi: '🎬 Tệp đầu ra mục tiêu: $1',
+          th: '🎬 ไฟล์เป้าหมายที่จะสร้าง: $1',
+          id: '🎬 File output target: $1',
+          es: '🎬 Archivo de destino: $1',
+          fr: '🎬 Fichier cible de sortie : $1',
+          pt: '🎬 Arquivo de destino de saída: $1',
+          de: '🎬 Zielausgabedatei: $1',
+          it: '🎬 File di output di destinazione: $1',
+          ru: '🎬 Целевой выходной файл: $1',
+          tr: '🎬 Hedef çıktı dosyası: $1',
+          bn: '🎬 লক্ষ্য আউটপুট ফাইল: $1',
+          ur: '🎬 ٹارگٹ آؤٹ پٹ فائل: $1',
+        }
+      },
+      {
+        pattern: /(?:🔑\s*)?携带用户鉴权凭据[:：]\s*(.*)/i,
+        templates: {
+          zh: '🔑 携带用户鉴权凭据: $1',
+          en: '🔑 With user auth token: $1',
+          ja: '🔑 ユーザー認証トークンを保持: $1',
+          ko: '🔑 사용자 인증 토큰 포함: $1',
+          vi: '🔑 Kèm theo mã thông báo xác thực người dùng: $1',
+          th: '🔑 แนบโทเค็นการตรวจสอบสิทธิ์ผู้ใช้: $1',
+          id: '🔑 Membawa token autentikasi pengguna: $1',
+          es: '🔑 Con token de autenticación de usuario: $1',
+          fr: '🔑 Avec jeton d\'authentification utilisateur : $1',
+          pt: '🔑 Com token de autenticação de usuário: $1',
+          de: '🔑 Mit Benutzer-Authentifizierungstoken: $1',
+          it: '🔑 Con token di autenticazione utente: $1',
+          ru: '🔑 С токеном аутентификации пользователя: $1',
+          tr: '🔑 Kullanıcı kimlik doğrulama belirteciyle: $1',
+          bn: '🔑 ব্যবহারকারী প্রমাণীকরণ টোকেন সহ: $1',
+          ur: '🔑 صارف کی توثیق کے ٹوکن کے ساتھ: $1',
+        }
+      },
+      {
+        pattern: /(?:⏳\s*)?正在向调度端同步状态为[「"“]正在渲染\s*\(rendering\)[」"”]/i,
+        templates: {
+          zh: '⏳ 正在向调度端同步状态为「正在渲染 (rendering)」...',
+          en: '⏳ Syncing status to scheduler: "rendering"...',
+          ja: '⏳ スケジューラーにステータスを「レンダリング中」と同期中...',
+          ko: '⏳ 스케줄러에 상태를 "렌더링 중 (rendering)"으로 동기화하는 중...',
+          vi: '⏳ Đang đồng bộ trạng thái sang bộ lập lịch là "đang kết xuất (rendering)"...',
+          th: '⏳ กำลังซิงค์สถานะไปยังตัวจัดกำหนดการ: "กำลังเรนเดอร์ (rendering)"...',
+          id: '⏳ Menyinkronkan status ke penjadwal: "sedang merender (rendering)"...',
+          es: '⏳ Sincronizando estado con el programador: "renderizando"...',
+          fr: '⏳ Synchronisation du statut avec le planificateur : "rendu en cours"...',
+          pt: '⏳ Sincronizando status com o agendador: "renderizando"...',
+          de: '⏳ Synchronisiere Status mit Planer: "Rendering läuft"...',
+          it: '⏳ Sincronizzazione stato con lo scheduler: "rendering in corso"...',
+          ru: '⏳ Синхронизация статуса с диспетчером: «рендеринг (rendering)»...',
+          tr: '⏳ Zamanlayıcıya durum senkronize ediliyor: "işleniyor (rendering)"...',
+          bn: '⏳ সময়সূচকে স্থিতি সিঙ্ক করা হচ্ছে: "রেন্ডারিং চলছে"...',
+          ur: '⏳ شیڈیولر میں اسٹیٹس کی ہم آہنگی: "رینڈرنگ جاری ہے"...',
+        }
+      },
+      {
+        pattern: /(?:📥\s*)?正在(?:预下载并校验|补齐\/校验)核心素材\s*\(音频\/图片\/文字\)\.\.\./i,
+        templates: {
+          zh: '📥 正在补齐/校验核心素材 (音频/图片/文字)...',
+          en: '📥 Verifying & downloading core assets (audio/images/text)...',
+          ja: '📥 コア素材を検証・ダウンロード中 (音声/画像/テキスト)...',
+          ko: '📥 핵심 에셋 다운로드 및 검증 중 (오디오/이미지/텍스트)...',
+          vi: '📥 Đang xác minh & tải xuống tài nguyên cốt lõi (âm thanh/hình ảnh/văn bản)...',
+          th: '📥 กำลังตรวจสอบและดาวน์โหลดองค์ประกอบหลัก (เสียง/ภาพ/ข้อความ)...',
+          id: '📥 Memverifikasi & mengunduh aset inti (audio/gambar/teks)...',
+          es: '📥 Verificando y descargando recursos principales (audio/imágenes/texto)...',
+          fr: '📥 Vérification et téléchargement des éléments essentiels (audio/images/texte)...',
+          pt: '📥 Verificando e baixando recursos principais (áudio/imagens/texto)...',
+          de: '📥 Überprüfung und Herunterladen der Kern-Assets (Audio/Bilder/Text)...',
+          it: '📥 Verifica e download delle risorse principali (audio/immagini/testo)...',
+          ru: '📥 Проверка и загрузка ключевых медиаресурсов (аудио/изображения/текст)...',
+          tr: '📥 Temel materyaller doğrulanıyor ve indiriliyor (ses/görsel/metin)...',
+          bn: '📥 মূল সম্পদগুলি যাচাই ও ডাউনলোড করা হচ্ছে (অডিও/ছবি/টেক্সট)...',
+          ur: '📥 بنیادی اثاثوں کی تصدیق اور ڈاؤن لوڈ جاری ہے (آڈیو/تصاویر/متن)...',
+        }
+      },
+      {
+        pattern: /(?:(?:✅|📊)s*)?核心素材(?:全部|全局)就绪[:：]s*采用s*meta.duration_ens*(?:视频时长|预估时长)s*([d.]+)ss*((d+)s*帧)/i,
+        templates: {
+          zh: '📊 核心素材全局就绪: 采用 meta.duration_en 预估时长 $1s ($2 帧)',
+          en: '📊 Core assets ready: using meta.duration_en estimated duration $1s ($2 frames)',
+          ja: '📊 コア素材の準備完了: meta.duration_en 推定時間 $1秒 ($2 フレーム)',
+          ko: '📊 핵심 에셋 준비 완료: meta.duration_en 기준 예상 시간 $1초 ($2 프레임)',
+          vi: '📊 Tài nguyên cốt lõi đã sẵn sàng: thời lượng ước tính meta.duration_en $1s ($2 khung hình)',
+          th: '📊 องค์ประกอบหลักพร้อมแล้ว: ใช้ระยะเวลาโดยประมาณ meta.duration_en $1 วินาที ($2 เฟรม)',
+          id: '📊 Aset inti siap: estimasi durasi meta.duration_en $1s ($2 bingkai)',
+          es: '📊 Recursos principales listos: duración estimada meta.duration_en $1s ($2 fotogramas)',
+          fr: '📊 Éléments essentiels prêts : durée estimée meta.duration_en $1s ($2 images)',
+          pt: '📊 Recursos principais prontos: duração estimada meta.duration_en $1s ($2 quadros)',
+          de: '📊 Kern-Assets bereit: geschätzte Dauer meta.duration_en $1s ($2 Frames)',
+          it: '📊 Risorse principali pronte: durata stimata meta.duration_en $1s ($2 fotogrammi)',
+          ru: '📊 Ресурсы готовы: расчетная длительность по meta.duration_en $1с ($2 кадров)',
+          tr: '📊 Temel materyaller hazır: meta.duration_en tahmini süre $1sn ($2 kare)',
+          bn: '📊 মূল সম্পদ প্রস্তুত: meta.duration_en আনুমানিক সময় $1 সেকেন্ড ($2 ফ্রেম)',
+          ur: '📊 بنیادی اثاثے تیار: meta.duration_en تخمینہ شدہ دورانیہ $1 سیکنڈ ($2 فریمز)',
+        }
+      },
+      {
+        pattern: /(?:🎬\s*)?根据任务(?:语言设定检测到|指定需渲染生成)\s*(\d+)\s*种(?:渲染)?版本[，,]?\s*(?:即将|即刻)开始渲染[:：]?/i,
+        templates: {
+          zh: '🎬 根据任务指定需渲染生成 $1 种语言版本，即刻开始渲染:',
+          en: '🎬 Rendering $1 language version(s) according to task settings:',
+          ja: '🎬 タスク設定に基づき $1 種類の言語バージョンをレンダリングします:',
+          ko: '🎬 작업 설정에 따라 $1개 언어 버전 렌더링을 시작합니다:',
+          vi: '🎬 Bắt đầu kết xuất $1 phiên bản ngôn ngữ theo cấu hình tác vụ:',
+          th: '🎬 เริ่มต้นการเรนเดอร์ $1 เวอร์ชันภาษาตามการตั้งค่างาน:',
+          id: '🎬 Memulai rendering $1 versi bahasa sesuai pengaturan tugas:',
+          es: '🎬 Iniciando renderizado de $1 versiones de idioma según la tarea:',
+          fr: '🎬 Rendu de $1 versions linguistiques selon les paramètres :',
+          pt: '🎬 Renderizando $1 versões de idioma de acordo com as configurações da tarefa:',
+          de: '🎬 Starte Rendering für $1 Sprachversionen gemäß Aufgabenstellung:',
+          it: '🎬 Avvio del rendering di $1 versioni linguistiche in base all\'attività:',
+          ru: '🎬 Запуск рендеринга $1 языковых версий согласно задаче:',
+          tr: '🎬 Görev ayarlarına göre $1 dil sürümü işlenmeye başlanıyor:',
+          bn: '🎬 টাস্ক সেটিংস অনুযায়ী $1টি ভাষার সংস্করণ রেন্ডারিং শুরু হচ্ছে:',
+          ur: '🎬 ٹاسک سیٹنگز کے مطابق $1 زبان کے ورژن کی رینڈرنگ شروع ہو رہی ہے:',
+        }
+      },
+      {
+        pattern: /(?:▶(?:️|\s*)\s*)?\[(\d+)\/(\d+)\]\s*正在执行[【\[](.*?)[】\]]渲染\s*\((.*?)\)\.\.\./i,
+        templates: {
+          zh: '▶ [$1/$2] 正在执行【$3】渲染 ($4)...',
+          en: '▶ [$1/$2] Executing [$3] rendering ($4)...',
+          ja: '▶ [$1/$2] 【$3】のレンダリングを実行中 ($4)...',
+          ko: '▶ [$1/$2] 【$3】렌더링 실행 중 ($4)...',
+          vi: '▶ [$1/$2] Đang thực hiện kết xuất [$3] ($4)...',
+          th: '▶ [$1/$2] กำลังเรนเดอร์ [$3] ($4)...',
+          id: '▶ [$1/$2] Menjalankan rendering [$3] ($4)...',
+          es: '▶ [$1/$2] Ejecutando renderizado de [$3] ($4)...',
+          fr: '▶ [$1/$2] Exécution du rendu [$3] ($4)...',
+          pt: '▶ [$1/$2] Executando renderização de [$3] ($4)...',
+          de: '▶ [$1/$2] Rendere [$3] ($4)...',
+          it: '▶ [$1/$2] Esecuzione rendering [$3] ($4)...',
+          ru: '▶ [$1/$2] Выполняется рендеринг «$3» ($4)...',
+          tr: '▶ [$1/$2] [$3] işlemesi yürütülüyor ($4)...',
+          bn: '▶ [$1/$2] [$3] রেন্ডারিং চলছে ($4)...',
+          ur: '▶ [$1/$2] [$3] رینڈرنگ جاری ہے ($4)...',
+        }
+      },
+      {
+        pattern: /(?:⚡\s*)?检测到已有\s*Remotion\s*打包缓存[:：]\s*(.*?)[，,]\s*(?:直接复用免打包|直推复用免打包)/i,
+        templates: {
+          zh: '⚡ 检测到已有 Remotion 打包缓存: $1，直接复用免打包',
+          en: '⚡ Found Remotion bundle cache: $1, reusing directly without re-bundling',
+          ja: '⚡ Remotion バンドルキャッシュを検出: $1、再ビルドをスキップして再利用',
+          ko: '⚡ Remotion 번들 캐시 감지됨: $1, 재빌드 없이 직접 재사용',
+          vi: '⚡ Đã tìm thấy bộ nhớ cache gói Remotion: $1, tái sử dụng trực tiếp không cần đóng gói lại',
+          th: '⚡ ตรวจพบแคชบันเดิล Remotion: $1 นำกลับมาใช้ซ้ำโดยไม่ต้องสร้างใหม่',
+          id: '⚡ Ditemukan cache bundel Remotion: $1, gunakan langsung tanpa membundel ulang',
+          es: '⚡ Caché de compilación de Remotion detectada: $1, reutilizando directamente',
+          fr: '⚡ Cache de bundle Remotion détecté : $1, réutilisé sans recompilation',
+          pt: '⚡ Cache de pacote Remotion detectado: $1, reutilizando diretamente sem reempacotar',
+          de: '⚡ Remotion-Bundle-Cache gefunden: $1, wird direkt ohne Neubundling wiederverwendet',
+          it: '⚡ Trovata cache bundle Remotion: $1, riutilizzo diretto senza ricompilazione',
+          ru: '⚡ Обнаружен кэш сборки Remotion: $1, прямое повторное использование без пересборки',
+          tr: '⚡ Remotion paket önbelleği bulundu: $1, yeniden paketlemeden doğrudan kullanılıyor',
+          bn: '⚡ Remotion বান্ডিল ক্যাশে পাওয়া গেছে: $1, পুনরায় বান্ডিল না করেই সরাসরি ব্যবহার করা হচ্ছে',
+          ur: '⚡ Remotion بنڈل کیش ملا: $1، دوبارہ بنڈل کیے بغیر براہ راست دوبارہ استعمال ہو رہا ہے',
+        }
+      },
+      {
+        pattern: /(?:(?:📥|🌐)\s*)?正在同步\s*Remotion\s*(?:本地|云端)静态素材\s*\((.*?)\)\.\.\./i,
+        templates: {
+          zh: '🌐 正在同步 Remotion 云端静态素材 ($1)...',
+          en: '🌐 Syncing Remotion cloud static assets ($1)...',
+          ja: '🌐 Remotion クラウド静的アセットを同期中 ($1)...',
+          ko: '🌐 Remotion 클라우드 정적 에셋 동기화 중 ($1)...',
+          vi: '🌐 Đang đồng bộ tài nguyên tĩnh Remotion trên đám mây ($1)...',
+          th: '🌐 กำลังซิงค์แอสเซทแบบคงที่บนคลาวด์ของ Remotion ($1)...',
+          id: '🌐 Menyinkronkan aset statis cloud Remotion ($1)...',
+          es: '🌐 Sincronizando recursos estáticos en la nube de Remotion ($1)...',
+          fr: '🌐 Synchronisation des ressources statiques Remotion sur le cloud ($1)...',
+          pt: '🌐 Sincronizando recursos estáticos da nuvem do Remotion ($1)...',
+          de: '🌐 Synchronisiere statische Remotion-Cloud-Assets ($1)...',
+          it: '🌐 Sincronizzazione delle risorse statiche cloud di Remotion ($1)...',
+          ru: '🌐 Синхронизация статических ресурсов Remotion из облака ($1)...',
+          tr: '🌐 Remotion bulut statik materyalleri senkronize ediliyor ($1)...',
+          bn: '🌐 Remotion ক্লাউড স্ট্যাটিক সম্পদ সিঙ্ক করা হচ্ছে ($1)...',
+          ur: '🌐 Remotion کلاؤڈ جامد اثاثے ہم آہنگ ہو رہے ہیں ($1)...',
+        }
+      },
+      {
+        pattern: /(?:(?:🚀|🎬)\s*)?执行渲染命令\s*(?:并发[:：]\s*(\d+)x)\s*[:：]?\s*(.*)/i,
+        templates: {
+          zh: '🎬 执行渲染命令 (并发: $1x): $2',
+          en: '🎬 Executing render command (concurrency: $1x): $2',
+          ja: '🎬 レンダリングコマンドを実行 (並列数: $1x): $2',
+          ko: '🎬 렌더링 명령 실행 (동시성: $1x): $2',
+          vi: '🎬 Thực thi lệnh kết xuất (đồng thời: $1x): $2',
+          th: '🎬 ดำเนินการคำสั่งเรนเดอร์ (การทำงานพร้อมกัน: $1x): $2',
+          id: '🎬 Menjalankan perintah render (konkurensi: $1x): $2',
+          es: '🎬 Ejecutando comando de renderizado (concurrencia: $1x): $2',
+          fr: '🎬 Exécution de la commande de rendu (concurrence : $1x) : $2',
+          pt: '🎬 Executando comando de renderização (simultaneidade: $1x): $2',
+          de: '🎬 Führe Renderbefehl aus (Parallelität: $1x): $2',
+          it: '🎬 Esecuzione comando di rendering (concorrenza: $1x): $2',
+          ru: '🎬 Выполнение команды рендеринга (параллелизм: $1x): $2',
+          tr: '🎬 İşleme komutu yürütülüyor (eşzamanlılık: $1x): $2',
+          bn: '🎬 রেন্ডার কমান্ড কার্যকর করা হচ্ছে (একযোগে: $1x): $2',
+          ur: '🎬 رینڈر کمانڈ چلائی جا رہی ہے (ہم آہنگی: $1x): $2',
+        }
+      },
+      {
+        pattern: /(?:🎵\s*)?[【\[](.*?)[】\]]正在对音频轨做微小变调\s*\((.*?)\)[，,].*/i,
+        templates: {
+          zh: '🎵 【$1】正在对音频轨做微小变调 ($2)...',
+          en: '🎵 [$1] Applying subtle pitch adjustment ($2)...',
+          ja: '🎵 【$1】音声トラックの微小ピッチ調整中 ($2)...',
+          ko: '🎵 【$1】오디오 트랙 미세 피치 조절 중 ($2)...',
+          vi: '🎵 [$1] Đang áp dụng điều chỉnh cao độ nhỏ cho âm thanh ($2)...',
+          th: '🎵 [$1] กำลังปรับระดับเสียงแทร็กเสียงเล็กน้อย ($2)...',
+          id: '🎵 [$1] Menerapkan penyesuaian nada halus pada trek audio ($2)...',
+          es: '🎵 [$1] Aplicando ajuste de tono sutil a la pista de audio ($2)...',
+          fr: '🎵 [$1] Ajustement subtil de la hauteur de la piste audio ($2)...',
+          pt: '🎵 [$1] Aplicando ajuste sutil de tom à faixa de áudio ($2)...',
+          de: '🎵 [$1] Feine Tonhöhenanpassung der Audiospur ($2)...',
+          it: '🎵 [$1] Regolazione fine dell\'intonazione della traccia audio ($2)...',
+          ru: '🎵 [$1] Применение микросдвига высоты тона звука ($2)...',
+          tr: '🎵 [$1] Ses parçasına hassas perde ayarı uygulanıyor ($2)...',
+          bn: '🎵 [$1] অডিও ট্র্যাকে সূক্ষ্ম পিচ সমন্বয় প্রয়োগ করা হচ্ছে ($2)...',
+          ur: '🎵 [$1] آڈیو ٹریک پر پچ ایڈجسٹمنٹ لاگو کی جا رہی ہے ($2)...',
+        }
+      },
+      {
+        pattern: /(?:✅\s*)?[【\[](.*?)[】\]]音频变调处理完成\s*\((.*?)\)/i,
+        templates: {
+          zh: '✅ 【$1】音频变调处理完成 ($2)',
+          en: '✅ [$1] Audio pitch adjustment completed ($2)',
+          ja: '✅ 【$1】音声ピッチ調整が完了 ($2)',
+          ko: '✅ 【$1】오디오 피치 조정 완료 ($2)',
+          vi: '✅ [$1] Đã hoàn tất điều chỉnh cao độ âm thanh ($2)',
+          th: '✅ [$1] ปรับระดับเสียงเสร็จสมบูรณ์ ($2)',
+          id: '✅ [$1] Penyesuaian nada audio selesai ($2)',
+          es: '✅ [$1] Ajuste de tono de audio completado ($2)',
+          fr: '✅ [$1] Ajustement de la hauteur audio terminé ($2)',
+          pt: '✅ [$1] Ajuste de tom de áudio concluído ($2)',
+          de: '✅ [$1] Tonhöhenanpassung abgeschlossen ($2)',
+          it: '✅ [$1] Regolazione dell\'intonazione audio completata ($2)',
+          ru: '✅ [$1] Коррекция высоты тона звука завершена ($2)',
+          tr: '✅ [$1] Ses perdesi ayarlaması tamamlandı ($2)',
+          bn: '✅ [$1] অডিও পিচ সমন্বয় সম্পন্ন হয়েছে ($2)',
+          ur: '✅ [$1] آڈیو پچ ایڈجسٹمنٹ مکمل ہو گئی ($2)',
+        }
+      },
+      {
+        pattern: /(?:✅\s*)?[【\[](.*?)[】\]]渲染完成[！!]\s*耗时[:：]\s*([\d.]+)s\s*\|\s*文件大小[:：]\s*([\d.]+)s*MB/i,
+        templates: {
+          zh: '✅ 【$1】渲染完成! 耗时: $2s | 文件大小: $3 MB',
+          en: '✅ [$1] Render completed! Duration: $2s | File size: $3 MB',
+          ja: '✅ 【$1】レンダリング完了！ 所要時間: $2s | ファイルサイズ: $3 MB',
+          ko: '✅ 【$1】렌더링 완료! 소요 시간: $2s | 파일 크기: $3 MB',
+          vi: '✅ [$1] Kết xuất hoàn tất! Thời gian: $2s | Dung lượng: $3 MB',
+          th: '✅ [$1] การเรนเดอร์เสร็จสมบูรณ์! เวลาที่ใช้: $2s | ขนาดไฟล์: $3 MB',
+          id: '✅ [$1] Render selesai! Durasi: $2s | Ukuran file: $3 MB',
+          es: '✅ [$1] ¡Renderizado completado! Duración: $2s | Tamaño: $3 MB',
+          fr: '✅ [$1] Rendu terminé ! Durée : $2s | Taille du fichier : $3 MB',
+          pt: '✅ [$1] Renderização concluída! Duração: $2s | Tamanho: $3 MB',
+          de: '✅ [$1] Rendering abgeschlossen! Dauer: $2s | Dateigröße: $3 MB',
+          it: '✅ [$1] Rendering completato! Durata: $2s | Dimensione file: $3 MB',
+          ru: '✅ [$1] Рендеринг завершен! Время: $2с | Размер файла: $3 МБ',
+          tr: '✅ [$1] İşleme tamamlandı! Süre: $2sn | Dosya boyutu: $3 MB',
+          bn: '✅ [$1] রেন্ডার সম্পন্ন! সময়: $2s | ফাইলের আকার: $3 MB',
+          ur: '✅ [$1] رینڈرنگ مکمل! وقت: $2s | فائل کا سائز: $3 MB',
+        }
+      },
+      {
+        pattern: /(?:❌\s*)?[【\[](.*?)[】\]]渲染失败[:：]\s*(.*)/i,
+        templates: {
+          zh: '❌ 【$1】渲染失败: $2',
+          en: '❌ [$1] Rendering failed: $2',
+          ja: '❌ 【$1】レンダリングに失敗しました: $2',
+          ko: '❌ 【$1】렌더링 실패: $2',
+          vi: '❌ [$1] Kết xuất thất bại: $2',
+          th: '❌ [$1] การเรนเดอร์ล้มเหลว: $2',
+          id: '❌ [$1] Rendering gagal: $2',
+          es: '❌ [$1] Error de renderizado: $2',
+          fr: '❌ [$1] Échec du rendu : $2',
+          pt: '❌ [$1] Falha na renderização: $2',
+          de: '❌ [$1] Rendering fehlgeschlagen: $2',
+          it: '❌ [$1] Rendering non riuscito: $2',
+          ru: '❌ [$1] Ошибка рендеринга: $2',
+          tr: '❌ [$1] İşleme başarısız: $2',
+          bn: '❌ [$1] রেন্ডারিং ব্যর্থ হয়েছে: $2',
+          ur: '❌ [$1] رینڈرنگ ناکام ہو گئی: $2',
+        }
+      },
+      {
+        pattern: /(?:🚀\s*)?准备执行视频渲染任务[:：]\s*(.*)/i,
+        templates: {
+          zh: '🚀 准备执行视频渲染任务: $1',
+          en: '🚀 Ready to execute video rendering task: $1',
+          ja: '🚀 動画レンダリングタスクの実行準備中: $1',
+          ko: '🚀 비디오 렌더링 작업 실행 준비: $1',
+          vi: '🚀 Chuẩn bị thực hiện tác vụ kết xuất video: $1',
+          th: '🚀 พร้อมดำเนินการงานเรนเดอร์วิดีโอ: $1',
+          bn: '🚀 ভিডিও রেন্ডারিং কাজ সম্পাদনের জন্য প্রস্তুত: $1',
+          id: '🚀 Siap menjalankan tugas rendering video: $1',
+          es: '🚀 Listo para ejecutar la tarea de renderizado de video: $1',
+          fr: '🚀 Prêt à exécuter la tâche de rendu vidéo : $1',
+          pt: '🚀 Pronto para executar a tarefa de renderização de vídeo: $1',
+          de: '🚀 Bereit zur Ausführung der Videorendering-Aufgabe: $1',
+          it: '🚀 Pronto per eseguire l\'attività di rendering video: $1',
+          ru: '🚀 Готов к выполнению задачи рендеринга видео: $1',
+          tr: '🚀 Video işleme görevi yürütülmeye hazır: $1',
+          ur: '🚀 ویڈیو رینڈرنگ کام انجام دینے کے لیے تیار: $1',
+        }
+      },
+      {
+        pattern: /(?:⚙\s*)?软件版本[:：]\s*(.*)/i,
+        templates: {
+          zh: '⚙ 软件版本: $1',
+          en: '⚙ Software Version: $1',
+          ja: '⚙ ソフトウェアバージョン: $1',
+          ko: '⚙ 소프트웨어 버전: $1',
+          vi: '⚙ Phiên bản phần mềm: $1',
+          th: '⚙ เวอร์ชันซอฟต์แวร์: $1',
+          bn: '⚙ সফটওয়্যার সংস্করণ: $1',
+          id: '⚙ Versi Perangkat Lunak: $1',
+          es: '⚙ Versión del software: $1',
+          fr: '⚙ Version du logiciel : $1',
+          pt: '⚙ Versão do software: $1',
+          de: '⚙ Softwareversion: $1',
+          it: '⚙ Versione software: $1',
+          ru: '⚙ Версия ПО: $1',
+          tr: '⚙ Yazılım Sürümü: $1',
+          ur: '⚙ سافٹ ویئر ورژن: $1',
+        }
+      },
+      {
+        pattern: /(?:📄\s*)?渲染脚本路径[:：]\s*(.*)/i,
+        templates: {
+          zh: '📄 渲染脚本路径: $1',
+          en: '📄 Render script path: $1',
+          ja: '📄 レンダリングスクリプトのパス: $1',
+          ko: '📄 렌더링 스크립트 경로: $1',
+          vi: '📄 Đường dẫn tập lệnh kết xuất: $1',
+          th: '📄 เส้นทางสคริปต์การเรนเดอร์: $1',
+          bn: '📄 রেন্ডারিং স্ক্রিপ্ট পাথ: $1',
+          id: '📄 Jalur skrip rendering: $1',
+          es: '📄 Ruta del script de renderizado: $1',
+          fr: '📄 Chemin du script de rendu : $1',
+          pt: '📄 Caminho do script de renderização: $1',
+          de: '📄 Pfad des Render-Skripts: $1',
+          it: '📄 Percorso dello script di rendering: $1',
+          ru: '📄 Путь к скрипту рендеринга: $1',
+          tr: '📄 İşleme betiği yolu: $1',
+          ur: '📄 رینڈر اسکرپٹ کا راستہ: $1',
+        }
+      },
+      {
+        pattern: /(?:[^a-zA-Z0-9一-龥]|\s)*目标(?:渲染|登录)?接口地址[:：]\s*(.*)/i,
+        templates: {
+          zh: '🌐 目标渲染接口地址: $1',
+          en: '🌐 Target render endpoint: $1',
+          ja: '🌐 ターゲットレンダリングエンドポイント: $1',
+          ko: '🌐 대상 렌더링 엔드포인트: $1',
+          vi: '🌐 Địa chỉ giao diện kết xuất mục tiêu: $1',
+          th: '🌐 ปลายทางอินเทอร์เฟซการเรนเดอร์เป้าหมาย: $1',
+          bn: '🌐 টার্গেট রেন্ডার এন্ডপয়েন্ট ঠিকানা: $1',
+          id: '🌐 Alamat endpoint render target: $1',
+          es: '🌐 Endpoint de renderizado de destino: $1',
+          fr: '🌐 Point de terminaison de rendu cible : $1',
+          pt: '🌐 Endpoint de renderização de destino: $1',
+          de: '🌐 Ziel-Render-Endpunkt: $1',
+          it: '🌐 Endpoint di rendering di destinazione: $1',
+          ru: '🌐 Целевой эндпоинт рендеринга: $1',
+          tr: '🌐 Hedef işleme uç noktası adresi: $1',
+          ur: '🌐 ہدف رینڈرنگ اینڈ پوائنٹ کا پتہ: $1',
+        }
+      },
+      {
+        pattern: /(?:📁\s*)?物理工作目录[:：]\s*(.*)/i,
+        templates: {
+          zh: '📁 物理工作目录: $1',
+          en: '📁 Working directory: $1',
+          ja: '📁 作業ディレクトリ: $1',
+          ko: '📁 작업 디렉토리: $1',
+          vi: '📁 Thư mục làm việc: $1',
+          th: '📁 ไดเรกทอรีการทำงาน: $1',
+          bn: '📁 কার্যকারী ডিরেক্টরি: $1',
+          id: '📁 Direktori kerja: $1',
+          es: '📁 Directorio de trabajo: $1',
+          fr: '📁 Répertoire de travail : $1',
+          pt: '📁 Diretório de trabalho: $1',
+          de: '📁 Arbeitsverzeichnis: $1',
+          it: '📁 Directory di lavoro: $1',
+          ru: '📁 Рабочий каталог: $1',
+          tr: '📁 Çalışma dizini: $1',
+          ur: '📁 ورکنگ ڈائرکٹری: $1',
+        }
+      },
+      {
+        pattern: /(?:[^a-zA-Z0-9一-龥]|\s)*视频输出目录[:：]\s*(.*)/i,
+        templates: {
+          zh: '📦 视频输出目录: $1',
+          en: '📦 Video output directory: $1',
+          ja: '📦 動画出力ディレクトリ: $1',
+          ko: '📦 동영상 출력 디렉토리: $1',
+          vi: '📦 Thư mục xuất video: $1',
+          th: '📦 ไดเรกทอรีผลลัพธ์วิดีโอ: $1',
+          bn: '📦 ভিডিও আউটপুট ডিরেক্টরি: $1',
+          id: '📦 Direktori output video: $1',
+          es: '📦 Directorio de salida de video: $1',
+          fr: '📦 Répertoire de sortie vidéo : $1',
+          pt: '📦 Diretório de saída de vídeo: $1',
+          de: '📦 Video-Ausgabeverzeichnis: $1',
+          it: '📦 Directory di output video: $1',
+          ru: '📦 Каталог вывода видео: $1',
+          tr: '📦 Video çıktı dizini: $1',
+          ur: '📦 ویڈیو آؤٹ پٹ ڈائرکٹری: $1',
+        }
+      },
+      {
+        pattern: /(?:🔑\s*)?已(?:成功)?捕获当前登录用户会话凭据\s*[（\(]([^\)）]+)[）\)]?[，,]?\s*已注入渲染安全进程/i,
+        templates: {
+          zh: '🔑 已成功捕获当前登录用户会话凭据 ($1)，已注入渲染安全进程',
+          en: '🔑 Successfully captured user session credentials ($1), injected into secure render worker',
+          ja: '🔑 ログインユーザーセッション認証情報 ($1) を取得し、安全なワーカーに注入しました',
+          ko: '🔑 로그인 사용자 세션 자격 증명 ($1) 캡처 성공, 보안 렌더 프로세스에 주입됨',
+          vi: '🔑 Đã thu thập thông tin phiên người dùng ($1), đưa vào tiến trình kết xuất an toàn',
+          th: '🔑 ดึงข้อมูลประจำตัวเซสชันของผู้ใช้สำเร็จ ($1) และใส่ลงในกระบวนการเรนเดอร์ที่ปลอดภัย',
+          bn: '🔑 ব্যবহারকারীর সেশন শংসাপত্র ($1) সফলভাবে ক্যাপচার করা হয়েছে, রেন্ডার প্রক্রিয়ায় ইনজেক্ট করা হয়েছে',
+          id: '🔑 Berhasil menangkap kredensial sesi pengguna ($1), disuntikkan ke proses render aman',
+          es: '🔑 Credenciales de sesión de usuario capturadas con éxito ($1), inyectadas en el proceso de renderizado seguro',
+          fr: '🔑 Identifiants de session utilisateur capturés avec succès ($1), injectés dans le processus de rendu sécurisé',
+          pt: '🔑 Credenciais da sessão do usuário capturadas com sucesso ($1), injetadas no processo de renderização seguro',
+          de: '🔑 Benutzersitzungs-Anmeldedaten erfolgreich erfasst ($1), in sicheren Render-Prozess eingefügt',
+          it: '🔑 Credenziali di sessione utente acquisite con successo ($1), inserite nel processo di rendering sicuro',
+          ru: '🔑 Учетные данные сеанса пользователя успешно получены ($1), внедрены в безопасный процесс рендеринга',
+          tr: '🔑 Kullanıcı oturumu kimlik bilgileri başarıyla yakalandı ($1), güvenli işleme sürecine enjekte edildi',
+          ur: '🔑 صارف سیشن کی اسناد ($1) کامیابی سے حاصل کر کے محفوظ رینڈرنگ پروسیس میں شامل کر دی گئیں',
+        }
+      },
+      {
+        pattern: /(?:🎬\s*)?短视频远程渲染工作进程\s*[（\(]ShortVideo Render Worker[）\)]/i,
+        templates: {
+          zh: '🎬 短视频远程渲染工作进程 (ShortVideo Render Worker)',
+          en: '🎬 ShortVideo Remote Render Worker (ShortVideo Render Worker)',
+          ja: '🎬 ショート動画リモートレンダリングワーカー (ShortVideo Render Worker)',
+          ko: '🎬 숏폼 동영상 원격 렌더링 워커 (ShortVideo Render Worker)',
+          vi: '🎬 Tiến trình kết xuất video từ xa (ShortVideo Render Worker)',
+          th: '🎬 กระบวนการเรนเดอร์วิดีโอสั้นระยะไกล (ShortVideo Render Worker)',
+          bn: '🎬 শর্ট ভিডিও দূরবর্তী রেন্ডার কর্মী (ShortVideo Render Worker)',
+          id: '🎬 Worker render video jarak jauh (ShortVideo Render Worker)',
+          es: '🎬 Proceso de trabajo de renderizado remoto de ShortVideo (ShortVideo Render Worker)',
+          fr: '🎬 Processus de travail de rendu vidéo à distance (ShortVideo Render Worker)',
+          pt: '🎬 Processo de trabalho de renderização remota do ShortVideo (ShortVideo Render Worker)',
+          de: '🎬 ShortVideo Remote-Rendering-Arbeitsprozess (ShortVideo Render Worker)',
+          it: '🎬 Processo di lavoro di rendering remoto di ShortVideo (ShortVideo Render Worker)',
+          ru: '🎬 Рабочий процесс удаленного рендеринга ShortVideo (ShortVideo Render Worker)',
+          tr: '🎬 ShortVideo Uzaktan Video İşleme İş Parçacığı (ShortVideo Render Worker)',
+          ur: '🎬 مختصر ویڈیو ریموٹ رینڈر ورکر (ShortVideo Render Worker)',
+        }
+      },
+      {
+        pattern: /(?:💻\s*)?(?:Host Hardware|本机硬件配置)[:：]\s*(.*?)\s*[（\(](\d+)\s*(?:核心|Cores?)[）\)]\s*\|\s*(?:内存|Memory)[:：]\s*([\d\.]+\s*GB)/i,
+        templates: {
+          zh: '💻 本机硬件配置: $1 ($2 核心) | 内存: $3',
+          en: '💻 Host Hardware: $1 ($2 Cores) | Memory: $3',
+          ja: '💻 ホストハードウェア仕様: $1 ($2 コア) | メモリ: $3',
+          ko: '💻 호스트 하드웨어 구성: $1 ($2 코어) | 메모리: $3',
+          vi: '💻 Cấu hình phần cứng: $1 ($2 Lõi) | Bộ nhớ: $3',
+          th: '💻 การกำหนดค่าฮาร์ดแวร์: $1 ($2 คอร์) | หน่วยความจำ: $3',
+          bn: '💻 হোস্ট হার্ডওয়্যার কনফিগারেশন: $1 ($2 কোর) | মেমরি: $3',
+          id: '💻 Konfigurasi perangkat keras: $1 ($2 Core) | Memori: $3',
+          es: '💻 Configuración de hardware: $1 ($2 núcleos) | Memoria: $3',
+          fr: '💻 Configuration matérielle : $1 ($2 cœurs) | Mémoire : $3',
+          pt: '💻 Configuração de hardware: $1 ($2 núcleos) | Memória: $3',
+          de: '💻 Host-Hardwarekonfiguration: $1 ($2 Kerne) | Arbeitsspeicher: $3',
+          it: '💻 Configurazione hardware: $1 ($2 core) | Memoria: $3',
+          ru: '💻 Конфигурация оборудования: $1 ($2 ядер) | Память: $3',
+          tr: '💻 Donanım yapılandırması: $1 ($2 Çekirdek) | Bellek: $3',
+          ur: '💻 میزبان ہارڈ ویئر کنفیگریشن: $1 ($2 کور) | میموری: $3',
+        }
+      },
+
+      {
+        pattern: /(?:⚡\s*)?渲染并发配置[:：]\s*(.*)/i,
+        templates: {
+          zh: '⚡ 渲染并发配置: $1',
+          en: '⚡ Render Concurrency: $1',
+          ja: '⚡ レンダリング並行設定: $1',
+          ko: '⚡ 렌더링 동시성 구성: $1',
+          vi: '⚡ Cấu hình đồng thời kết xuất: $1',
+          th: '⚡ การทำงานพร้อมกันในการเรนเดอร์: $1',
+          bn: '⚡ রেন্ডার কনকারেন্সি কনফিগারেশন: $1',
+          id: '⚡ Konfigurasi konkurensi render: $1',
+          es: '⚡ Concurrencia de renderizado: $1',
+          fr: '⚡ Concurrence de rendu : $1',
+          pt: '⚡ Concorrência de renderização: $1',
+          de: '⚡ Rendering-Gleichzeitigkeit: $1',
+          it: '⚡ Concorrenza di rendering: $1',
+          ru: '⚡ Конфигурация параллельного рендеринга: $1',
+          tr: '⚡ İşleme eşzamanlılık yapılandırması: $1',
+          ur: '⚡ رینڈر کنکرنسی کنفیگریشن: $1',
+        }
+      },
+      {
+        pattern: /(?:🌐\s*)?目标服务端[:：]\s*(.*)/i,
+        templates: {
+          zh: '🌐 目标服务端: $1',
+          en: '🌐 Target Server: $1',
+          ja: '🌐 ターゲットサーバー: $1',
+          ko: '🌐 대상 서버: $1',
+          vi: '🌐 Máy chủ mục tiêu: $1',
+          th: '🌐 เซิร์ฟเวอร์เป้าหมาย: $1',
+          bn: '🌐 টার্গেট সার্ভার: $1',
+          id: '🌐 Server Target: $1',
+          es: '🌐 Servidor de destino: $1',
+          fr: '🌐 Serveur cible : $1',
+          pt: '🌐 Servidor de destino: $1',
+          de: '🌐 Zielserver: $1',
+          it: '🌐 Server di destinazione: $1',
+          ru: '🌐 Целевой сервер: $1',
+          tr: '🌐 Hedef sunucu: $1',
+          ur: '🌐 ہدف سرور: $1',
+        }
+      },
+
+      {
+        pattern: /(?:☁️?|☁)?\s*(?:视频上传通道|服务模式|Video Upload Channel)[:：]\s*(?:(?:🌐\s*)?(?:服务端安全代理模式|服务端渲染代理模式)\s*[（\(]Server R2 Proxy[）\)]|Server R2 Proxy)/i,
+        templates: {
+          zh: '☁️ 视频上传通道: 🌐 服务端安全代理模式 (Server R2 Proxy)',
+          en: '☁️ Video Upload Channel: 🌐 Server R2 Proxy Mode (Server R2 Proxy)',
+          ja: '☁️ 動画アップロードチャンネル: 🌐 サーバー安全プロキシモード (Server R2 Proxy)',
+          ko: '☁️ 비디오 업로드 채널: 🌐 서버 보안 프록시 모드 (Server R2 Proxy)',
+          vi: '☁️ Kênh tải video: 🌐 Chế độ proxy an toàn máy chủ (Server R2 Proxy)',
+          th: '☁️ ช่องทางการอัปโหลดวิดีโอ: 🌐 โหมดพร็อกซีความปลอดภัยของเซิร์ฟเวอร์ (Server R2 Proxy)',
+          bn: '☁️ ভিডিও আপলোড চ্যানেল: 🌐 সার্ভার নিরাপদ প্রক্সি মোড (Server R2 Proxy)',
+          id: '☁️ Saluran Unggah Video: 🌐 Mode Proksi Aman Server (Server R2 Proxy)',
+          es: '☁️ Canal de subida de video: 🌐 Modo Proxy Seguro del Servidor (Server R2 Proxy)',
+          fr: '☁️ Canal de téléversement vidéo : 🌐 Mode proxy sécurisé du serveur (Server R2 Proxy)',
+          pt: '☁️ Canal de upload de vídeo: 🌐 Modo Proxy Seguro do Servidor (Server R2 Proxy)',
+          de: '☁️ Video-Upload-Kanal: 🌐 Sicherer Server-Proxy-Modus (Server R2 Proxy)',
+          it: '☁️ Canale di caricamento video: 🌐 Modalità proxy sicuro del server (Server R2 Proxy)',
+          ru: '☁️ Канал загрузки видео: 🌐 Режим безопасного прокси сервера (Server R2 Proxy)',
+          tr: '☁️ Video Yükleme Kanalı: 🌐 Güvenli Sunucu Proxy Modu (Server R2 Proxy)',
+          ur: '☁️ ویڈیو اپ لوڈ چینل: 🌐 سرور محفوظ پراکسی موڈ (Server R2 Proxy)',
+        }
+      },
+      {
+        pattern: /(?:☁️?|☁)?\s*(?:视频上传通道|服务模式|Video Upload Channel)[:：]\s*(?:(?:⚡\s*)?本地直传模式\s*[（\(]Local R2[）\)]|Local R2)/i,
+        templates: {
+          zh: '☁️ 视频上传通道: ⚡ 本地直传模式 (Local R2)',
+          en: '☁️ Video Upload Channel: ⚡ Direct Local R2 Upload (Local R2)',
+          ja: '☁️ 動画アップロードチャンネル: ⚡ ローカル直接アップロード (Local R2)',
+          ko: '☁️ 비디오 업로드 채널: ⚡ 로컬 직접 업로드 모드 (Local R2)',
+          vi: '☁️ Kênh tải video: ⚡ Chế độ tải lên trực tiếp cục bộ (Local R2)',
+          th: '☁️ ช่องทางการอัปโหลดวิดีโอ: ⚡ โหมดอัปโหลดตรงจากเครื่อง (Local R2)',
+          bn: '☁️ ভিডিও আপলোড চ্যানেল: ⚡ স্থানীয় সরাসরি আপলোড মোড (Local R2)',
+          id: '☁️ Saluran Unggah Video: ⚡ Mode Unggah Langsung Lokal (Local R2)',
+          es: '☁️ Canal de subida de video: ⚡ Modo de subida directa local (Local R2)',
+          fr: '☁️ Canal de téléversement vidéo : ⚡ Mode de téléversement direct local (Local R2)',
+          pt: '☁️ Canal de upload de vídeo: ⚡ Modo de upload direto local (Local R2)',
+          de: '☁️ Video-Upload-Kanal: ⚡ Lokaler Direkt-Upload-Modus (Local R2)',
+          it: '☁️ Canale di caricamento video: ⚡ Modalità caricamento diretto locale (Local R2)',
+          ru: '☁️ Канал загрузки видео: ⚡ Режим прямой локальной загрузки (Local R2)',
+          tr: '☁️ Video Yükleme Kanalı: ⚡ Yerel Doğrudan Yükleme Modu (Local R2)',
+          ur: '☁️ ویڈیو اپ لوڈ چینل: ⚡ مقامی براہ راست اپ لوڈ موڈ (Local R2)',
+        }
+      },
+      {
+        pattern: /(?:🌍\s*)?(?:指定渲染语言|Target Language)[:：]\s*(.*)/i,
+        templates: {
+          zh: '🌍 指定渲染语言: $1',
+          en: '🌍 Target Language: $1',
+          ja: '🌍 指定レンダリング言語: $1',
+          ko: '🌍 지정 렌더링 언어: $1',
+          vi: '🌍 Ngôn ngữ kết xuất đã chỉ định: $1',
+          th: '🌍 ภาษาการเรนเดอร์ที่ระบุ: $1',
+          bn: '🌍 নির্দিষ্ট রেন্ডার ভাষা: $1',
+          id: '🌍 Bahasa Render yang Ditentukan: $1',
+          es: '🌍 Idioma de renderizado especificado: $1',
+          fr: '🌍 Langue de rendu spécifiée : $1',
+          pt: '🌍 Idioma de renderização especificado: $1',
+          de: '🌍 Angegebene Render-Sprache: $1',
+          it: '🌍 Lingua di rendering specificata: $1',
+          ru: '🌍 Указанный язык рендеринга: $1',
+          tr: '🌍 Belirtilen İşleme Dili: $1',
+          ur: '🌍 مخصوص رینڈرنگ زبان: $1',
+        }
+      },
+      {
+        pattern: /(?:🔑\s*用户会话鉴权|User Session Auth)[:：]\s*(?:(?:[✔✅\s]*(?:已(?:捕获|绑定)当前用户\s*Token|User session token captured)\s*[（\(](?:安全会话|Secure session)[）\)])|(.*))/i,
+        templates: {
+          zh: '🔑 用户会话鉴权: ✔ 已绑定当前用户 Token (安全会话)',
+          en: '🔑 User Session Auth: ✔ User session token captured (Secure session)',
+          ja: '🔑 ユーザーセッション認証: ✔ ユーザーToken取得済み (セキュアセッション)',
+          ko: '🔑 사용자 세션 인증: ✔ 사용자 토큰 캡처됨 (보안 세션)',
+          vi: '🔑 Xác thực phiên người dùng: ✔ Đã thu thập Token người dùng (Phiên an toàn)',
+          th: '🔑 การตรวจสอบสิทธิ์เซสชัน: ✔ ดึงโทเค็นผู้ใช้แล้ว (เซสชันที่ปลอดภัย)',
+          bn: '🔑 ব্যবহারকারী সেশন প্রমাণীকরণ: ✔ ব্যবহারকারীর টোকেন ক্যাপচার করা হয়েছে (নিরাপদ সেশন)',
+          id: '🔑 Autentikasi Sesi Pengguna: ✔ Token pengguna ditangkap (Sesi aman)',
+          es: '🔑 Autenticación de sesión de usuario: ✔ Token de usuario capturado (Sesión segura)',
+          fr: '🔑 Authentification de session utilisateur : ✔ Jeton utilisateur capturé (Session sécurisée)',
+          pt: '🔑 Autenticação de sessão do usuário: ✔ Token do usuário capturado (Sessão segura)',
+          de: '🔑 Benutzersitzungs-Authentifizierung: ✔ Benutzer-Token erfasst (Sichere Sitzung)',
+          it: '🔑 Autenticazione sessione utente: ✔ Token utente acquisito (Sessione sicura)',
+          ru: '🔑 Аутентификация сеанса пользователя: ✔ Токен пользователя получен (Безопасный сеанс)',
+          tr: '🔑 Kullanıcı Oturum Doğrulaması: ✔ Kullanıcı Tokenı yakalandı (Güvenli oturum)',
+          ur: '🔑 صارف سیشن کی توثیق: ✔ صارف کا ٹوکن محفوظ طریقے سے حاصل ہو گیا (محفوظ سیشن)',
+        }
+      },
+      {
+        pattern: /(?:⚡\s*Remotion\s*缓存|Remotion Cache)[:：]\s*(?:(?:[✔✅\s]*已就绪\s*[（\(](?:秒级)?免打包[）\)]\s*(.*))|(?:[✔\s]*Ready\s*[（\(]Zero-bundle[）\)]\s*(.*))|(.*))/i,
+        templates: {
+          zh: '⚡ Remotion 缓存: ✔ 已就绪 (秒级免打包) $1$2$3',
+          en: '⚡ Remotion Cache: ✔ Ready (Zero-bundle) $1$2$3',
+          ja: '⚡ Remotion キャッシュ: ✔ 準備完了 (事前ビルド不要) $1$2$3',
+          ko: '⚡ Remotion 캐시: ✔ 준비 완료 (무패키징) $1$2$3',
+          vi: '⚡ Bộ nhớ cache Remotion: ✔ Đã sẵn sàng (Không cần đóng gói) $1$2$3',
+          th: '⚡ แคช Remotion: ✔ พร้อมแล้ว (ไม่ต้องบันเดิล) $1$2$3',
+          bn: '⚡ Remotion ক্যাশ: ✔ প্রস্তুত (বান্ডেল মুক্ত) $1$2$3',
+          id: '⚡ Cache Remotion: ✔ Siap (Tanpa bundling) $1$2$3',
+          es: '⚡ Caché de Remotion: ✔ Listo (Sin empaquetar) $1$2$3',
+          fr: '⚡ Cache Remotion : ✔ Prêt (Sans paquetage) $1$2$3',
+          pt: '⚡ Cache do Remotion: ✔ Pronto (Sem empacotamento) $1$2$3',
+          de: '⚡ Remotion-Cache: ✔ Bereit (Ohne Bündelung) $1$2$3',
+          it: '⚡ Cache di Remotion: ✔ Pronto (Senza bundling) $1$2$3',
+          ru: '⚡ Кэш Remotion: ✔ Готов (Без сборки) $1$2$3',
+          tr: '⚡ Remotion Önbelleği: ✔ Hazır (Paketleme gerektirmez) $1$2$3',
+          ur: '⚡ Remotion کیش: ✔ تیار ہے (پیکجنگ فری) $1$2$3',
+        }
+      },
+      {
+        pattern: /(?:[^a-zA-Z0-9一-龥]|\s)*(?:运行模式|Running Mode)[:：]\s*(?:(?:后台守护监听|异步守护|Async Daemon)|(.*))/i,
+        templates: {
+          zh: '🛡 运行模式: 异步守护监听',
+          en: '🛡 Running Mode: Async Daemon',
+          ja: '🛡 実行モード: 非同期デーモン',
+          ko: '🛡 실행 모드: 비동기 데몬',
+          vi: '🛡 Chế độ chạy: Daemon không đồng bộ',
+          th: '🛡 โหมดการทำงาน: เดมอนแบบอะซิงโครนัส',
+          bn: '🛡 চলমান মোড: অ্যাসিঙ্ক ডিমন',
+          id: '🛡 Mode Berjalan: Daemon Asinkron',
+          es: '🛡 Modo de ejecución: Demonio asíncrono',
+          fr: '🛡 Mode d\'exécution : Démon asynchrone',
+          pt: '🛡 Modo de execução: Daemon assíncrono',
+          de: '🛡 Betriebsmodus: Asynchroner Daemon',
+          it: '🛡 Modalità di esecuzione: Demone asincrono',
+          ru: '🛡 Режим работы: Асинхронный демон',
+          tr: '🛡 Çalışma Modu: Eşzamansız Arka Plan Programı',
+          ur: '🛡 رننگ موڈ: غیر متزامن ڈیمن',
+        }
+      },
+      {
+        pattern: /(?:[📡▶]\s*)?正在建立\s*SSE\s*实时任务下发长连接[:：]\s*(.*)/i,
+        templates: {
+          zh: '📡 正在建立 SSE 实时任务下发长连接: $1',
+          en: '📡 Establishing SSE real-time task dispatch connection: $1',
+          ja: '📡 SSE リアルタイムタスク配信接続を確立中: $1',
+          ko: '📡 SSE 실시간 작업 전달 연결 수립 중: $1',
+          vi: '📡 Đang thiết lập kết nối điều phối tác vụ thời gian thực SSE: $1',
+          th: '📡 กำลังสร้างการเชื่อมต่อจัดส่งงานแบบเรียลไทม์ SSE: $1',
+          bn: '📡 SSE রিয়েল-টাইম টাস্ক প্রেরণ সংযোগ স্থাপন করা হচ্ছে: $1',
+          id: '📡 Membangun koneksi pengiriman tugas real-time SSE: $1',
+          es: '📡 Estableciendo conexión persistente SSE para envío de tareas en tiempo real: $1',
+          fr: '📡 Établissement de la connexion persistente SSE pour la distribution de tâches en temps réel : $1',
+          pt: '📡 Estabelecendo conexão persistente SSE para despacho de tarefas em tempo real: $1',
+          de: '📡 Aufbau einer SSE-Echtzeit-Aufgabenverbindung: $1',
+          it: '📡 Creazione della connessione persistente SSE per l\'invio di attività in tempo reale: $1',
+          ru: '📡 Установление постоянного соединения SSE для передачи задач в реальном времени: $1',
+          tr: '📡 SSE gerçek zamanlı görev dağıtımı kalıcı bağlantısı kuruluyor: $1',
+          ur: '📡 SSE ریئل ٹائم ٹاسک کنکشن قائم کیا جا رہا ہے: $1',
+        }
+      },
+      {
+        pattern: /(?:⚡\s*)?SSE\s*任务长连接已打通[！!]?\s*已进入[「【\[]即时事件下发[」】\]]监听状态[。.]?/i,
+        templates: {
+          zh: '⚡ SSE 任务长连接已打通！已进入「即时事件下发」监听状态。',
+          en: '⚡ SSE task connection established! Listening for instant event dispatches.',
+          ja: '⚡ SSE タスク接続が確立されました！「即時イベント配信」待機状態に入りました。',
+          ko: '⚡ SSE 작업 연결 완료! 「즉각 이벤트 전달」 감시 상태에 들어갔습니다.',
+          vi: '⚡ Kết nối tác vụ SSE đã thông suốt! Đã vào trạng thái lắng nghe sự kiện tức thì.',
+          th: '⚡ การเชื่อมต่องาน SSE สำเร็จแล้ว! เข้าสู่สถานะพร้อมรับการส่งเหตุการณ์ทันที',
+          bn: '⚡ SSE টাস্ক সংযোগ সফলভাবে প্রতিষ্ঠিত! অবিলম্বে ইভেন্ট গ্রহণের জন্য প্রস্তুত।',
+          id: '⚡ Koneksi tugas SSE berhasil dibuat! Masuk ke status pemantauan acara instan.',
+          es: '⚡ ¡Conexión de tareas SSE establecida! Escuchando eventos instantáneos.',
+          fr: '⚡ Connexion de tâche SSE établie ! À l\'écoute des événements instantanés.',
+          pt: '⚡ Conexão de tarefas SSE estabelecida! Escutando eventos instantâneos.',
+          de: '⚡ SSE-Aufgabenverbindung hergestellt! Hört auf sofortige Ereignisausgaben.',
+          it: '⚡ Connessione attività SSE stabilita! In ascolto per l\'invio di eventi istantanei.',
+          ru: '⚡ Постоянное соединение SSE установлено! Переход в режим ожидания мгновенных событий.',
+          tr: '⚡ SSE görev bağlantısı açıldı! Anlık olay dağıtımı dinleme moduna geçildi.',
+          ur: '⚡ SSE ٹاسک کنکشن قائم ہو گیا! فوری ایونٹ کے لیے تیار۔',
+        }
+      },
+      {
+        pattern: /(?:[☁⚡]\s*)?服务端确认长连接(?:成功|就绪)\s*[（\(]SSE Ready[）\)]/i,
+        templates: {
+          zh: '☁ 服务端确认长连接就绪 (SSE Ready)',
+          en: '☁ Server confirmed connection ready (SSE Ready)',
+          ja: '☁ サーバーが接続準備完了を確認しました (SSE Ready)',
+          ko: '☁ 서버 연결 준비 확인 (SSE Ready)',
+          vi: '☁ Máy chủ xác nhận kết nối sẵn sàng (SSE Ready)',
+          th: '☁ เซิร์ฟเวอร์ยืนยันการเชื่อมต่อพร้อมใช้งาน (SSE Ready)',
+          bn: '☁ সার্ভার সংযোগ প্রস্তুত তা নিশ্চিত করেছে (SSE Ready)',
+          id: '☁ Server mengonfirmasi koneksi siap (SSE Ready)',
+          es: '☁ El servidor confirmó que la conexión está lista (SSE Ready)',
+          fr: '☁ Le serveur a confirmé que la connexion est prête (SSE Ready)',
+          pt: '☁ O servidor confirmou que a conexão está pronta (SSE Ready)',
+          de: '☁ Server hat Bereitschaft der Verbindung bestätigt (SSE Ready)',
+          it: '☁ Il server ha confermato la connessione pronta (SSE Ready)',
+          ru: '☁ Сервер подтвердил готовность соединения (SSE Ready)',
+          tr: '☁ Sunucu kalıcı bağlantının hazır olduğunu onayladı (SSE Ready)',
+          ur: '☁ سرور نے کنکشن کی تیاری کی تصدیق کر دی (SSE Ready)',
+        }
+      },
+      {
+        pattern: /(?:[⚡\s]*)?渲染调度服务(?:端连接|运转|就绪)正常[，,]?\s*当前队列中没有视频任务[，,]?\s*等待中\.\.\./i,
+        templates: {
+          zh: '渲染调度服务端连接正常，当前队列中没有视频任务，等待中...',
+          en: 'Render scheduler server connected normally, no video tasks in queue, waiting...',
+          ja: 'レンダリングスケジュールサービスは正常に接続されました。キューにタスクはありません。待機中...',
+          ko: '렌더링 스케줄 서버 연결 정상, 대기열에 비디오 작업이 없습니다. 대기 중...',
+          vi: 'Máy chủ lập lịch kết xuất kết nối bình thường, không có tác vụ nào trong hàng đợi, đang chờ...',
+          th: 'เซิร์ฟเวอร์กำหนดเวลาเรนเดอร์เชื่อมต่อปกติ ไม่มีงานวิดีโอในคิว กำลังรอ...',
+          bn: 'রেন্ডার শিডিউলার সার্ভার স্বাভাবিকভাবে সংযুক্ত, সারিতে কোনো ভিডিও কাজ নেই, অপেক্ষা করছে...',
+          id: 'Server penjadwal render terhubung normal, tidak ada tugas video dalam antrean, menunggu...',
+          es: 'Servidor de programación de renderizado conectado normalmente, no hay tareas de video en cola, esperando...',
+          fr: 'Serveur de planification de rendu connecté normalement, aucune tâche vidéo en attente, en attente...',
+          pt: 'Servidor de agendamento de renderização conectado normalmente, sem tarefas de vídeo na fila, aguardando...',
+          de: 'Render-Planungsserver normal verbunden, keine Videoaufgaben in der Warteschlange, warte...',
+          it: 'Server di pianificazione del rendering connesso normalmente, nessuna attività video in coda, in attesa...',
+          ru: 'Сервер диспетчеризации рендеринга подключен нормально, в очереди нет задач, ожидание...',
+          tr: 'İşleme zamanlayıcı sunucusu normal şekilde bağlandı, sırada video görevi yok, bekleniyor...',
+          ur: 'رینڈر شیڈولر سرور معمول کے مطابق جڑا ہوا ہے، قطار میں کوئی ویڈیو کام نہیں ہے، انتظار کر رہا ہے...',
+        }
+      },
+      {
+        pattern: /(?:⚡\s*)?检测到\s*(\d+)\s*个待渲染任务[，,]?\s*压入队列处理\.\.\./i,
+        templates: {
+          zh: '⚡ 检测到 $1 个待渲染任务，压入队列处理...',
+          en: '⚡ Detected $1 pending video tasks, pushing to queue...',
+          ja: '⚡ $1 件の待機中タスクを検出、キューにプッシュ中...',
+          ko: '⚡ 대기 중인 비디오 작업 $1개 감지됨, 대기열에 추가 중...',
+          vi: '⚡ Phát hiện $1 tác vụ video đang chờ, đang đẩy vào hàng đợi...',
+          th: '⚡ ตรวจพบงานวิดีโอที่รอดำเนินการ $1 งาน กำลังส่งไปยังคิว...',
+          bn: '⚡ $1টি অপেক্ষমাণ ভিডিও কাজ শনাক্ত করা হয়েছে, সারিতে পাঠানো হচ্ছে...',
+          id: '⚡ Terdeteksi $1 tugas video tertunda, memasukkan ke antrean...',
+          es: '⚡ Detectadas $1 tareas de video pendientes, enviando a la cola...',
+          fr: '⚡ $1 tâches vidéo en attente détectées, ajout à la file d\'attente...',
+          pt: '⚡ Detectadas $1 tarefas de vídeo pendentes, adicionando à fila...',
+          de: '⚡ $1 ausstehende Videoaufgaben erkannt, in die Warteschlange verschoben...',
+          it: '⚡ Rilevate $1 attività video in sospeso, aggiunta alla coda...',
+          ru: '⚡ Обнаружено задач на рендеринг: $1, отправка в очередь...',
+          tr: '⚡ $1 bekleyen video görevi algılandı, kuyruğa aktarılıyor...',
+          ur: '⚡ $1 زیر التواء ویڈیو کام دریافت ہوئے، قطار میں بھیجے جا رہے ہیں...',
+        }
+      },
+      {
+        pattern: /(?:🎯\s*)?任务调度范围[:：]\s*(?:🔒\s*)?仅限当前登录用户\s*[（\(]Electron\s*客户端模式[）\)]/i,
+        templates: {
+          zh: '🎯 任务调度范围: 🔒 仅限当前登录用户 (Electron 客户端模式)',
+          en: '🎯 Task Scope: 🔒 Current logged-in user only (Electron client mode)',
+          ja: '🎯 タスクスコープ: 🔒 現在のログインユーザーのみ (Electronクライアントモード)',
+          ko: '🎯 작업 범위: 🔒 현재 로그인한 사용자 전용 (Electron 클라이언트 모드)',
+          vi: '🎯 Phạm vi tác vụ: 🔒 Chỉ người dùng hiện tại đã đăng nhập (Chế độ máy khách Electron)',
+          th: '🎯 ขอบเขตงาน: 🔒 เฉพาะผู้ใช้ที่เข้าสู่ระบบปัจจุบันเท่านั้น (โหมดไคลเอ็นต์ Electron)',
+          bn: '🎯 টাস্ক পরিধি: 🔒 শুধুমাত্র বর্তমান লগইন করা ব্যবহারকারী (Electron ক্লায়েন্ট মোড)',
+          id: '🎯 Cakupan Tugas: 🔒 Hanya pengguna yang sedang masuk (Mode klien Electron)',
+          es: '🎯 Alcance de la tarea: 🔒 Solo usuario actual conectado (Modo cliente Electron)',
+          fr: '🎯 Portée de la tâche : 🔒 Utilisateur connecté actuel uniquement (Mode client Electron)',
+          pt: '🎯 Escopo da tarefa: 🔒 Apenas usuário conectado atual (Modo cliente Electron)',
+          de: '🎯 Aufgabenbereich: 🔒 Nur aktuell angemeldeter Benutzer (Electron-Client-Modus)',
+          it: '🎯 Ambito attività: 🔒 Solo utente attualmente connesso (Modalità client Electron)',
+          ru: '🎯 Область задач: 🔒 Только текущий вошедший пользователь (Режим клиента Electron)',
+          tr: '🎯 Görev Kapsamı: 🔒 Yalnızca oturum açmış geçerli kullanıcı (Electron istemci modu)',
+          ur: '🎯 ٹاسک اسکوپ: 🔒 صرف موجودہ لاگ ان صارف (Electron کلائنٹ موڈ)',
+        }
+      },
+      {
+        pattern: /(?:🎯\s*)?任务调度范围[:：]\s*(?:🌍\s*)?全局任务队列\s*[（\(]支持渲染所有用户的待处理视频\s*-\s*CLI\s*模式[）\)]/i,
+        templates: {
+          zh: '🎯 任务调度范围: 🌍 全局任务队列 (支持渲染所有用户的待处理视频 - CLI 模式)',
+          en: '🎯 Task Scope: 🌍 Global queue (Renders pending videos for all users - CLI mode)',
+          ja: '🎯 タスクスコープ: 🌍 グローバルキュー (全ユーザーの保留中動画レンダリング対応 - CLIモード)',
+          ko: '🎯 작업 범위: 🌍 전역 큐 (모든 사용자의 대기 중 비디오 렌더링 지원 - CLI 모드)',
+          vi: '🎯 Phạm vi tác vụ: 🌍 Hàng đợi toàn cầu (Kết xuất video đang chờ cho tất cả người dùng - Chế độ CLI)',
+          th: '🎯 ขอบเขตงาน: 🌍 คิวส่วนกลาง (เรนเดอร์วิดีโอที่รอดำเนินการของผู้ใช้ทั้งหมด - โหมด CLI)',
+          bn: '🎯 টাস্ক পরিধি: 🌍 গ্লোবাল কিউ (সমস্ত ব্যবহারকারীর অপেক্ষমাণ ভিডিও রেন্ডার করে - CLI মোড)',
+          id: '🎯 Cakupan Tugas: 🌍 Antrean global (Merender video tertunda untuk semua pengguna - Mode CLI)',
+          es: '🎯 Alcance de la tarea: 🌍 Cola global (Renderiza videos pendientes para todos los usuarios - Modo CLI)',
+          fr: '🎯 Portée de la tâche : 🌍 File globale (Rendu des vidéos en attente pour tous les utilisateurs - Mode CLI)',
+          pt: '🎯 Escopo da tarefa: 🌍 Fila global (Renderiza vídeos pendentes para todos os usuários - Modo CLI)',
+          de: '🎯 Aufgabenbereich: 🌍 Globale Warteschlange (Rendert ausstehende Videos für alle Benutzer - CLI-Modus)',
+          it: '🎯 Ambito attività: 🌍 Coda globale (Esegue il rendering dei video in sospeso per tutti gli utenti - Modalità CLI)',
+          ru: '🎯 Область задач: 🌍 Глобальная очередь (Рендеринг ожидающих видео для всех пользователей - Режим CLI)',
+          tr: '🎯 Görev Kapsamı: 🌍 Genel kuyruk (Tüm kullanıcılar için bekleyen videoları işler - CLI modu)',
+          ur: '🎯 ٹاسک اسکوپ: 🌍 عالمی قطار (تمام صارفین کے لیے زیر التواء ویڈیوز کو رینڈر کرتا ہے - CLI موڈ)',
+        }
+      },
+      {
+        pattern: /(?:🔑\s*)?已成功捕获当前登录用户会话凭据\s*[（\(](.*?)[）\)]\s*，已注入渲染安全进程/i,
+        templates: {
+          zh: '🔑 已成功捕获当前登录用户会话凭据 ($1)，已注入渲染安全进程',
+          en: '🔑 Successfully captured logged-in user credentials ($1), injected into render process',
+          ja: '🔑 ログインユーザーのセッション資格情報 ($1) を取得し、安全プロセスに注入しました',
+          ko: '🔑 현재 로그인한 사용자 자격 증명 ($1) 획득 완료, 보안 프로세스에 주입됨',
+          vi: '🔑 Đã nhận thành công thông tin phiên đăng nhập ($1), đã tiêm vào tiến trình bảo mật',
+          th: '🔑 บันทึกข้อมูลรับรองเซสชันผู้ใช้สำเร็จ ($1) ฉีดเข้าไปในกระบวนการเรนเดอร์ที่ปลอดภัย',
+          bn: '🔑 ব্যবহারকারী সেশনের শংসাপত্র ($1) সফলভাবে ক্যাপচার করা হয়েছে, রেন্ডার প্রক্রিয়ায় ইনজেক্ট করা হয়েছে',
+          id: '🔑 Berhasil mengambil kredensial sesi pengguna ($1), disuntikkan ke proses aman render',
+          es: '🔑 Credenciales de sesión del usuario capturadas con éxito ($1), inyectadas en el proceso de renderizado',
+          fr: '🔑 Identifiants de session utilisateur capturés avec succès ($1), injectés dans le processus sécurisé',
+          pt: '🔑 Credenciais de sessão do usuário capturadas com sucesso ($1), injetadas no processo de renderização',
+          de: '🔑 Anmeldesitzungsdaten des Benutzers erfolgreich erfasst ($1), in den sicheren Prozess injiziert',
+          it: '🔑 Credenziali di sessione utente acquisite con successo ($1), inserite nel processo di rendering sicuro',
+          ru: '🔑 Учетные данные сессии пользователя ($1) успешно получены и внедрены в процесс рендеринга',
+          tr: '🔑 Oturum açmış kullanıcı kimlik bilgileri ($1) başarıyla alındı ve güvenli işleme sürecine enjekte edildi',
+          ur: '🔑 لاگ ان صارف کے سیشن کی اسناد ($1) کامیابی سے حاصل کی گئیں، محفوظ رینڈرنگ پروسیس میں شامل کی گئیں',
+        }
+      },
+      {
+        pattern: /(?:🚀\s*)?准备执行视频渲染任务[:：]\s*(.*)/i,
+        templates: {
+          zh: '🚀 准备执行视频渲染任务: $1',
+          en: '🚀 Preparing video rendering task: $1',
+          ja: '🚀 動画レンダリングタスクの準備中: $1',
+          ko: '🚀 비디오 렌더링 작업 실행 준비: $1',
+          vi: '🚀 Chuẩn bị thực hiện tác vụ kết xuất video: $1',
+          th: '🚀 เตรียมการดำเนินการงานเรนเดอร์วิดีโอ: $1',
+          bn: '🚀 ভিডিও রেন্ডারিং কার্য সম্পাদন করার প্রস্তুতি চলছে: $1',
+          id: '🚀 Mempersiapkan pelaksanaan tugas rendering video: $1',
+          es: '🚀 Preparando tarea de renderizado de video: $1',
+          fr: '🚀 Préparation de l\'exécution de la tâche de rendu vidéo : $1',
+          pt: '🚀 Preparando execução da tarefa de renderização de vídeo: $1',
+          de: '🚀 Bereite Ausführung der Videorendering-Aufgabe vor: $1',
+          it: '🚀 Preparazione esecuzione attività di rendering video: $1',
+          ru: '🚀 Подготовка к выполнению задачи рендеринга видео: $1',
+          tr: '🚀 Video işleme görevini yürütmeye hazırlanıyor: $1',
+          ur: '🚀 ویڈیو رینڈرنگ ٹاسک پر عمل درآمد کی تیاری کی جا رہی ہے: $1',
+        }
+      },
+      {
+        pattern: /(?:🏷️\s*)?软件版本[:：]\s*(.*)/i,
+        templates: {
+          zh: '🏷️ 软件版本: $1',
+          en: '🏷️ App Version: $1',
+          ja: '🏷️ ソフトウェアバージョン: $1',
+          ko: '🏷️ 소프트웨어 버전: $1',
+          vi: '🏷️ Phiên bản phần mềm: $1',
+          th: '🏷️ เวอร์ชันซอฟต์แวร์: $1',
+          bn: '🏷️ সফটওয়্যার সংস্করণ: $1',
+          id: '🏷️ Versi Perangkat Lunak: $1',
+          es: '🏷️ Versión del software: $1',
+          fr: '🏷️ Version du logiciel : $1',
+          pt: '🏷️ Versão do software: $1',
+          de: '🏷️ Software-Version: $1',
+          it: '🏷️ Versione del software: $1',
+          ru: '🏷️ Версия приложения: $1',
+          tr: '🏷️ Yazılım Sürümü: $1',
+          ur: '🏷️ سافٹ ویئر ورژن: $1',
+        }
+      },
+      {
+        pattern: /(?:📄\s*)?渲染脚本路径[:：]\s*(.*)/i,
+        templates: {
+          zh: '📄 渲染脚本路径: $1',
+          en: '📄 Render script path: $1',
+          ja: '📄 レンダリングスクリプトのパス: $1',
+          ko: '📄 렌더링 스크립트 경로: $1',
+          vi: '📄 Đường dẫn tập lệnh kết xuất: $1',
+          th: '📄 เส้นทางสคริปต์การเรนเดอร์: $1',
+          bn: '📄 রেন্ডার স্ক্রিপ্ট পাথ: $1',
+          id: '📄 Jalur skrip render: $1',
+          es: '📄 Ruta del script de renderizado: $1',
+          fr: '📄 Chemin du script de rendu : $1',
+          pt: '📄 Caminho do script de renderização: $1',
+          de: '📄 Pfad des Render-Skripts: $1',
+          it: '📄 Percorso dello script di rendering: $1',
+          ru: '📄 Путь к скрипту рендеринга: $1',
+          tr: '📄 İşleme betiği yolu: $1',
+          ur: '📄 رینڈر اسکرپٹ کا راستہ: $1',
+        }
+      },
+      {
+        pattern: /(?:📁\s*)?用户已手动指定项目源码目录[:：]\s*(.*)/i,
+        templates: {
+          zh: '📁 用户已手动指定项目源码目录: $1',
+          en: '📁 User manually set project source directory: $1',
+          ja: '📁 プロジェクトソースディレクトリが手動指定されました: $1',
+          ko: '📁 사용자가 프로젝트 소스 디렉터리를 수동으로 지정했습니다: $1',
+          vi: '📁 Người dùng đã chỉ định thư mục mã nguồn theo cách thủ công: $1',
+          th: '📁 ผู้ใช้ระบุไดเรกทอรีซอร์สโค้ดของโปรเจกต์ด้วยตนเอง: $1',
+          bn: '📁 ব্যবহারকারী ম্যানুয়ালি প্রকল্প সোর্স ডিরেক্টরি নির্দিষ্ট করেছেন: $1',
+          id: '📁 Pengguna menetapkan direktori sumber proyek secara manual: $1',
+          es: '📁 El usuario especificó manualmente el directorio fuente del proyecto: $1',
+          fr: '📁 L\'utilisateur a spécifié manuellement le dossier source du projet : $1',
+          pt: '📁 O usuário definiu manualmente o diretório de origem do projeto: $1',
+          de: '📁 Benutzer hat Projektquellverzeichnis manuell angegeben: $1',
+          it: '📁 L\'utente ha specificato manualmente la directory dei sorgenti: $1',
+          ru: '📁 Пользователь вручную указал каталог исходного кода: $1',
+          tr: '📁 Kullanıcı proje kaynak dizinini manuel olarak belirtti: $1',
+          ur: '📁 صارف نے دستی طور پر پروجیکٹ سورس ڈائرکٹری کی وضاحت کی: $1',
+        }
+      },
+      {
+        pattern: /(?:❌\s*)?\[登录拦截\]\s*(?:当前未检测到用户登录凭据\s*[（\(]Token\s*为空[）\)]?|检测到当前尚未登录用户账号)[，,]?\s*(?:已终止执行渲染|已取消启动视频渲染)[！!]?/i,
+        templates: {
+          zh: '❌ [登录拦截] 当前未检测到用户登录凭据 (Token 为空)，已取消启动视频渲染！',
+          en: '❌ [Auth Required] No user login credentials detected (Token empty), render aborted!',
+          ja: '❌ [認証エラー] ログイン資格情報が検出されませんでした (Tokenが空)、レンダリングを中止しました！',
+          ko: '❌ [로그인 필요] 로그인 자격 증명이 감지되지 않았습니다 (Token 비어있음), 렌더링 중단됨!',
+          vi: '❌ [Yêu cầu đăng nhập] Không phát hiện thông tin đăng nhập (Token trống), đã hủy kết xuất!',
+          th: '❌ [จำเป็นต้องเข้าสู่ระบบ] ตรวจไม่พบข้อมูลการเข้าสู่ระบบ (Token ว่างเปล่า) ยกเลิกการเรนเดอร์!',
+          bn: '❌ [লগইন প্রয়োজন] কোনো ব্যবহারকারী লগইন শংসাপত্র শনাক্ত করা যায়নি (Token খালি), রেন্ডার বাতিল করা হয়েছে!',
+          id: '❌ [Login Diperlukan] Kredensial login tidak terdeteksi (Token kosong), render dibatalkan!',
+          es: '❌ [Autenticación requerida] No se detectaron credenciales de usuario (Token vacío), ¡renderizado abortado!',
+          fr: '❌ [Connexion requise] Aucun identifiant utilisateur détecté (Token vide), rendu interrompu !',
+          pt: '❌ [Login necessário] Nenhuma credencial de usuário detectada (Token vazio), renderização cancelada!',
+          de: '❌ [Anmeldung erforderlich] Keine Anmeldedaten erkannt (Token leer), Rendering abgebrochen!',
+          it: '❌ [Accesso richiesto] Nessuna credenziale utente rilevata (Token vuoto), rendering interrotto!',
+          ru: '❌ [Требуется вход] Учетные данные пользователя не обнаружены (Token пуст), рендеринг отменен!',
+          tr: '❌ [Giriş Gerekli] Kullanıcı oturum açma bilgisi algılanamadı (Token boş), işleme iptal edildi!',
+          ur: '❌ [لاگ ان درکار ہے] صارف کے لاگ ان کی اسناد نہیں ملیں (Token خالی ہے)، رینڈر منسوخ کر دیا گیا!',
+        }
+      },
+      {
+        pattern: /(?:💡\s*)?(?:提示[:：]\s*)?(?:请先在\s*ShortVideo\s*桌面客户端的主站窗口中登录账号后再开始渲染|请先切换到【ShortVideo 主站】标签页登录您的账号，登录成功后回到此页面点击【开始渲染】即可)[。.]?/i,
+        templates: {
+          zh: '💡 提示: 请先切换到【ShortVideo 主站】标签页登录您的账号，登录成功后回到此页面点击【开始渲染】即可。',
+          en: '💡 Tip: Please log in to your account on the main ShortVideo tab first, then return here and click [Start Render].',
+          ja: '💡 ヒント: 最初に「ShortVideo」メインタブでログインし、完了後にこのページで「レンダリング開始」をクリックしてください。',
+          ko: '💡 팁: 먼저 [ShortVideo 메인] 탭에서 계정에 로그인한 후 이 페이지로 돌아와 [렌더링 시작]을 클릭하세요.',
+          vi: '💡 Mẹo: Vui lòng đăng nhập vào tài khoản trên tab chính ShortVideo trước, sau đó quay lại trang này và nhấp [Bắt đầu kết xuất].',
+          th: '💡 คำแนะนำ: โปรดเข้าสู่ระบบบัญชีของคุณในแท็บหลักของ ShortVideo ก่อน จากนั้นกลับมาที่หน้านี้และคลิก [เริ่มเรนเดอร์]',
+          bn: '💡 টিপ: প্রথমে প্রধান ShortVideo ট্যাবে আপনার অ্যাকাউন্টে লগ ইন করুন, তারপর এখানে ফিরে এসে [রেন্ডার শুরু করুন] ক্লিক করুন।',
+          id: '💡 Tips: Silakan masuk ke akun Anda di tab utama ShortVideo terlebih dahulu, lalu kembali ke halaman ini dan klik [Mulai Render].',
+          es: '💡 Consejo: Inicie sesión en su cuenta en la pestaña principal de ShortVideo primero, luego regrese aquí y haga clic en [Iniciar renderizado].',
+          fr: '💡 Astuce : Veuillez d\'abord vous connecter sur l\'onglet principal de ShortVideo, puis revenez ici et cliquez sur [Démarrer le rendu].',
+          pt: '💡 Dica: Faça login na sua conta na guia principal do ShortVideo primeiro, depois retorne aqui e clique em [Iniciar renderização].',
+          de: '💡 Hinweis: Bitte melden Sie sich zuerst im Haupt-Tab von ShortVideo an und kehren Sie dann hierher zurück, um auf [Rendering starten] zu klicken.',
+          it: '💡 Suggerimento: Accedi al tuo account nella scheda principale di ShortVideo, poi torna qui e fai clic su [Avvia rendering].',
+          ru: '💡 Совет: Сначала войдите в систему на главной вкладке ShortVideo, затем вернитесь сюда и нажмите [Начать рендеринг].',
+          tr: '💡 İpucu: Lütfen önce ana ShortVideo sekmesinde hesabınıza giriş yapın, ardından buraya dönüp [İşlemeyi Başlat]\'a tıklayın.',
+          ur: '💡 مشورہ: براہ کرم پہلے ShortVideo کے مین ٹیب پر اپنے اکاؤنٹ میں لاگ ان کریں، پھر یہاں واپس آئیں اور [رینڈرنگ شروع کریں] پر کلک کریں۔',
+        }
+      },
+      {
+        pattern: /(?:单次运行模式完成[，,]?\s*退出[。.]?)/i,
+        templates: {
+          zh: '单次运行模式完成，退出。',
+          en: 'Single run mode completed, exiting.',
+          ja: '単一実行モードが完了しました。終了します。',
+          ko: '단일 실행 모드가 완료되었습니다. 종료합니다.',
+          vi: 'Chế độ chạy một lần hoàn tất, đang thoát.',
+          th: 'โหมดการทำงานครั้งเดียวเสร็จสมบูรณ์ กำลังออก',
+          bn: 'একক রান মোড সম্পন্ন হয়েছে, প্রস্থান করা হচ্ছে।',
+          id: 'Mode sekali jalan selesai, keluar.',
+          es: 'Modo de ejecución única completado, saliendo.',
+          fr: 'Mode d\'exécution unique terminé, fermeture.',
+          pt: 'Modo de execução única concluído, saindo.',
+          de: 'Einzellaufmodus abgeschlossen, wird beendet.',
+          it: 'Modalità di esecuzione singola completata, uscita.',
+          ru: 'Режим однократного запуска завершен, выход.',
+          tr: 'Tek seferlik çalışma modu tamamlandı, çıkılıyor.',
+          ur: 'سنگل رن موڈ مکمل ہو گیا، باہر نکل رہا ہے۔',
+        }
+      },
+      {
+        pattern: /轮询异常[:：]\s*(.*)/i,
+        templates: {
+          zh: '轮询异常: $1',
+          en: 'Polling exception: $1',
+          ja: 'ポーリング例外: $1',
+          ko: '폴링 예외: $1',
+          vi: 'Ngoại lệ thăm dò: $1',
+          th: 'ข้อยกเว้นการสำรวจ: $1',
+          bn: 'পোলিং ব্যতিক্রম: $1',
+          id: 'Pengecualian polling: $1',
+          es: 'Excepción de sondeo: $1',
+          fr: 'Exception de scrutation : $1',
+          pt: 'Exceção de sondagem: $1',
+          de: 'Polling-Ausnahme: $1',
+          it: 'Eccezione di polling: $1',
+          ru: 'Исключение при опросе: $1',
+          tr: 'Yoklama istisnası: $1',
+          ur: 'پولنگ استثناء: $1',
+        }
+      },
+      {
+        pattern: /(?:[🛑\s]*)?正在终止视频渲染进程\s*[（\(]PID[:：]\s*(\d+)[）\)]\.\.\./i,
+        templates: {
+          zh: '🛑 正在终止视频渲染进程 (PID: $1)...',
+          en: '🛑 Terminating video rendering process (PID: $1)...',
+          ja: '🛑 動画レンダリングプロセスを終了中 (PID: $1)...',
+          ko: '🛑 비디오 렌더링 프로세스 종료 중 (PID: $1)...',
+          vi: '🛑 Đang chấm dứt tiến trình kết xuất video (PID: $1)...',
+          th: '🛑 กำลังยุติกระบวนการเรนเดอร์วิดีโอ (PID: $1)...',
+          bn: '🛑 ভিডিও রেন্ডারিং প্রক্রিয়া বন্ধ করা হচ্ছে (PID: $1)...',
+          id: '🛑 Menghentikan proses rendering video (PID: $1)...',
+          es: '🛑 Terminando el proceso de renderizado de video (PID: $1)...',
+          fr: '🛑 Arrêt du processus de rendu vidéo (PID : $1)...',
+          pt: '🛑 Encerrando o processo de renderização de vídeo (PID: $1)...',
+          de: '🛑 Videorendering-Prozess wird beendet (PID: $1)...',
+          it: '🛑 Terminazione del processo di rendering video in corso (PID: $1)...',
+          ru: '🛑 Завершение процесса рендеринга видео (PID: $1)...',
+          tr: '🛑 Video işleme süreci sonlandırılıyor (PID: $1)...',
+          ur: '🛑 ویڈیو رینڈرنگ پروسیس ختم کیا جا رہا ہے (PID: $1)...',
+        }
+      },
+      {
+        pattern: /(?:[🛑\s]*)?视频渲染任务已由用户手动终止/i,
+        templates: {
+          zh: '🛑 视频渲染任务已由用户手动终止',
+          en: '🛑 Video rendering task was terminated manually by user',
+          ja: '🛑 動画レンダリングタスクはユーザーによって手動停止されました',
+          ko: '🛑 비디오 렌더링 작업이 사용자에 의해 수동 종료되었습니다',
+          vi: '🛑 Tác vụ kết xuất video đã được người dùng dừng thủ công',
+          th: '🛑 งานเรนเดอร์วิดีโอถูกยกเลิกด้วยตนเองโดยผู้ใช้',
+          bn: '🛑 ভিডিও রেন্ডারিং কাজটি ব্যবহারকারী ম্যানুয়ালি বন্ধ করেছেন',
+          id: '🛑 Tugas rendering video dihentikan secara manual oleh pengguna',
+          es: '🛑 La tarea de renderizado de video fue cancelada manualmente por el usuario',
+          fr: '🛑 La tâche de rendu vidéo a été arrêtée manuellement par l\'utilisateur',
+          pt: '🛑 A tarefa de renderização de vídeo foi cancelada manualmente pelo usuário',
+          de: '🛑 Die Videorendering-Aufgabe wurde vom Benutzer manuell abgebrochen',
+          it: '🛑 L\'attività di rendering video è stata interrotta manualmente dall\'utente',
+          ru: '🛑 Задача рендеринга видео была остановлена пользователем вручную',
+          tr: '🛑 Video işleme görevi kullanıcı tarafından manuel olarak durduruldu',
+          ur: '🛑 ویڈیو رینڈرنگ کا کام صارف نے دستی طور پر ختم کر دیا',
+        }
+      },
+      {
+        pattern: /(?:[❌\s]*)?视频渲染任务异常退出\s*[（\(]退出代码[:：]\s*(\d+)[）\)]/i,
+        templates: {
+          zh: '❌ 视频渲染任务异常退出 (退出代码: $1)',
+          en: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
+          ja: '❌ 動画レンダリングタスクが異常終了しました (終了コード: $1)',
+          ko: '❌ 비디오 렌더링 작업이 비정상 종료되었습니다 (종료 코드: $1)',
+          vi: '❌ Tác vụ kết xuất video đã thoát bất thường (Mã thoát: $1)',
+          th: '❌ งานเรนเดอร์วิดีโอออกโดยไม่คาดคิด (รหัสออก: $1)',
+          bn: '❌ ভিডিও রেন্ডারিং টাস্ক অপ্রত্যাশিতভাবে প্রস্থান করেছে (প্রস্থান কোড: $1)',
+          id: '❌ Tugas rendering video keluar secara tidak normal (Kode keluar: $1)',
+          es: '❌ La tarea de renderizado de video salió con error (Código de salida: $1)',
+          fr: '❌ La tâche de rendu vidéo s\'est terminée de manière anormale (Code de sortie : $1)',
+          pt: '❌ A tarefa de renderização de vídeo encerrou de forma anormal (Código de saída: $1)',
+          de: '❌ Videorendering-Aufgabe wurde unerwartet beendet (Exit-Code: $1)',
+          it: '❌ L\'attività di rendering video è terminata in modo anomalo (Codice di uscita: $1)',
+          ru: '❌ Задача рендеринга видео завершилась аварийно (Код выхода: $1)',
+          tr: '❌ Video işleme görevi anormal şekilde kapandı (Çıkış kodu: $1)',
+          ur: '❌ ویڈیو رینڈرنگ ٹاسک غیر متوقع طور پر بند ہو گیا (خروج کوڈ: $1)',
+        }
+      },
+      {
+        pattern: /(?:🚀\s*)?开始渲染视频任务[:：]?\s*(.*)/i,
+        templates: {
+          zh: '🚀 开始渲染视频任务: $1',
+          en: '🚀 Starting video render task: $1',
+          ja: '🚀 動画レンダリングタスクを開始: $1',
+          ko: '🚀 비디오 렌더링 작업 시작: $1',
+          vi: '🚀 Bắt đầu tác vụ kết xuất video: $1',
+          th: '🚀 เริ่มงานเรนเดอร์วิดีโอ: $1',
+          bn: '🚀 ভিডিও রেন্ডার কাজ শুরু হচ্ছে: $1',
+          id: '🚀 Memulai tugas rendering video: $1',
+          es: '🚀 Iniciando tarea de renderizado de video: $1',
+          fr: '🚀 Démarrage de la tâche de rendu vidéo : $1',
+          pt: '🚀 Iniciando tarefa de renderização de vídeo: $1',
+          de: '🚀 Starte Videorendering-Aufgabe: $1',
+          it: '🚀 Avvio attività di rendering video: $1',
+          ru: '🚀 Запуск задачи рендеринга видео: $1',
+          tr: '🚀 Video işleme görevi başlatılıyor: $1',
+          ur: '🚀 ویڈیو رینڈرنگ کا کام شروع ہو رہا ہے: $1',
+        }
+      },
+      {
+        pattern: /(?:🎉\s*)?视频渲染合成成功[！!]?\s*(.*)/i,
+        templates: {
+          zh: '🎉 视频渲染合成成功! $1',
+          en: '🎉 Video rendering & synthesis succeeded! $1',
+          ja: '🎉 動画のレンダリング・合成に成功しました！ $1',
+          ko: '🎉 비디오 렌더링 및 합성 성공! $1',
+          vi: '🎉 Kết xuất và tổng hợp video thành công! $1',
+          th: '🎉 การเรนเดอร์และสังเคราะห์วิดีโอสำเร็จ! $1',
+          bn: '🎉 ভিডিও রেন্ডারিং এবং সংশ্লেষণ সফল হয়েছে! $1',
+          id: '🎉 Rendering & sintesis video berhasil! $1',
+          es: '🎉 ¡Renderizado y síntesis de video exitosos! $1',
+          fr: '🎉 Rendu et synthèse vidéo réussis ! $1',
+          pt: '🎉 Renderização e síntese de vídeo bem-sucedidas! $1',
+          de: '🎉 Videorendering und -synthese erfolgreich! $1',
+          it: '🎉 Rendering e sintesi video completati con successo! $1',
+          ru: '🎉 Синтез и рендеринг видео успешно завершены! $1',
+          tr: '🎉 Video işleme ve sentezi başarıyla tamamlandı! $1',
+          ur: '🎉 ویڈیو رینڈرنگ اور ترکیب کامیاب ہو گئی! $1',
+        }
+      }
+    ];
+
+    // 智能渲染日志本地化翻译器 (支持时间戳自动剥离重拼与 14 种语言)
+    function localizeRenderLog(rawText, lang) {
+      if (!rawText || typeof rawText !== 'string') return '';
+      const targetLang = (lang || 'zh').toLowerCase();
+
+      // 提取可选的前置时间戳，如 [21:11:49]
+      const timeMatch = rawText.match(/^(\[\d{2}:\d{2}:\d{2}\]\s*)(.*)$/);
+      const prefix = timeMatch ? timeMatch[1] : '';
+      const body = timeMatch ? timeMatch[2] : rawText;
+
+      for (const rule of RENDER_LOG_RULES) {
+        if (rule.pattern.test(body)) {
+          const tpl = rule.templates[targetLang] || rule.templates.en || rule.templates.zh;
+          if (tpl) {
+            return prefix + body.replace(rule.pattern, tpl);
+          }
+        }
+      }
+      return rawText;
+    }
+
+    function createLogElement(entry) {
+      const line = document.createElement('div');
+      line.className = 'log-line';
+      line.dataset.id = entry.id;
+
+      const timeSpan = document.createElement('span');
+      timeSpan.className = 'log-time';
+      timeSpan.textContent = entry.timestamp;
+
+      const typeSpan = document.createElement('span');
+      typeSpan.className = `log-type ${entry.type}`;
+      typeSpan.textContent = entry.type;
+
+      const contentSpan = document.createElement('span');
+      contentSpan.className = 'log-content';
+      const localizedText = localizeRenderLog(entry.text, currentRenderLang);
+      contentSpan.innerHTML = parseAnsiToHtml(localizedText);
+
+      line.appendChild(timeSpan);
+      line.appendChild(typeSpan);
+      line.appendChild(contentSpan);
+
+      if (entry.count && entry.count > 1) {
+        const repeatBadge = document.createElement('span');
+        repeatBadge.className = 'repeat-badge';
+        repeatBadge.textContent = `×${entry.count}`;
+        line.appendChild(repeatBadge);
+      }
+
+      return line;
+    }
+
+    function updateProgressBar(prog) {
+      if (!prog || !progressWrap) return;
+      lastRenderProgress = prog;
+      const c = getRenderLocale();
+      progressWrap.style.display = 'flex';
+      const pct = typeof prog.percent === 'number' ? prog.percent : 0;
+      progressFill.style.width = `${pct}%`;
+      progressPctText.textContent = `${pct}%`;
+
+      if (prog.current && prog.total) {
+        progressFramesText.textContent = `(${prog.current}/${prog.total} ${c.framesUnit})`;
+      } else {
+        progressFramesText.textContent = '';
+      }
+
+      if (prog.eta) {
+        progressEtaText.textContent = `${c.etaPrefix}${prog.eta}`;
+      } else {
+        progressEtaText.textContent = '';
+      }
+
+      if (statProgressItem && statProgressVal) {
+        statProgressItem.style.display = 'flex';
+        statProgressVal.textContent = `${pct}%`;
+      }
+    }
+
+    function updateSingleLog(entry) {
+      const idx = allLogs.findIndex(l => l.id === entry.id);
+      if (idx !== -1) {
+        allLogs[idx] = entry;
+      } else {
+        allLogs.push(entry);
+      }
+
+      const el = container.querySelector(`.log-line[data-id="${entry.id}"]`);
+      if (el) {
+        if (!matchQuery(entry)) {
+          el.remove();
+        } else {
+          const timeSpan = el.querySelector('.log-time');
+          const typeSpan = el.querySelector('.log-type');
+          const contentSpan = el.querySelector('.log-content');
+          if (timeSpan) timeSpan.textContent = entry.timestamp;
+          if (typeSpan) {
+            typeSpan.className = `log-type ${entry.type}`;
+            typeSpan.textContent = entry.type;
+          }
+          if (contentSpan) {
+            const localizedText = localizeRenderLog(entry.text, currentRenderLang);
+            contentSpan.innerHTML = parseAnsiToHtml(localizedText);
+          }
+
+          let repeatBadge = el.querySelector('.repeat-badge');
+          if (entry.count && entry.count > 1) {
+            if (!repeatBadge) {
+              repeatBadge = document.createElement('span');
+              repeatBadge.className = 'repeat-badge';
+              el.appendChild(repeatBadge);
+            }
+            repeatBadge.textContent = `×${entry.count}`;
+          } else if (repeatBadge) {
+            repeatBadge.remove();
+          }
+
+          // 仅普通重复日志触发轻量闪光动效，高频进度与等待心跳平滑原地数字递增
+          if (!entry.progress && !entry.text.includes('等待中') && !/Rendered\s+\d+\/\d+/i.test(entry.text)) {
+            el.classList.remove('flash-update');
+            void el.offsetWidth;
+            el.classList.add('flash-update');
+          }
+        }
+      } else if (matchQuery(entry)) {
+        renderLogs();
+      }
+
+      if (entry.progress) {
+        updateProgressBar(entry.progress);
+      }
+
+      if (autoScroll) {
+        scrollToBottom();
+      }
+    }
+
+    function matchQuery(entry) {
+      if (!searchQuery) return true;
+      const q = searchQuery.toLowerCase();
+      const raw = (entry.text || '').toLowerCase();
+      const loc = localizeRenderLog(entry.text || '', currentRenderLang).toLowerCase();
+      return raw.includes(q) || loc.includes(q);
+    }
+
+    function renderLogs() {
+      container.innerHTML = '';
+      const matched = allLogs.filter(matchQuery);
+
+      if (matched.length === 0) {
+        container.appendChild(emptyState);
+        emptyState.style.display = 'flex';
+      } else {
+        emptyState.style.display = 'none';
+        const fragment = document.createDocumentFragment();
+        for (const entry of matched) {
+          fragment.appendChild(createLogElement(entry));
+        }
+        container.appendChild(fragment);
+      }
+
+      statLines.textContent = allLogs.length.toString();
+
+      if (autoScroll) {
+        scrollToBottom();
+      }
+    }
+
+    function appendSingleLog(entry) {
+      allLogs.push(entry);
+      statLines.textContent = allLogs.length.toString();
+
+      if (emptyState.parentNode === container) {
+        emptyState.style.display = 'none';
+      }
+
+      if (matchQuery(entry)) {
+        container.appendChild(createLogElement(entry));
+        if (autoScroll) {
+          scrollToBottom();
+        }
+      }
+    }
+
+    let isProgrammaticScroll = false;
+
+    function scrollToBottom() {
+      if (!container) return;
+      isProgrammaticScroll = true;
+      container.scrollTop = container.scrollHeight;
+      requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight;
+        setTimeout(() => { isProgrammaticScroll = false; }, 60);
+      });
+    }
+
+    function setAutoScroll(enabled) {
+      autoScroll = enabled;
+      const c = getRenderLocale();
+      const txt = enabled ? c.autoScrollOn : c.autoScrollOff;
+      if (enabled) {
+        btnAutoScroll.classList.add('active');
+        btnAutoScroll.innerHTML = `<span>⬇</span> <span id="btn-autoscroll-text">${txt}</span>`;
+        scrollToBottom();
+      } else {
+        btnAutoScroll.classList.remove('active');
+        btnAutoScroll.innerHTML = `<span>⬇</span> <span id="btn-autoscroll-text">${txt}</span>`;
+      }
+    }
+
+    // 更新页面状态与计时器
+    function updateStatus(state) {
+      lastRenderState = state;
+      currentStatus = state.status;
+      statusBadge.className = `status-badge ${state.status}`;
+
+      const c = getRenderLocale();
+      const statusMap = {
+        idle: c.statusIdle,
+        running: c.statusRunning,
+        success: c.statusSuccess,
+        error: c.statusError,
+      };
+
+      const txt = statusMap[state.status] || state.status;
+      statusText.textContent = txt;
+      statStatus.textContent = txt;
+
+      btnStart.disabled = state.status === 'running';
+      btnStop.disabled = state.status !== 'running';
+
+      if (state.status === 'running') {
+        startTime = state.startTime || Date.now();
+        if (!durationTimer) {
+          durationTimer = setInterval(() => {
+            const sec = Math.floor((Date.now() - startTime) / 1000);
+            statDuration.textContent = `${sec}s`;
+          }, 1000);
+        }
+      } else {
+        if (durationTimer) {
+          clearInterval(durationTimer);
+          durationTimer = null;
+        }
+        if (state.durationMs) {
+          statDuration.textContent = `${Math.round(state.durationMs / 1000)}s`;
+        }
+      }
+    }
+
+    // 事件绑定
+    btnStart.addEventListener('click', async () => {
+      await ipcRenderer.invoke('render:start');
+    });
+
+    btnStop.addEventListener('click', async () => {
+      await ipcRenderer.invoke('render:stop');
+    });
+
+    btnRestart.addEventListener('click', async () => {
+      await ipcRenderer.invoke('render:stop');
+      setTimeout(async () => {
+        await ipcRenderer.invoke('render:start');
+      }, 500);
+    });
+
+    btnClear.addEventListener('click', async () => {
+      await ipcRenderer.invoke('render:clear');
+      allLogs = [];
+      renderLogs();
+    });
+
+    btnCopy.addEventListener('click', () => {
+      if (allLogs.length === 0) return;
+      const text = allLogs
+        .map(l => {
+          const locText = localizeRenderLog(l.text, currentRenderLang);
+          return `[${l.timestamp}] [${l.type}] ${locText}`;
+        })
+        .join('\n');
+      navigator.clipboard.writeText(text).then(() => {
+        const c = getRenderLocale();
+        const copySpan = document.getElementById('btn-copy-text');
+        if (copySpan) {
+          const old = copySpan.textContent;
+          copySpan.textContent = c.copied;
+          setTimeout(() => { copySpan.textContent = old; }, 1500);
+        }
+      });
+    });
+
+    btnExport?.addEventListener('click', () => {
+      if (allLogs.length === 0) return;
+      const text = allLogs
+        .map(l => {
+          const locText = localizeRenderLog(l.text, currentRenderLang);
+          return `[${l.timestamp}] [${l.type}] ${locText}`;
+        })
+        .join('\r\n');
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const pad = n => n.toString().padStart(2, '0');
+      const d = new Date();
+      const filename = `render-logs-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.log`;
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+
+    const btnOpenDir = document.getElementById('btn-open-dir');
+    if (btnOpenDir) {
+      btnOpenDir.addEventListener('click', async () => {
+        try {
+          await ipcRenderer.invoke('render:open-output-dir');
+        } catch (e) {
+          console.error('打开视频输出目录失败:', e);
+        }
+      });
+    }
+
+    btnAutoScroll.addEventListener('click', () => {
+      setAutoScroll(!autoScroll);
+    });
+
+    // 仅当用户手动滚轮或拖动向上时暂停自动滚底；滑回底部时自动恢复
+    container.addEventListener('wheel', (e) => {
+      if (e.deltaY < 0 && autoScroll) {
+        setAutoScroll(false);
+      } else if (e.deltaY > 0 && !autoScroll) {
+        setTimeout(() => {
+          const distance = container.scrollHeight - container.scrollTop - container.clientHeight;
+          if (distance < 30) {
+            setAutoScroll(true);
+          }
+        }, 50);
+      }
+    }, { passive: true });
+
+    container.addEventListener('scroll', () => {
+      if (isProgrammaticScroll) return;
+      const distance = container.scrollHeight - container.scrollTop - container.clientHeight;
+      if (distance < 20 && !autoScroll) {
+        setAutoScroll(true);
+      }
+    });
+
+    searchInput.addEventListener('input', (e) => {
+      searchQuery = (e.target.value || '').trim();
+      renderLogs();
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        searchInput.focus();
+        searchInput.select();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'l') {
+        e.preventDefault();
+        btnClear.click();
+      }
+    });
+
+    // 监听语言切换广播
+    ipcRenderer.on('render:language-change', (_event, lang) => {
+      applyLanguage(lang);
+      renderLogs();
+    });
+
+    // IPC 监听
+    ipcRenderer.on('render:init', (_event, data) => {
+      if (data.state) updateStatus(data.state);
+      if (Array.isArray(data.logs)) {
+        allLogs = data.logs;
+        renderLogs();
+        const lastWithProg = [...data.logs].reverse().find(l => l.progress);
+        if (lastWithProg && lastWithProg.progress) {
+          updateProgressBar(lastWithProg.progress);
+        }
+      }
+    });
+
+    ipcRenderer.on('render:log', (_event, entry) => {
+      appendSingleLog(entry);
+      if (entry.progress) {
+        updateProgressBar(entry.progress);
+      }
+    });
+
+    ipcRenderer.on('render:log-update', (_event, entry) => {
+      updateSingleLog(entry);
+    });
+
+    ipcRenderer.on('render:progress-update', (_event, prog) => {
+      updateProgressBar(prog);
+    });
+
+    ipcRenderer.on('render:status-update', (_event, state) => {
+      updateStatus(state);
+      if (state.status === 'success') {
+        const c = getRenderLocale();
+        updateProgressBar({ percent: 100, eta: c.statusCompleted });
+        setTimeout(() => {
+          if (progressWrap && currentStatus === 'success') {
+            progressWrap.style.display = 'none';
+          }
+        }, 6000);
+      } else if (state.status === 'idle') {
+        if (progressWrap) progressWrap.style.display = 'none';
+        if (statProgressItem) statProgressItem.style.display = 'none';
+      }
+    });
+
+    ipcRenderer.on('render:cleared', () => {
+      allLogs = [];
+      renderLogs();
+      if (progressWrap) progressWrap.style.display = 'none';
+      if (statProgressItem) statProgressItem.style.display = 'none';
+    });
+
+    // 页面初次加载时拉取一次当前状态
+    ipcRenderer.invoke('render:get-state').then((res) => {
+      if (res && res.state) {
+        updateStatus(res.state);
+      }
+      if (res && Array.isArray(res.logs)) {
+        allLogs = res.logs;
+        renderLogs();
+      }
+    }).catch(() => { });
+
+    // 动态拉取当前软件版本 (TAG 形式如 v0.1.6) 及当前语言展示在界面中
+    ipcRenderer.invoke('app:get-info').then((info) => {
+      if (info && info.language) {
+        applyLanguage(info.language);
+        renderLogs();
+      }
+      if (info && info.version) {
+        const verStr = info.version.startsWith('v') ? info.version : `v${info.version}`;
+        const verEl = document.getElementById('empty-app-version');
+        const statVerEl = document.getElementById('stat-version');
+        if (verEl) verEl.textContent = verStr;
+        if (statVerEl) statVerEl.textContent = verStr;
+      }
+    }).catch(() => { });
+  </script>
+</body>
+</html>
