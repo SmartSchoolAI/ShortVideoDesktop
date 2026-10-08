@@ -109,10 +109,10 @@ jobs:
           name: release-windows
           retention-days: 1
           path: |
-            release/*.exe
-            release/*.zip
-            release/*.blockmap
-            release/*.yml
+            dist-release/*.exe
+            dist-release/*.zip
+            dist-release/*.blockmap
+            dist-release/*.yml
           if-no-files-found: warn
 
       - name: Publish Windows Assets to GitHub Release
@@ -122,10 +122,10 @@ jobs:
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           files: |
-            release/*.exe
-            release/*.zip
-            release/*.blockmap
-            release/*.yml
+            dist-release/*.exe
+            dist-release/*.zip
+            dist-release/*.blockmap
+            dist-release/*.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -144,11 +144,11 @@ jobs:
             VERSION="${APP_VERSION}"
             echo "📦 Current release version: $VERSION"
             echo "📦 Generated release items:"
-            ls -lh release/
+            ls -lh dist-release/
             echo "Uploading Windows release packages to Cloudflare R2 (archive: website/${VERSION}/ & root: website/)..."
             upload_count=0
             shopt -s nocasematch
-            for file in release/*; do
+            for file in dist-release/*; do
               if [ -f "$file" ]; then
                 filename=$(basename "$file")
                 case "$filename" in
@@ -248,10 +248,10 @@ jobs:
           name: release-macos
           retention-days: 1
           path: |
-            release/*.dmg
-            release/*.zip
-            release/*.blockmap
-            release/*.yml
+            dist-release/*.dmg
+            dist-release/*.zip
+            dist-release/*.blockmap
+            dist-release/*.yml
           if-no-files-found: warn
 
       - name: Publish macOS Assets to GitHub Release
@@ -261,10 +261,10 @@ jobs:
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           files: |
-            release/*.dmg
-            release/*.zip
-            release/*.blockmap
-            release/*.yml
+            dist-release/*.dmg
+            dist-release/*.zip
+            dist-release/*.blockmap
+            dist-release/*.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -282,11 +282,11 @@ jobs:
             VERSION="${APP_VERSION}"
             echo "📦 Current release version: $VERSION"
             echo "📦 Generated release items:"
-            ls -lh release/
+            ls -lh dist-release/
             echo "Uploading macOS release packages to Cloudflare R2 (archive: website/${VERSION}/ & root: website/)..."
             upload_count=0
             shopt -s nocasematch
-            for file in release/*; do
+            for file in dist-release/*; do
               if [ -f "$file" ]; then
                 filename=$(basename "$file")
                 case "$filename" in

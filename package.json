@@ -9,7 +9,10 @@
   "private": false,
   "scripts": {
     "clean": "node scripts/clean-electron.js",
+    "clean:electron": "node scripts/clean-electron.js",
+    "clean:workflows": "node scripts/delete-all-workflow-runs.js",
     "compile": "tsc -p tsconfig.json && tsc -p tsconfig.render.json && node scripts/copy-electron-views.js",
+    "electron:compile": "tsc -p tsconfig.json && tsc -p tsconfig.render.json && node scripts/copy-electron-views.js",
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.render.json && node scripts/copy-electron-views.js",
     "dev": "tsc -p tsconfig.json && tsc -p tsconfig.render.json && node scripts/copy-electron-views.js && electron dist-electron/main.js",
     "start": "tsc -p tsconfig.json && tsc -p tsconfig.render.json && node scripts/copy-electron-views.js && electron dist-electron/main.js",
