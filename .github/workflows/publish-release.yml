@@ -1,0 +1,58 @@
+name: Cloud Release Dispatcher
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Git Tag Name to Release'
+        required: true
+        type: string
+      run_id:
+        description: 'GitHub Actions Build Run ID containing artifacts'
+        required: true
+        type: string
+
+jobs:
+  publish-to-release:
+    name: Attach Cloud Artifacts to GitHub Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all release artifacts from build run
+        uses: actions/download-artifact@v4
+        with:
+          pattern: 'release-*'
+          merge-multiple: true
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: final-release-files
+
+      - name: List collected files
+        shell: bash
+        run: |
+          echo "📦 Collected cloud artifacts:"
+          ls -lh final-release-files/
+
+      - name: Publish and Append Assets to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag_name }}
+          files: |
+            final-release-files/*.exe
+            final-release-files/*.dmg
+            final-release-files/*.AppImage
+            final-release-files/*.deb
+            final-release-files/*.rpm
+            final-release-files/*.zip
+            final-release-files/*.yml
+            final-release-files/*.yaml
+            final-release-files/*.blockmap
+            final-release-files/*.7z
+            final-release-files/*.tar.gz
+            final-release-files/*.tar.xz
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

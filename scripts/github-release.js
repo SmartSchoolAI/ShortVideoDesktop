@@ -245,6 +245,175 @@ function uploadReleaseAsset(owner, repo, releaseId, filePath, token) {
   });
 }
 
+function downloadArtifactZip(downloadUrl, token, destPath) {
+  return new Promise((resolve, reject) => {
+    function fetchUrl(targetUrl, isRedirect = false) {
+      try {
+        const parsedUrl = new URL(targetUrl);
+        const isHttps = parsedUrl.protocol === 'https:';
+        const client = isHttps ? https : require('http');
+
+        const headers = {
+          'User-Agent': 'ShortVideo-Release-Agent',
+        };
+        // 关键：重定向至 S3 / Azure 预签名存储桶时绝对不携带 Authorization 头部，避免签名机制冲突
+        if (!isRedirect && token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const req = client.get(parsedUrl, { headers }, (res) => {
+          if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
+            return fetchUrl(res.headers.location, true);
+          }
+          if (res.statusCode !== 200) {
+            return reject(new Error(`Download failed with status ${res.statusCode}`));
+          }
+          const fileStream = fs.createWriteStream(destPath);
+          res.pipe(fileStream);
+          fileStream.on('finish', () => {
+            fileStream.close();
+            resolve(true);
+          });
+          fileStream.on('error', (err) => {
+            try { fs.unlinkSync(destPath); } catch (_) { }
+            reject(err);
+          });
+        });
+        req.on('error', reject);
+      } catch (err) {
+        reject(err);
+      }
+    }
+    fetchUrl(downloadUrl);
+  });
+}
+
+function extractZip(zipFilePath, targetDir) {
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
+  }
+  try {
+    execSync(`tar -xf "${zipFilePath}" -C "${targetDir}"`, { stdio: 'pipe' });
+    return true;
+  } catch (_) {
+    if (process.platform === 'win32') {
+      try {
+        execSync(`powershell -NoProfile -Command "Expand-Archive -Path '${zipFilePath}' -DestinationPath '${targetDir}' -Force"`, { stdio: 'pipe' });
+        return true;
+      } catch (_) { }
+    }
+    return false;
+  }
+}
+
+async function fetchCloudArtifacts(owner, repo, targetTag, token, isDryRun = false) {
+  console.log(`${c.cyan}${t('RELEASE_SEARCHING_CLOUD_ARTIFACTS', { tag: targetTag })}${c.reset}`);
+
+  // 1. 获取 Tag 对应的 commit SHA
+  let commitSha = run(`git rev-parse refs/tags/${targetTag}^{commit}`, { ignoreError: true })
+    || run(`git rev-parse ${targetTag}^{commit}`, { ignoreError: true });
+
+  if (!commitSha) {
+    try {
+      const tagRefRes = await sendGitHubAPI('GET', `/repos/${owner}/${repo}/git/ref/tags/${targetTag}`, token);
+      if (tagRefRes.statusCode === 200 && tagRefRes.data && tagRefRes.data.object) {
+        commitSha = tagRefRes.data.object.sha;
+      }
+    } catch (_) { }
+  }
+
+  // 2. 查询相关的 GitHub Actions Workflow Runs
+  let runsRes = await sendGitHubAPI('GET', `/repos/${owner}/${repo}/actions/runs?per_page=30`, token);
+  if (runsRes.statusCode !== 200 || !runsRes.data || !Array.isArray(runsRes.data.workflow_runs)) {
+    return { assets: [] };
+  }
+
+  const runs = runsRes.data.workflow_runs;
+  // 匹配 run：优先按 commitSha 匹配，或按 head_branch 匹配
+  let targetRun = null;
+  if (commitSha) {
+    targetRun = runs.find((r) => r.head_sha === commitSha);
+  }
+  if (!targetRun) {
+    targetRun = runs.find((r) => r.head_branch === targetTag);
+  }
+
+  if (!targetRun) {
+    console.log(`${c.yellow}[Cloud Assets] 未在 GitHub Actions 找到与 Tag ${targetTag} 对应的构建流水线记录。${c.reset}`);
+    return { assets: [] };
+  }
+
+  console.log(`${c.bold}[Workflow Run]${c.reset}    : ID ${targetRun.id} (Status: ${targetRun.status}, Conclusion: ${targetRun.conclusion || 'pending'})`);
+  console.log(`${c.gray}   流水线链接: ${targetRun.html_url}${c.reset}`);
+
+  // 检查是否还在打包中
+  if (targetRun.status !== 'completed') {
+    console.log(`\n${c.yellow}${t('RELEASE_BUILD_IN_PROGRESS', { status: targetRun.status, url: targetRun.html_url })}${c.reset}`);
+    return { inProgress: true, runUrl: targetRun.html_url, assets: [] };
+  }
+
+  // 检查是否构建失败
+  if (targetRun.conclusion === 'failure') {
+    console.log(`\n${c.red}${t('RELEASE_BUILD_FAILED', { status: targetRun.conclusion, url: targetRun.html_url })}${c.reset}`);
+    return { failed: true, runUrl: targetRun.html_url, assets: [] };
+  }
+
+  // 3. 获取该 run 的 artifacts
+  const artifactsRes = await sendGitHubAPI('GET', `/repos/${owner}/${repo}/actions/runs/${targetRun.id}/artifacts`, token);
+  if (artifactsRes.statusCode !== 200 || !artifactsRes.data || !Array.isArray(artifactsRes.data.artifacts) || artifactsRes.data.artifacts.length === 0) {
+    console.log(`${c.yellow}[Cloud Assets] 该云端流水线未生成制品包 (Artifacts)。${c.reset}`);
+    return { assets: [] };
+  }
+
+  const artifacts = artifactsRes.data.artifacts;
+  console.log(`${c.green}${t('RELEASE_CLOUD_ARTIFACTS_FOUND', { count: artifacts.length })}${c.reset}`);
+
+  if (isDryRun) {
+    for (const artifact of artifacts) {
+      const sizeMB = (artifact.size_in_bytes / (1024 * 1024)).toFixed(2);
+      console.log(`  📦 [Cloud Artifact] ${artifact.name} (${sizeMB} MB)`);
+    }
+    return { assets: [], artifactsCount: artifacts.length, isPreview: true };
+  }
+
+  const cacheBaseDir = path.resolve(process.cwd(), '.release-cloud-cache', targetTag);
+  if (!fs.existsSync(cacheBaseDir)) {
+    fs.mkdirSync(cacheBaseDir, { recursive: true });
+  }
+
+  const collectedAssets = [];
+  const allowedExts = /\.(exe|dmg|AppImage|deb|rpm|zip|msi|blockmap|7z|tar\.gz|tar\.xz)$/i;
+
+  for (const artifact of artifacts) {
+    const sizeMB = (artifact.size_in_bytes / (1024 * 1024)).toFixed(2);
+    console.log(t('RELEASE_DOWNLOADING_ARTIFACT', { name: artifact.name, sizeMB }));
+
+    const zipFilePath = path.join(cacheBaseDir, `${artifact.name}.zip`);
+    const extractDir = path.join(cacheBaseDir, artifact.name);
+
+    try {
+      await downloadArtifactZip(artifact.archive_download_url, token, zipFilePath);
+
+      const ok = extractZip(zipFilePath, extractDir);
+      if (ok && fs.existsSync(extractDir)) {
+        const files = fs.readdirSync(extractDir);
+        for (const file of files) {
+          if (file === 'builder-effective-config.yaml') continue;
+          const fullPath = path.join(extractDir, file);
+          const stat = fs.statSync(fullPath);
+          if (stat.isFile() && (allowedExts.test(file) || file.startsWith('latest'))) {
+            collectedAssets.push(fullPath);
+          }
+        }
+      }
+    } catch (e) {
+      console.log(`  └─ ⚠️ 获取制品 [${artifact.name}] 遇到异常: ${e.message}`);
+    }
+  }
+
+  return { assets: collectedAssets, cacheDir: cacheBaseDir };
+}
+
 function getReleaseOutputDir() {
   try {
     const builderConfigPath = path.resolve(process.cwd(), 'electron-builder.json');
@@ -365,7 +534,39 @@ ${changelogSection}
 * ⚡ **Release 标签**: https://github.com/${repoInfo.owner}/${repoInfo.repo}/releases/tag/${targetTag}
 `;
 
-  const foundAssets = getReleaseAssets();
+  const token = findGitHubToken();
+
+  let cloudAssets = [];
+  let cacheDirToClean = null;
+
+  if (token) {
+    const cloudResult = await fetchCloudArtifacts(repoInfo.owner, repoInfo.repo, targetTag, token, isDryRun);
+    if (cloudResult && cloudResult.inProgress) {
+      process.exit(1);
+    }
+    if (cloudResult && cloudResult.failed) {
+      process.exit(1);
+    }
+    if (cloudResult && cloudResult.assets && cloudResult.assets.length > 0) {
+      cloudAssets = cloudResult.assets;
+      cacheDirToClean = cloudResult.cacheDir;
+    }
+  }
+
+  // 本地可能存在的安装包（作为补充或离线备选）
+  const localAssets = getReleaseAssets();
+
+  // 合并资源，优先使用从 GitHub Actions 下载解压的云端安装包，并按文件名去重
+  const assetMap = new Map();
+  for (const p of cloudAssets) {
+    assetMap.set(path.basename(p), p);
+  }
+  for (const p of localAssets) {
+    if (!assetMap.has(path.basename(p))) {
+      assetMap.set(path.basename(p), p);
+    }
+  }
+  const foundAssets = Array.from(assetMap.values());
 
   console.log(`${c.bold}[Release Target]${c.reset}  : ${c.yellow}${targetTag}${c.reset}`);
   console.log(`${c.bold}[Previous Tag]${c.reset}    : ${c.gray}${prevTag || 'None'}${c.reset}`);
@@ -390,8 +591,6 @@ ${changelogSection}
     console.log(`${c.yellow}[Dry Run] 预览演练完成，未发起实际 API 发布与安装包上传请求。${c.reset}`);
     return;
   }
-
-  const token = findGitHubToken();
 
   // 1. 尝试使用 GitHub API 自动创建或更新 Release
   if (token) {
@@ -457,6 +656,13 @@ ${changelogSection}
           }
         }
 
+        function cleanupCache() {
+          if (cacheDirToClean && fs.existsSync(cacheDirToClean)) {
+            try { fs.rmSync(cacheDirToClean, { recursive: true, force: true }); } catch (_) { }
+          }
+        }
+
+        cleanupCache();
         console.log(`\n${c.green}====================================================${c.reset}`);
         console.log(`${c.bold}${c.green}🎉 GitHub Release API 自动生成与安装包资源上传成功!${c.reset}`);
         console.log(`${c.bold}📦 Release URL: ${htmlUrl}${c.reset}`);
@@ -490,6 +696,9 @@ ${changelogSection}
       run(ghCmd, { stdio: 'inherit' });
 
       try { fs.unlinkSync(tmpNotesFile); } catch (_) { }
+      if (cacheDirToClean && fs.existsSync(cacheDirToClean)) {
+        try { fs.rmSync(cacheDirToClean, { recursive: true, force: true }); } catch (_) { }
+      }
 
       console.log(`\n${c.green}====================================================${c.reset}`);
       console.log(`${c.bold}${c.green}🎉 GitHub Release CLI 自动发布成功!${c.reset}`);
