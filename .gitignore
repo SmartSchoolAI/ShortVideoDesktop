@@ -6,6 +6,9 @@ node_modules/
 dist/
 dist-electron/
 release/
+build/*
+!build/icon.ico
+!build/icon.png
 out/
 
 # Environment Variables & Secrets
@@ -33,3 +36,4 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+

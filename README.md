@@ -41,14 +41,19 @@ pnpm run dist
 
 ## 🚀 CI / CD & Release
 
-This repository uses **GitHub Actions** for automated builds across Windows, macOS, and Linux:
+### Automated Tag & Release
+- **Auto increment and push Tag**:
+  ```bash
+  pnpm run tag        # Increment patch tag (e.g. v0.1.1) and trigger GitHub Actions build
+  pnpm run tagall     # Build all platforms (Windows + macOS + Linux)
+  ```
 
-1. Push a git tag (e.g. `v0.1.0`):
-   ```bash
-   git tag v0.1.0
-   git push origin v0.1.0
-   ```
-2. GitHub Actions will automatically compile installers for Windows, macOS, and Linux, and create a GitHub Release with download assets.
+- **Publish / Update GitHub Release notes**:
+  ```bash
+  pnpm run release    # Automatically sync release notes to GitHub Release page
+  ```
+
+Pushing a Tag triggers **GitHub Actions** (`.github/workflows/release.yml`) to automatically compile installers and publish release assets to GitHub.
 
 ---
 

@@ -9,15 +9,23 @@
   "private": false,
   "scripts": {
     "clean": "node scripts/clean-electron.js",
-    "compile": "tsc -p tsconfig.json && node scripts/copy-electron-views.js",
-    "dev": "tsc -p tsconfig.json && node scripts/copy-electron-views.js && electron dist-electron/main.js",
-    "start": "tsc -p tsconfig.json && node scripts/copy-electron-views.js && electron dist-electron/main.js",
-    "pack": "node scripts/clean-electron.js && tsc -p tsconfig.json && node scripts/copy-electron-views.js && electron-builder --dir",
-    "dist": "node scripts/clean-electron.js && tsc -p tsconfig.json && node scripts/copy-electron-views.js && electron-builder"
+    "compile": "tsc -p tsconfig.json && tsc -p tsconfig.render.json && node scripts/copy-electron-views.js",
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.render.json && node scripts/copy-electron-views.js",
+    "dev": "tsc -p tsconfig.json && tsc -p tsconfig.render.json && node scripts/copy-electron-views.js && electron dist-electron/main.js",
+    "start": "tsc -p tsconfig.json && tsc -p tsconfig.render.json && node scripts/copy-electron-views.js && electron dist-electron/main.js",
+    "render": "node dist-electron/scripts/scripts/CompareEnglishWord.js",
+    "pack": "node scripts/clean-electron.js && tsc -p tsconfig.json && tsc -p tsconfig.render.json && node scripts/copy-electron-views.js && electron-builder --dir",
+    "dist": "node scripts/clean-electron.js && tsc -p tsconfig.json && tsc -p tsconfig.render.json && node scripts/copy-electron-views.js && electron-builder",
+    "tag": "node scripts/add-tag.js",
+    "tagall": "node scripts/add-tag.js --all",
+    "release": "node scripts/github-release.js"
   },
   "dependencies": {
+    "@remotion/cli": "^4.0.520",
+    "@remotion/renderer": "^4.0.520",
     "electron-updater": "^6.3.9",
     "playwright-core": "^1.49.0",
+    "remotion": "^4.0.520",
     "ws": "^8.18.0"
   },
   "devDependencies": {
@@ -26,5 +34,13 @@
     "electron": "^33.3.1",
     "electron-builder": "^26.15.3",
     "typescript": "^5.6.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "@noble/hashes": "^1.6.1"
+    }
+  },
+  "overrides": {
+    "@noble/hashes": "^1.6.1"
   }
 }

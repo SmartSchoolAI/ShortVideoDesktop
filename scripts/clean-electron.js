@@ -1,7 +1,20 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { t } = require('./i18n');
+
+let t = (key, params) => {
+  if (key === 'CLEAN_ELECTRON_START') return '[clean-electron] Cleaning legacy Electron processes and build cache...';
+  if (key === 'CLEAN_ELECTRON_DONE') return '[clean-electron] Build cache cleaned successfully.';
+  if (key === 'CLEAN_ELECTRON_WARN_LOCK') return `[clean-electron] Warning: Directory ${params?.dir} is locked by another process: ${params?.err}`;
+  return key;
+};
+
+try {
+  const i18n = require('./i18n');
+  if (i18n && typeof i18n.t === 'function') {
+    t = i18n.t;
+  }
+} catch (_) {}
 
 function killProcess(processName) {
   if (process.platform === 'win32') {
@@ -44,4 +57,3 @@ removeDirSafe('release');
 removeDirSafe('dist-electron');
 
 console.log(t('CLEAN_ELECTRON_DONE'));
-
