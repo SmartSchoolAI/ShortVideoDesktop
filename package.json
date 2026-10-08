@@ -18,7 +18,8 @@
     "dist": "node scripts/clean-electron.js && tsc -p tsconfig.json && tsc -p tsconfig.render.json && node scripts/copy-electron-views.js && electron-builder",
     "tag": "node scripts/add-tag.js",
     "tagall": "node scripts/add-tag.js --all",
-    "release": "node scripts/github-release.js"
+    "release": "node scripts/github-release.js",
+    "r2": "node scripts/manage-r2-website.js"
   },
   "dependencies": {
     "@remotion/cli": "4.0.534",
