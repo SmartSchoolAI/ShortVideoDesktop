@@ -19,7 +19,8 @@
     "tag": "node scripts/add-tag.js",
     "tagall": "node scripts/add-tag.js --all",
     "release": "node scripts/github-release.js",
-    "r2": "node scripts/manage-r2-website.js"
+    "r2": "node scripts/manage-r2-website.js",
+    "r2:upload": "node scripts/upload-to-r2.js"
   },
   "dependencies": {
     "@remotion/cli": "4.0.534",
