@@ -245,66 +245,6 @@ function uploadReleaseAsset(owner, repo, releaseId, filePath, token) {
   });
 }
 
-function downloadArtifactZip(downloadUrl, token, destPath) {
-  return new Promise((resolve, reject) => {
-    function fetchUrl(targetUrl, isRedirect = false) {
-      try {
-        const parsedUrl = new URL(targetUrl);
-        const isHttps = parsedUrl.protocol === 'https:';
-        const client = isHttps ? https : require('http');
-
-        const headers = {
-          'User-Agent': 'ShortVideo-Release-Agent',
-        };
-        // 关键：重定向至 S3 / Azure 预签名存储桶时绝对不携带 Authorization 头部，避免签名机制冲突
-        if (!isRedirect && token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-
-        const req = client.get(parsedUrl, { headers }, (res) => {
-          if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
-            return fetchUrl(res.headers.location, true);
-          }
-          if (res.statusCode !== 200) {
-            return reject(new Error(`Download failed with status ${res.statusCode}`));
-          }
-          const fileStream = fs.createWriteStream(destPath);
-          res.pipe(fileStream);
-          fileStream.on('finish', () => {
-            fileStream.close();
-            resolve(true);
-          });
-          fileStream.on('error', (err) => {
-            try { fs.unlinkSync(destPath); } catch (_) { }
-            reject(err);
-          });
-        });
-        req.on('error', reject);
-      } catch (err) {
-        reject(err);
-      }
-    }
-    fetchUrl(downloadUrl);
-  });
-}
-
-function extractZip(zipFilePath, targetDir) {
-  if (!fs.existsSync(targetDir)) {
-    fs.mkdirSync(targetDir, { recursive: true });
-  }
-  try {
-    execSync(`tar -xf "${zipFilePath}" -C "${targetDir}"`, { stdio: 'pipe' });
-    return true;
-  } catch (_) {
-    if (process.platform === 'win32') {
-      try {
-        execSync(`powershell -NoProfile -Command "Expand-Archive -Path '${zipFilePath}' -DestinationPath '${targetDir}' -Force"`, { stdio: 'pipe' });
-        return true;
-      } catch (_) { }
-    }
-    return false;
-  }
-}
 
 async function getCloudBuildInfo(owner, repo, targetTag, token) {
   console.log(`${c.cyan}${t('RELEASE_SEARCHING_CLOUD_ARTIFACTS', { tag: targetTag })}${c.reset}`);
