@@ -213,7 +213,7 @@ function main() {
         if (localExists || remoteExists) {
           nextPatch += 1;
         } else {
-          nextTag = isBuildAll ? candidateAll : candidate;
+          nextTag = candidate;
           nextVersion = `${nextMajor}.${nextMinor}.${nextPatch}`;
           break;
         }
@@ -231,13 +231,9 @@ function main() {
       const parts = defaultVer.split('.').map((n) => parseInt(n, 10) || 0);
       const nextPatch = (parts[2] || 0) + 1;
       const baseTag = `v${parts[0] || 0}.${parts[1] || 1}.${nextPatch}`;
-      nextTag = isBuildAll ? `${baseTag}-all` : baseTag;
+      nextTag = baseTag;
       nextVersion = `${parts[0] || 0}.${parts[1] || 1}.${nextPatch}`;
     }
-  }
-
-  if (isBuildAll && !nextTag.endsWith('-all')) {
-    nextTag += '-all';
   }
 
   const buildTargetText = isBuildAll ? '🌐 [云端构建: Windows + macOS + Linux 三平台]' : '🪟 [云端构建: 仅 Windows 单平台]';

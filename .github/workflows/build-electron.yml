@@ -117,7 +117,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Publish Windows Assets to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release == true)
+        if: github.event_name == 'workflow_dispatch' && inputs.create_release == true
         uses: softprops/action-gh-release@v2
         continue-on-error: true
         with:
@@ -192,7 +192,7 @@ jobs:
   build-macos:
     name: Build macOS
     needs: [cleanup-previous-runs]
-    if: contains(github.ref_name, '-all') || contains(github.ref, '-all') || (github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'macos'))
+    if: github.event_name == 'push' || contains(github.ref_name, '-all') || (github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'macos'))
     runs-on: macos-latest
 
     steps:
@@ -256,7 +256,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Publish macOS Assets to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release == true)
+        if: github.event_name == 'workflow_dispatch' && inputs.create_release == true
         uses: softprops/action-gh-release@v2
         continue-on-error: true
         with:
@@ -330,7 +330,7 @@ jobs:
   build-linux:
     name: Build Linux
     needs: [cleanup-previous-runs]
-    if: contains(github.ref_name, '-all') || contains(github.ref, '-all') || (github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'linux'))
+    if: github.event_name == 'push' || contains(github.ref_name, '-all') || (github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'linux'))
     runs-on: ubuntu-latest
 
     steps:
@@ -397,7 +397,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Publish Linux Assets to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release == true)
+        if: github.event_name == 'workflow_dispatch' && inputs.create_release == true
         uses: softprops/action-gh-release@v2
         continue-on-error: true
         with:
@@ -472,7 +472,7 @@ jobs:
   publish-release:
     name: Publish GitHub Release
     needs: [build-windows, build-macos, build-linux]
-    if: always() && (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release == true))
+    if: github.event_name == 'workflow_dispatch' && inputs.create_release == true
     runs-on: ubuntu-latest
 
     steps:
