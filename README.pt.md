@@ -24,7 +24,7 @@
   <a href="https://app.shortvideo.ca"><img src="https://img.shields.io/badge/Estúdio_Web-app.shortvideo.ca-success?style=flat-square" alt="Web Studio"></a>
   <a href="https://download.shortvideo.ca"><img src="https://img.shields.io/badge/Baixar_App-Windows_%7C_macOS_%7C_Linux-orange?style=flat-square" alt="Download Client"></a>
   <a href="https://github.com/SmartSchoolAI/ShortVideoDesktop/releases"><img src="https://img.shields.io/badge/GitHub-Lançamentos-blue?style=flat-square" alt="GitHub Releases"></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/Licença-MIT-green?style=flat-square" alt="License"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/Licença-GPL--3.0-blue?style=flat-square" alt="License"></a>
 </p>
 
 ---
@@ -62,6 +62,7 @@ O **ShortVideo** é uma solução completa para criadores de conteúdo, educador
 
 ---
 
-## 📄 Licença
+## 📄 Licença e Termos (License & Terms)
 
-[MIT License](./LICENSE) © 2026 ShortVideo Team.
+* **ShortVideo Desktop (Aplicativo)**: Código aberto sob a licença [GNU General Public License v3.0 (GPL-3.0)](./LICENSE).
+* **ShortVideo.ca (Serviço Web & Plataforma em Nuvem)**: Plataforma comercial proprietária e fechada (Proprietary / Closed Source). Todos os direitos reservados.

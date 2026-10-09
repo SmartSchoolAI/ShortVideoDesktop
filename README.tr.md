@@ -24,7 +24,7 @@
   <a href="https://app.shortvideo.ca"><img src="https://img.shields.io/badge/Web_Stüdyo-app.shortvideo.ca-success?style=flat-square" alt="Web Studio"></a>
   <a href="https://download.shortvideo.ca"><img src="https://img.shields.io/badge/İndir-Windows_%7C_macOS_%7C_Linux-orange?style=flat-square" alt="Download Client"></a>
   <a href="https://github.com/SmartSchoolAI/ShortVideoDesktop/releases"><img src="https://img.shields.io/badge/GitHub-Sürümler-blue?style=flat-square" alt="GitHub Releases"></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/Lisans-MIT-green?style=flat-square" alt="License"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/Lisans-GPL--3.0-blue?style=flat-square" alt="License"></a>
 </p>
 
 ---
@@ -62,6 +62,7 @@
 
 ---
 
-## 📄 Lisans
+## 📄 Lisans ve Koşullar (License & Terms)
 
-[MIT License](./LICENSE) © 2026 ShortVideo Team.
+* **ShortVideo Desktop (İstemci)**: [GNU General Public License v3.0 (GPL-3.0)](./LICENSE) kapsamında açık kaynaktır.
+* **ShortVideo.ca (Web Hizmeti ve Bulut Altyapısı)**: Tescilli, kapalı kaynaklı ticari bir platformdur (Proprietary / Closed Source). Tüm hakları saklıdır.
