@@ -64,5 +64,5 @@
 
 ## 📄 Lisans ve Koşullar (License & Terms)
 
-* **ShortVideo Desktop (İstemci)**: [GNU General Public License v3.0 (GPL-3.0)](./LICENSE) kapsamında açık kaynaktır.
-* **ShortVideo.ca (Web Hizmeti ve Bulut Altyapısı)**: Tescilli, kapalı kaynaklı ticari bir platformdur (Proprietary / Closed Source). Tüm hakları saklıdır.
+* **ShortVideo Desktop**: [GPL-3.0 license](./LICENSE) kapsamında açık kaynaktır.
+* **ShortVideo.ca**: Tescilli, kapalı kaynaklı ticari bir platformdur (Proprietary / Closed Source). Tüm hakları saklıdır.

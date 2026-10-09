@@ -66,5 +66,5 @@
 
 ## 📄 Giấy Phép & Điều Khoản (License & Terms)
 
-* **ShortVideo Desktop (Ứng dụng)**: Mã nguồn mở theo giấy phép [GNU General Public License v3.0 (GPL-3.0)](./LICENSE).
-* **ShortVideo.ca (Dịch vụ Web & Máy chủ đám mây)**: Là nền tảng thương mại đóng mã nguồn độc quyền (Proprietary / Closed Source). Bảo lưu mọi quyền.
+* **ShortVideo Desktop**: Mã nguồn mở theo giấy phép [GPL-3.0 license](./LICENSE).
+* **ShortVideo.ca**: Nền tảng thương mại độc quyền đóng mã nguồn (Proprietary / Closed Source). Bảo lưu mọi quyền.

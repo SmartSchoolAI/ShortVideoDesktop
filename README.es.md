@@ -66,5 +66,5 @@ Diseñado para creadores de contenido, educadores, comercios electrónicos trans
 
 ## 📄 Licencia y Términos (License & Terms)
 
-* **ShortVideo Desktop (Cliente)**: Código abierto bajo la licencia [GNU General Public License v3.0 (GPL-3.0)](./LICENSE).
-* **ShortVideo.ca (Servicio Web y Plataforma en la Nube)**: Plataforma comercial propietaria y de código cerrado (Proprietary / Closed Source). Todos los derechos reservados.
+* **ShortVideo Desktop**: Código abierto bajo la licencia [GPL-3.0 license](./LICENSE).
+* **ShortVideo.ca**: Plataforma comercial propietaria y de código cerrado (Proprietary / Closed Source). Todos los derechos reservados.

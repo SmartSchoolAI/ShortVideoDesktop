@@ -64,5 +64,5 @@
 
 ## 📄 Лицензия и условия (License & Terms)
 
-* **ShortVideo Desktop (Клиент)**: Открытый исходный код под лицензией [GNU General Public License v3.0 (GPL-3.0)](./LICENSE).
-* **ShortVideo.ca (Веб-сервис и облачный движок)**: Проприетарная закрытая коммерческая платформа (Proprietary / Closed Source). Все права защищены.
+* **ShortVideo Desktop**: Открытый исходный код под лицензией [GPL-3.0 license](./LICENSE).
+* **ShortVideo.ca**: Проприетарная закрытая коммерческая платформа (Proprietary / Closed Source). Все права защищены.

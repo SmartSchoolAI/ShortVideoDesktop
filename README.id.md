@@ -66,5 +66,5 @@ Dirancang untuk kreator konten, pendidik, pelaku e-commerce lintas negara, dan a
 
 ## 📄 Lisensi & Ketentuan (License & Terms)
 
-* **ShortVideo Desktop (Klien)**: Sumber terbuka di bawah lisensi [GNU General Public License v3.0 (GPL-3.0)](./LICENSE).
-* **ShortVideo.ca (Layanan Web & Server Cloud)**: Platform komersial berpemilik dan tertutup (Proprietary / Closed Source). Hak cipta dilindungi undang-undang.
+* **ShortVideo Desktop**: Sumber terbuka di bawah [GPL-3.0 license](./LICENSE).
+* **ShortVideo.ca**: Platform komersial berpemilik dan tertutup (Proprietary / Closed Source). Hak cipta dilindungi undang-undang.

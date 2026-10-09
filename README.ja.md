@@ -87,5 +87,5 @@
 
 ## 📄 ライセンスと利用規約 (License & Terms)
 
-* **ShortVideo Desktop (クライアント)**: [GNU General Public License v3.0 (GPL-3.0)](./LICENSE) に基づくオープンソースです。
-* **ShortVideo.ca (Webサービス・クラウド基盤)**: プロプライエタリ（非公開・クローズドソース）商用プラットフォームであり、すべての権利を保有します。
+* **ShortVideo Desktop**: [GPL-3.0 license](./LICENSE) に基づくオープンソースです。
+* **ShortVideo.ca**: プロプライエタリ（非公開・クローズドソース / Proprietary / Closed Source）商用プラットフォームであり、すべての権利を保有します。

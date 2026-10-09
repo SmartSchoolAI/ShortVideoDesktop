@@ -64,5 +64,5 @@
 
 ## 📄 Licence & Conditions (License & Terms)
 
-* **ShortVideo Desktop (Application)** : Open source sous licence [GNU General Public License v3.0 (GPL-3.0)](./LICENSE).
-* **ShortVideo.ca (Service Web & Moteur Cloud)** : Plateforme commerciale propriétaire et fermée (Proprietary / Closed Source). Tous droits réservés.
+* **ShortVideo Desktop** : Open source sous [GPL-3.0 license](./LICENSE).
+* **ShortVideo.ca** : Plateforme commerciale propriétaire et fermée (Proprietary / Closed Source). Tous droits réservés.

@@ -66,5 +66,5 @@ Entwickelt für Creator, Bildungsanbieter, grenzüberschreitenden E-Commerce und
 
 ## 📄 Lizenz & Bedingungen (License & Terms)
 
-* **ShortVideo Desktop (Client)**: Open-Source unter der [GNU General Public License v3.0 (GPL-3.0)](./LICENSE).
-* **ShortVideo.ca (Web-Dienst & Cloud-Plattform)**: Proprietäre, geschlossene kommerzielle Plattform (Proprietary / Closed Source). Alle Rechte vorbehalten.
+* **ShortVideo Desktop**: Open-Source unter der [GPL-3.0 license](./LICENSE).
+* **ShortVideo.ca**: Proprietäre, geschlossene kommerzielle Plattform (Proprietary / Closed Source). Alle Rechte vorbehalten.

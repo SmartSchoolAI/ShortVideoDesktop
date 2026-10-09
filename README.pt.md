@@ -64,5 +64,5 @@ O **ShortVideo** é uma solução completa para criadores de conteúdo, educador
 
 ## 📄 Licença e Termos (License & Terms)
 
-* **ShortVideo Desktop (Aplicativo)**: Código aberto sob a licença [GNU General Public License v3.0 (GPL-3.0)](./LICENSE).
-* **ShortVideo.ca (Serviço Web & Plataforma em Nuvem)**: Plataforma comercial proprietária e fechada (Proprietary / Closed Source). Todos os direitos reservados.
+* **ShortVideo Desktop**: Código aberto sob a licença [GPL-3.0 license](./LICENSE).
+* **ShortVideo.ca**: Plataforma comercial proprietária e fechada (Proprietary / Closed Source). Todos os direitos reservados.

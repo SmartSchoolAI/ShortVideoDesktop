@@ -90,5 +90,6 @@
 
 ## 📄 开源与商业授权 (License & Terms)
 
-* **ShortVideo Desktop (客户端)**：遵循 [GNU General Public License v3.0 (GPL-3.0)](./LICENSE) 协议开源。
-* **ShortVideo.ca (Web 服务与云端引擎)**：为商业专有闭源服务 (Proprietary / Closed Source)，保留所有权利。
+* **ShortVideo Desktop**：开源协议修改为 [GPL-3.0 license](./LICENSE)。
+* **ShortVideo.ca**：为商业专有闭源平台 (Closed Source / Proprietary)，保留所有权利。
+

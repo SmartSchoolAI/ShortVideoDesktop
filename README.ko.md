@@ -87,5 +87,5 @@
 
 ## 📄 라이선스 및 이용 약관 (License & Terms)
 
-* **ShortVideo Desktop (클라이언트)**: [GNU General Public License v3.0 (GPL-3.0)](./LICENSE) 오픈소스 라이선스를 준수합니다.
-* **ShortVideo.ca (웹 서비스 및 클라우드 엔진)**: 비공개 상용 독점 서비스(Proprietary / Closed Source)이며, 모든 권리를 보유합니다.
+* **ShortVideo Desktop**: [GPL-3.0 license](./LICENSE) 오픈소스 라이선스를 준수합니다.
+* **ShortVideo.ca**: 비공개 상용 독점 플랫폼(Proprietary / Closed Source)이며, 모든 권리를 보유합니다.

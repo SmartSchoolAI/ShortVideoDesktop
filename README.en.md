@@ -87,5 +87,6 @@ The desktop client blends web-based studio creativity with native desktop automa
 
 ## 📄 License & Terms
 
-* **ShortVideo Desktop (Client)**: Open-sourced under the [GNU General Public License v3.0 (GPL-3.0)](./LICENSE).
-* **ShortVideo.ca (Web Service & Cloud Engine)**: Proprietary, closed-source commercial platform. All rights reserved.
+* **ShortVideo Desktop**: Licensed under the [GPL-3.0 license](./LICENSE).
+* **ShortVideo.ca**: Proprietary closed-source commercial platform. All rights reserved.
+

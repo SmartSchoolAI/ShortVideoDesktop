@@ -64,5 +64,5 @@
 
 ## 📄 สัญญาอนุญาตและข้อกำหนด (License & Terms)
 
-* **ShortVideo Desktop (โปรแกรมไคลเอนต์)**: เป็นโอเพนซอร์สภายใต้สัญญาอนุญาต [GNU General Public License v3.0 (GPL-3.0)](./LICENSE)
-* **ShortVideo.ca (บริการเว็บและคลาวด์)**: เป็นแพลตฟอร์มเชิงพาณิชย์แบบปิด (Proprietary / Closed Source) สงวนลิขสิทธิ์ทั้งหมด
+* **ShortVideo Desktop**: เป็นโอเพนซอร์สภายใต้ [GPL-3.0 license](./LICENSE)
+* **ShortVideo.ca**: เป็นแพลตฟอร์มเชิงพาณิชย์แบบปิด (Proprietary / Closed Source) สงวนลิขสิทธิ์ทั้งหมด
