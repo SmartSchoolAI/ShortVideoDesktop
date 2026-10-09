@@ -33,7 +33,10 @@
   ],
   "asarUnpack": [
     "**/node_modules/@remotion/**/*",
-    "**/node_modules/@esbuild/**/*"
+    "**/node_modules/@esbuild/**/*",
+    "**/node_modules/dotenv/**/*",
+    "**/node_modules/react/**/*",
+    "**/node_modules/react-dom/**/*"
   ],
   "extraMetadata": {
     "main": "dist-electron/main.js"
