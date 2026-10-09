@@ -90,6 +90,7 @@
 
 ## 📄 开源与商业授权 (License & Terms)
 
-* **ShortVideo Desktop**：开源协议修改为 [GPL-3.0 license](./LICENSE)。
+* **ShortVideo Desktop**：遵循 [GPL-3.0 license](./LICENSE) 开源协议。
 * **ShortVideo.ca**：为商业专有闭源平台 (Closed Source / Proprietary)，保留所有权利。
+
 
