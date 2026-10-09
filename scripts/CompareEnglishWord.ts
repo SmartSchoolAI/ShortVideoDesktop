@@ -2072,15 +2072,6 @@ async function processSingleTask(
       }
     }
 
-    // 兼容机制：同时生成一份默认无语言后缀的根主视频 (wordA-wordB.mp4)
-    const isPrimaryCompatLang = lang === chosenLang || lang === 'en' || lang === 'zh';
-    if (isPrimaryCompatLang) {
-      const defaultCompatFile = path.join(outputDir, `${wordA}-${wordB}.mp4`);
-      try {
-        fs.copyFileSync(langOutputFile, defaultCompatFile);
-      } catch (_) { }
-    }
-
     const r2Key = `CompareEnglishWord/${cleanFolder}/${langFilename}`;
     const cdnUrl = `${getCdnDomain()}/${r2Key}`;
 
@@ -2098,8 +2089,20 @@ async function processSingleTask(
   const totalCostSec = ((Date.now() - totalStartTime) / 1000).toFixed(1);
   log(localizeScriptLog(`\n🎉 全部 ${renderedVideos.length} 个语言版本视频渲染完成! 总渲染耗时: ${totalCostSec}s`), 'green');
 
-  // （ ）
-  const primaryVideo = renderedVideos.find((v) => v.lang === chosenLang) || renderedVideos.find((v) => v.lang === 'zh') || renderedVideos[0];
+  // 精准锁定全局主视频（优先级：指定语言 > 中文 > 英文 > 首个完成的视频）
+  const primaryVideo =
+    renderedVideos.find((v) => v.lang === chosenLang) ||
+    renderedVideos.find((v) => v.lang === 'zh') ||
+    renderedVideos.find((v) => v.lang === 'en') ||
+    renderedVideos[0];
+
+  // 兼容机制：将选定的全局主视频精准固化一份为默认无语言后缀的根主视频 (wordA-wordB.mp4)
+  if (primaryVideo?.outputFile && fs.existsSync(primaryVideo.outputFile)) {
+    const defaultCompatFile = path.join(outputDir, `${wordA}-${wordB}.mp4`);
+    try {
+      fs.copyFileSync(primaryVideo.outputFile, defaultCompatFile);
+    } catch (_) { }
+  }
 
   // g.   MP4
   // 1.   --skip-upload，
@@ -2171,8 +2174,8 @@ async function processSingleTask(
 
         log(localizeScriptLog(`✅ 【${item.label}】本地直传成功: ${item.cdnUrl}`), 'green');
 
-        // 兼容机制：向 R2 上传一份默认无语言后缀的主视频，确保旧链接与根链接 100% 访问可用
-        if (item.lang === chosenLang || item.lang === 'en' || item.lang === 'zh') {
+        // 兼容机制：向 R2 上传选定的主视频作为默认根文件，确保旧链接与根链接 100% 访问可用
+        if (item.lang === primaryVideo.lang) {
           const defaultCompatKey = `CompareEnglishWord/${cleanFolder}/${wordA}-${wordB}.mp4`;
           await uploadToR2(defaultCompatKey, fileBuffer, 'video/mp4').catch(() => null);
         }
