@@ -1584,7 +1584,10 @@ function copyDirSafe(srcDir: string, destDir: string): void {
       // Remotion
       const entryFile = path.resolve(ROOT_DIR, 'src/index.ts');
       if (!fs.existsSync(entryFile)) {
-        const errMsg = localizeScriptLog(`❌ 当前工作区 (${ROOT_DIR}) 缺失 Remotion 入口文件 src/index.ts！请在控制台顶部点击【设置项目目录】指定 ShortVideo 源码工程根目录。`);
+        const isClientMode = process.env.SHORTVIDEO_CLIENT_MODE === 'electron' || Boolean((process as any).resourcesPath);
+        const errMsg = isClientMode
+          ? localizeScriptLog(`❌ 客户端未能加载到内置 Remotion 视频渲染核心资源，请检查客户端安装完整性。`)
+          : localizeScriptLog(`❌ 当前工作区 (${ROOT_DIR}) 缺失 Remotion 入口文件 src/index.ts！请指定 ShortVideo 源码工程根目录。`);
         log(errMsg, 'red');
         bundlePromise = null;
         return reject(new Error(errMsg));
@@ -2473,6 +2476,12 @@ async function main() {
 
   const options: RenderWorkerOptions = { skipUpload, concurrency, lang: targetLang, scope: clientScope };
 
+  // 启动即主动预热/固化 Remotion Bundle，确保独立客户端完全脱离源码也能秒级免打包就绪
+  const rebuildBundle = args.includes('--rebuild-bundle') || args.includes('--clean-bundle');
+  try {
+    await ensureRemotionBundle(rebuildBundle);
+  } catch (_) { }
+
   console.clear();
   log(`============================================================`, 'green');
   log(localizeScriptLog(`🎬 短视频远程渲染工作进程 (ShortVideo Render Worker)`), 'green');
@@ -2494,12 +2503,6 @@ async function main() {
     log(localizeScriptLog(`❌ [登录拦截] 当前未检测到用户登录凭据 (Token 为空)，已终止执行渲染！`), 'red');
     log(localizeScriptLog(`💡 提示: 请先在 ShortVideo 桌面客户端的主站窗口中登录账号后再开始渲染。\n`), 'yellow');
     process.exit(1);
-  }
-
-  // 检查是否指定了 --rebuild-bundle
-  const rebuildBundle = args.includes('--rebuild-bundle') || args.includes('--clean-bundle');
-  if (rebuildBundle) {
-    await ensureRemotionBundle(true);
   }
 
   // 后台模式下，优先拉起 SSE 任务即时通知长连接
