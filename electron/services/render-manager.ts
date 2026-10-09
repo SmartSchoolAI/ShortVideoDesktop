@@ -640,7 +640,7 @@ export class RenderManager {
       const targetApiUrl = APP_CONFIG.siteUrl || APP_CONFIG.productionUrl || 'https://app.shortvideo.ca';
       
       this.appendLog('system', `🌐 目标渲染接口地址: ${targetApiUrl}`);
-      this.appendLog('system', `📁 物理工作目录: ${workingDir}`);
+      this.appendLog('system', `📦 渲染运行模式: 独立客户端引擎 (免源码依赖)`);
       this.appendLog('system', `💾 视频输出目录: ${defaultOutputDir}`);
       if (!authToken) {
         this.status = 'idle';
@@ -671,6 +671,9 @@ export class RenderManager {
         `--lang=${currentLang}`,
       ];
 
+      const effectiveResourcesPath = process.resourcesPath || path.join(path.dirname(process.execPath), 'resources');
+      const builtinBundleDir = path.join(effectiveResourcesPath, 'app.asar.unpacked', 'build', 'remotion-bundle');
+
       this.currentProcess = spawn(process.execPath, spawnArgs, {
         cwd: workingDir,
         shell: false,
@@ -684,6 +687,8 @@ export class RenderManager {
           SHORTVIDEO_CLIENT_MODE: 'electron',
           SHORTVIDEO_CLIENT_SCOPE: 'current_user',
           SHORTVIDEO_LANG: currentLang,
+          ELECTRON_RESOURCES_PATH: effectiveResourcesPath,
+          REMOTION_BUILTIN_BUNDLE_DIR: builtinBundleDir,
           // 明确告知渲染脚本将生成的视频文件存放在应用程序数据目录（userData/out）
           SHORTVIDEO_OUTPUT_DIR: defaultOutputDir,
           // 告知渲染脚本把 BundledCodeCache 存到 userData 而非源码目录

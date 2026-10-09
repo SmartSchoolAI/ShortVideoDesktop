@@ -1497,21 +1497,6 @@ function isRemotionBundleValid(bundleDir: string): boolean {
 }
 
 /**
- * 确保 Remotion 编译缓存目录 ./BundledCodeCache/CompareEnglishWord 就绪
- */
-let bundlePromise: Promise<string> | null = null;
-
-function ensureRemotionBundle(forceRebuild = false): Promise<string> {
-  const indexHtml = path.join(BUNDLE_CACHE_DIR, 'index.html');
-  if (!forceRebuild && isRemotionBundleValid(BUNDLE_CACHE_DIR)) {
-    log(localizeScriptLog(`⚡ 检测到已有 Remotion 打包缓存 (4.0.534): ${BUNDLE_CACHE_DIR}，直接复用免打包`), 'green');
-    return Promise.resolve(BUNDLE_CACHE_DIR);
-  } else if (!forceRebuild && fs.existsSync(indexHtml)) {
-    log(localizeScriptLog(`🧹 检测到 Remotion 缓存版本过期 (非 4.0.534)，自动清理并刷新: ${BUNDLE_CACHE_DIR}`), 'yellow');
-    try { fs.rmSync(BUNDLE_CACHE_DIR, { recursive: true, force: true }); } catch (_) {}
-  }
-
-/**
  * 递归复制目录，深度兼容 Electron app.asar 虚拟归档与普通物理路径
  * 规避 Node 原生 fs.cpSync 在面对 asar 路径时调用 native opendir 抛出 ENOENT 的问题
  */
@@ -1532,22 +1517,46 @@ function copyDirSafe(srcDir: string, destDir: string): void {
   }
 }
 
-  // 1. 尝试使用安装包内置或工程中的预编译 Bundle 静态资源 (全面覆盖 asar.unpacked、asar 及各层目录)
-  const procResourcesPath = (process as any).resourcesPath || '';
+/**
+ * 确保 Remotion 编译核心目录 ./BundledCodeCache/CompareEnglishWord 就绪
+ * 独立客户端模式下 100% 免源码依赖，直接加载内置或缓存的预编译 Bundle
+ */
+let bundlePromise: Promise<string> | null = null;
+
+function ensureRemotionBundle(forceRebuild = false): Promise<string> {
+  const indexHtml = path.join(BUNDLE_CACHE_DIR, 'index.html');
+  if (!forceRebuild && isRemotionBundleValid(BUNDLE_CACHE_DIR)) {
+    log(localizeScriptLog(`⚡ 检测到已有 Remotion 渲染核心缓存 (4.0.534): ${BUNDLE_CACHE_DIR}，直接复用免打包`), 'green');
+    return Promise.resolve(BUNDLE_CACHE_DIR);
+  } else if (!forceRebuild && fs.existsSync(indexHtml)) {
+    log(localizeScriptLog(`🧹 检测到 Remotion 缓存版本过期 (非 4.0.534)，自动清理并刷新: ${BUNDLE_CACHE_DIR}`), 'yellow');
+    try { fs.rmSync(BUNDLE_CACHE_DIR, { recursive: true, force: true }); } catch (_) {}
+  }
+
+  // 1. 优先使用安装包内置的预编译 Bundle 静态资源 (全面覆盖 asar.unpacked、asar 及各层目录)
+  const exeDir = process.execPath ? path.dirname(process.execPath) : '';
+  const procResourcesPath =
+    process.env.ELECTRON_RESOURCES_PATH ||
+    (process as any).resourcesPath ||
+    (exeDir ? path.join(exeDir, 'resources') : '');
+
   const builtInBundleDirs = [
+    process.env.REMOTION_BUILTIN_BUNDLE_DIR,
     path.join(procResourcesPath, 'app.asar.unpacked', 'build', 'remotion-bundle'),
     path.join(procResourcesPath, 'app.asar', 'build', 'remotion-bundle'),
     path.join(procResourcesPath, 'build', 'remotion-bundle'),
+    exeDir ? path.join(exeDir, 'resources', 'app.asar.unpacked', 'build', 'remotion-bundle') : '',
+    exeDir ? path.join(exeDir, 'resources', 'build', 'remotion-bundle') : '',
     path.join(__dirname, '..', '..', 'build', 'remotion-bundle'),
     path.join(__dirname, '..', 'build', 'remotion-bundle'),
     path.resolve(ROOT_DIR, 'build/remotion-bundle'),
     path.resolve(ROOT_DIR, '..', 'ShortVideo', 'build', 'remotion-bundle'),
     path.resolve(__dirname, '..', '..', 'ShortVideo', 'build', 'remotion-bundle'),
-  ];
+  ].filter(Boolean) as string[];
 
   for (const bDir of builtInBundleDirs) {
     if (isRemotionBundleValid(bDir)) {
-      log(localizeScriptLog(`📦 检测到安装包内置的预编译 Remotion 资源 (${bDir})，正在注入运行缓存...`), 'green');
+      log(localizeScriptLog(`📦 检测到客户端内置预编译 Remotion 渲染核心 (${bDir})，正在注入运行缓存...`), 'green');
       try {
         if (!fs.existsSync(BUNDLE_CACHE_DIR)) {
           fs.mkdirSync(BUNDLE_CACHE_DIR, { recursive: true });
@@ -1555,11 +1564,11 @@ function copyDirSafe(srcDir: string, destDir: string): void {
         // 使用支持 asar 虚拟流的安全复制，秒级固化至运行缓存
         copyDirSafe(bDir, BUNDLE_CACHE_DIR);
         if (fs.existsSync(indexHtml)) {
-          log(localizeScriptLog(`✅ 内置 Remotion 资源固化就绪: ${BUNDLE_CACHE_DIR}，免源码秒级执行！`), 'green');
+          log(localizeScriptLog(`✅ 内置 Remotion 渲染核心固化就绪: ${BUNDLE_CACHE_DIR}，免源码秒级执行！`), 'green');
           return Promise.resolve(BUNDLE_CACHE_DIR);
         }
       } catch (cpErr: any) {
-        log(localizeScriptLog(`⚠️ 复制内置资源警告: ${cpErr.message}，尝试直接使用内置路径`), 'yellow');
+        log(localizeScriptLog(`⚠️ 复制内置资源警告: ${cpErr.message}，直接挂载内置核心路径使用`), 'yellow');
         return Promise.resolve(bDir);
       }
     }
@@ -1569,30 +1578,36 @@ function copyDirSafe(srcDir: string, destDir: string): void {
     return bundlePromise;
   }
 
+  // 2. 检测运行环境：判断是否为独立客户端模式（普通安装环境，无源码依赖）
+  const entryFile = path.resolve(ROOT_DIR, 'src/index.ts');
+  const isClientIndependentMode =
+    process.env.SHORTVIDEO_CLIENT_MODE === 'electron' ||
+    Boolean((process as any).resourcesPath) ||
+    Boolean(process.env.ELECTRON_RESOURCES_PATH) ||
+    __dirname.includes('.asar') ||
+    process.env.ELECTRON_RUN_AS_NODE === '1' ||
+    !fs.existsSync(entryFile);
+
+  if (isClientIndependentMode) {
+    // 独立运行模式：绝对不尝试动态编译源码，而是报告核心组件状态
+    const errMsg = localizeScriptLog(`❌ 客户端视频渲染核心组件缺失，未检测到内置预编译包。请重新安装客户端以恢复渲染功能。`);
+    log(errMsg, 'red');
+    return Promise.reject(new Error(errMsg));
+  }
+
+  // 3. 仅限开发者源码工程模式：存在 src/index.ts 时进行开发者动态打包
   bundlePromise = (async () => {
     if (forceRebuild && fs.existsSync(BUNDLE_CACHE_DIR)) {
       log(localizeScriptLog(`🧹 检测到强制重新构建，清理历史缓存目录: ${BUNDLE_CACHE_DIR}`), 'yellow');
       fs.rmSync(BUNDLE_CACHE_DIR, { recursive: true, force: true });
     }
 
-    log(localizeScriptLog(`📦 未检测到 Remotion 打包缓存，正在首次打包至: ${BUNDLE_CACHE_DIR} ...`), 'yellow');
+    log(localizeScriptLog(`📦 开发者模式：未检测到 Remotion 缓存，正在基于源码打包至: ${BUNDLE_CACHE_DIR} ...`), 'yellow');
     if (!fs.existsSync(BUNDLE_CACHE_DIR)) {
       fs.mkdirSync(BUNDLE_CACHE_DIR, { recursive: true });
     }
 
     return new Promise<string>((resolve, reject) => {
-      // Remotion
-      const entryFile = path.resolve(ROOT_DIR, 'src/index.ts');
-      if (!fs.existsSync(entryFile)) {
-        const isClientMode = process.env.SHORTVIDEO_CLIENT_MODE === 'electron' || Boolean((process as any).resourcesPath);
-        const errMsg = isClientMode
-          ? localizeScriptLog(`❌ 客户端未能加载到内置 Remotion 视频渲染核心资源，请检查客户端安装完整性。`)
-          : localizeScriptLog(`❌ 当前工作区 (${ROOT_DIR}) 缺失 Remotion 入口文件 src/index.ts！请指定 ShortVideo 源码工程根目录。`);
-        log(errMsg, 'red');
-        bundlePromise = null;
-        return reject(new Error(errMsg));
-      }
-
       const executor = getRemotionExecutor();
       const args = [
         ...executor.baseArgs,
