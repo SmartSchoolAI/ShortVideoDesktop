@@ -390,6 +390,70 @@ function getReleaseAssets() {
   return assets;
 }
 
+function extractCleanVersion(tagOrVersion) {
+  if (!tagOrVersion) return '';
+  // 去除可能的前缀 v 或 V
+  let v = String(tagOrVersion).trim().replace(/^v/i, '');
+  // 提取纯净的核心语义版本号 (如 0.1.10)
+  const coreMatch = v.match(/^(\d+\.\d+\.\d+)/);
+  if (coreMatch) {
+    return coreMatch[1];
+  }
+  return v;
+}
+
+function syncWranglerDownloadVersion(rawVersion, isDryRun = false) {
+  const cleanVersion = extractCleanVersion(rawVersion);
+  if (!cleanVersion) {
+    return;
+  }
+
+  const candidatePaths = [
+    path.resolve(__dirname, '../../ShortVideo/wrangler.toml'),
+    'D:/Github/ShortVideo/wrangler.toml',
+    'd:/Github/ShortVideo/wrangler.toml',
+    path.resolve(process.cwd(), '../ShortVideo/wrangler.toml'),
+  ];
+
+  let wranglerPath = candidatePaths.find((p) => {
+    try {
+      return fs.existsSync(p);
+    } catch (_) {
+      return false;
+    }
+  });
+
+  if (!wranglerPath) {
+    console.log(`${c.yellow}${t('RELEASE_SYNC_WRANGLER_NOT_FOUND')}${c.reset}`);
+    return;
+  }
+
+  try {
+    const content = fs.readFileSync(wranglerPath, 'utf8');
+    const versionRegex = /(NEXT_PUBLIC_DOWNLOAD_VERSION\s*=\s*)(["'][^"']*["'])/;
+    if (versionRegex.test(content)) {
+      const currentMatch = content.match(versionRegex);
+      const currentVal = currentMatch[2].replace(/["']/g, '');
+
+      if (currentVal === cleanVersion) {
+        console.log(`${c.green}${t('RELEASE_SYNC_WRANGLER_ALREADY_LATEST', { file: wranglerPath, version: cleanVersion })}${c.reset}`);
+        return;
+      }
+
+      if (isDryRun) {
+        console.log(`${c.cyan}[Dry-Run] 拟将 ${wranglerPath} 中的 NEXT_PUBLIC_DOWNLOAD_VERSION 从 "${currentVal}" 更新为 "${cleanVersion}"${c.reset}`);
+        return;
+      }
+
+      const updated = content.replace(versionRegex, `$1"${cleanVersion}"`);
+      fs.writeFileSync(wranglerPath, updated, 'utf8');
+      console.log(`${c.green}${t('RELEASE_SYNC_WRANGLER_SUCCESS', { file: wranglerPath, version: cleanVersion })}${c.reset}`);
+    }
+  } catch (err) {
+    console.error(`${c.red}[Wrangler Sync Error] ${err.message}${c.reset}`);
+  }
+}
+
 // 主程序
 async function main() {
   console.log(`\n${c.cyan}====================================================${c.reset}`);
@@ -413,6 +477,9 @@ async function main() {
     console.error(`${c.red}${t('RELEASE_NO_TAG')}${c.reset}`);
     process.exit(1);
   }
+
+  // 自动同步更新 D:\Github\ShortVideo\wrangler.toml 中的 NEXT_PUBLIC_DOWNLOAD_VERSION 为纯净版本号 (不带 v)
+  syncWranglerDownloadVersion(targetTag, isDryRun);
 
   const prevTag = tags.find((t) => t !== targetTag) || '';
   const commits = getCommitsBetween(prevTag, targetTag);
