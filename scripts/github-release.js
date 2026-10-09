@@ -410,9 +410,9 @@ function syncWranglerDownloadVersion(rawVersion, isDryRun = false) {
 
   const candidatePaths = [
     path.resolve(__dirname, '../../ShortVideo/wrangler.toml'),
-    'D:/Github/ShortVideo/wrangler.toml',
-    'd:/Github/ShortVideo/wrangler.toml',
+    path.resolve(__dirname, '../../../ShortVideo/wrangler.toml'),
     path.resolve(process.cwd(), '../ShortVideo/wrangler.toml'),
+    path.resolve(process.cwd(), '../../ShortVideo/wrangler.toml'),
   ];
 
   let wranglerPath = candidatePaths.find((p) => {

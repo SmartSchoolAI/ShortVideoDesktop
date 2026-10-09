@@ -1433,11 +1433,11 @@ function buildEnhancedNodePath(): string {
     path.join(procResources, 'app.asar.unpacked', 'node_modules'),
     path.resolve(ROOT_DIR, 'node_modules'),
     path.resolve(ROOT_DIR, '..', 'node_modules'),
+    path.resolve(ROOT_DIR, '..', 'ShortVideo', 'node_modules'),
     path.resolve(__dirname, '..', 'node_modules'),
     path.resolve(__dirname, '..', '..', 'node_modules'),
+    path.resolve(__dirname, '..', '..', 'ShortVideo', 'node_modules'),
     path.resolve(process.cwd(), 'node_modules'),
-    'D:\\Github\\ShortVideo\\node_modules',
-    'd:\\Github\\ShortVideo\\node_modules',
     process.env.NODE_PATH || '',
   ];
 
@@ -1460,19 +1460,58 @@ function buildEnhancedNodePath(): string {
 }
 
 /**
- *   Remotion   ./BundledCodeCache/CompareEnglishWord
- *  ， ，  'Bundled code'  
+ * 校验 Remotion Bundle 是否属于当前匹配的 4.0.534 版本
+ * 严格防止复用 4.0.520 的旧缓存导致版本不匹配警告
+ */
+function isRemotionBundleValid(bundleDir: string): boolean {
+  const indexHtml = path.join(bundleDir, 'index.html');
+  const bundleJs = path.join(bundleDir, 'bundle.js');
+  if (!fs.existsSync(indexHtml) || !fs.existsSync(bundleJs)) {
+    return false;
+  }
+
+  const versionFile = path.join(bundleDir, 'remotion-version.json');
+  if (fs.existsSync(versionFile)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(versionFile, 'utf8'));
+      if (data && data.version === '4.0.534') {
+        return true;
+      }
+    } catch (_) {}
+  }
+
+  try {
+    const stat = fs.statSync(bundleJs);
+    const readLen = Math.min(stat.size, 100000);
+    const fd = fs.openSync(bundleJs, 'r');
+    const buf = Buffer.alloc(readLen);
+    fs.readSync(fd, buf, 0, readLen, 0);
+    fs.closeSync(fd);
+    const head = buf.toString('utf8');
+    if (head.includes('4.0.520') && !head.includes('4.0.534')) {
+      return false;
+    }
+  } catch (_) {}
+
+  return true;
+}
+
+/**
+ * 确保 Remotion 编译缓存目录 ./BundledCodeCache/CompareEnglishWord 就绪
  */
 let bundlePromise: Promise<string> | null = null;
 
 function ensureRemotionBundle(forceRebuild = false): Promise<string> {
   const indexHtml = path.join(BUNDLE_CACHE_DIR, 'index.html');
-  if (!forceRebuild && fs.existsSync(indexHtml)) {
-    log(localizeScriptLog(`⚡ 检测到已有 Remotion 打包缓存: ${BUNDLE_CACHE_DIR}，直接复用免打包`), 'green');
+  if (!forceRebuild && isRemotionBundleValid(BUNDLE_CACHE_DIR)) {
+    log(localizeScriptLog(`⚡ 检测到已有 Remotion 打包缓存 (4.0.534): ${BUNDLE_CACHE_DIR}，直接复用免打包`), 'green');
     return Promise.resolve(BUNDLE_CACHE_DIR);
+  } else if (!forceRebuild && fs.existsSync(indexHtml)) {
+    log(localizeScriptLog(`🧹 检测到 Remotion 缓存版本过期 (非 4.0.534)，自动清理并刷新: ${BUNDLE_CACHE_DIR}`), 'yellow');
+    try { fs.rmSync(BUNDLE_CACHE_DIR, { recursive: true, force: true }); } catch (_) {}
   }
 
-  // 1.   Bundle  ，
+  // 1. 尝试使用安装包内置的预编译 Bundle 静态资源 (优先采用 4.0.534)
   const procResourcesPath = (process as any).resourcesPath || '';
   const builtInBundleDirs = [
     path.join(__dirname, '..', '..', 'build', 'remotion-bundle'),
@@ -1483,7 +1522,7 @@ function ensureRemotionBundle(forceRebuild = false): Promise<string> {
   ];
 
   for (const bDir of builtInBundleDirs) {
-    if (fs.existsSync(path.join(bDir, 'index.html'))) {
+    if (isRemotionBundleValid(bDir)) {
       log(localizeScriptLog(`📦 检测到安装包内置的预编译 Remotion 资源 (${bDir})，正在注入运行缓存...`), 'green');
       try {
         if (!fs.existsSync(BUNDLE_CACHE_DIR)) {

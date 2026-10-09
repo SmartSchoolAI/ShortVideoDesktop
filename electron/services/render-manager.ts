@@ -542,12 +542,14 @@ export class RenderManager {
     env.Path = combined;
 
     // 动态构建并注入完整的 NODE_PATH，确保 Electron 解包进程能正常加载 asar 及本地 node_modules (如 dotenv, react)
+    const workingDir = this.resolvePhysicalWorkingDir();
     const nodePathCandidates = [
       path.join(procResources, 'app.asar', 'node_modules'),
       path.join(procResources, 'app.asar.unpacked', 'node_modules'),
       path.join(app.getAppPath(), 'node_modules'),
-      'D:\\Github\\ShortVideo\\node_modules',
-      'd:\\Github\\ShortVideo\\node_modules',
+      path.join(workingDir, 'node_modules'),
+      path.resolve(workingDir, '..', 'ShortVideo', 'node_modules'),
+      path.resolve(app.getAppPath(), '..', 'node_modules'),
       process.env.NODE_PATH || '',
     ];
     const validNodePaths: string[] = [];
