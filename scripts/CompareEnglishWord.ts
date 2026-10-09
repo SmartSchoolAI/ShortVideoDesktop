@@ -1511,14 +1511,38 @@ function ensureRemotionBundle(forceRebuild = false): Promise<string> {
     try { fs.rmSync(BUNDLE_CACHE_DIR, { recursive: true, force: true }); } catch (_) {}
   }
 
-  // 1. 尝试使用安装包内置的预编译 Bundle 静态资源 (优先采用 4.0.534)
+/**
+ * 递归复制目录，深度兼容 Electron app.asar 虚拟归档与普通物理路径
+ * 规避 Node 原生 fs.cpSync 在面对 asar 路径时调用 native opendir 抛出 ENOENT 的问题
+ */
+function copyDirSafe(srcDir: string, destDir: string): void {
+  if (!fs.existsSync(destDir)) {
+    fs.mkdirSync(destDir, { recursive: true });
+  }
+  const entries = fs.readdirSync(srcDir);
+  for (const entry of entries) {
+    const srcPath = path.join(srcDir, entry);
+    const destPath = path.join(destDir, entry);
+    const stat = fs.statSync(srcPath);
+    if (stat.isDirectory()) {
+      copyDirSafe(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
+  // 1. 尝试使用安装包内置或工程中的预编译 Bundle 静态资源 (全面覆盖 asar.unpacked、asar 及各层目录)
   const procResourcesPath = (process as any).resourcesPath || '';
   const builtInBundleDirs = [
+    path.join(procResourcesPath, 'app.asar.unpacked', 'build', 'remotion-bundle'),
+    path.join(procResourcesPath, 'app.asar', 'build', 'remotion-bundle'),
+    path.join(procResourcesPath, 'build', 'remotion-bundle'),
     path.join(__dirname, '..', '..', 'build', 'remotion-bundle'),
     path.join(__dirname, '..', 'build', 'remotion-bundle'),
-    path.join(procResourcesPath, 'build', 'remotion-bundle'),
-    path.join(procResourcesPath, 'app.asar.unpacked', 'build', 'remotion-bundle'),
     path.resolve(ROOT_DIR, 'build/remotion-bundle'),
+    path.resolve(ROOT_DIR, '..', 'ShortVideo', 'build', 'remotion-bundle'),
+    path.resolve(__dirname, '..', '..', 'ShortVideo', 'build', 'remotion-bundle'),
   ];
 
   for (const bDir of builtInBundleDirs) {
@@ -1528,8 +1552,8 @@ function ensureRemotionBundle(forceRebuild = false): Promise<string> {
         if (!fs.existsSync(BUNDLE_CACHE_DIR)) {
           fs.mkdirSync(BUNDLE_CACHE_DIR, { recursive: true });
         }
-        // asar  ，
-        fs.cpSync(bDir, BUNDLE_CACHE_DIR, { recursive: true });
+        // 使用支持 asar 虚拟流的安全复制，秒级固化至运行缓存
+        copyDirSafe(bDir, BUNDLE_CACHE_DIR);
         if (fs.existsSync(indexHtml)) {
           log(localizeScriptLog(`✅ 内置 Remotion 资源固化就绪: ${BUNDLE_CACHE_DIR}，免源码秒级执行！`), 'green');
           return Promise.resolve(BUNDLE_CACHE_DIR);
