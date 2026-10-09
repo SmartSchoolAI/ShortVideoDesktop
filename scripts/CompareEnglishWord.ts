@@ -2072,8 +2072,9 @@ async function processSingleTask(
       }
     }
 
-    // ，  (wordA-wordB.mp4)
-    if (lang === 'zh') {
+    // 兼容机制：同时生成一份默认无语言后缀的根主视频 (wordA-wordB.mp4)
+    const isPrimaryCompatLang = lang === chosenLang || lang === 'en' || lang === 'zh';
+    if (isPrimaryCompatLang) {
       const defaultCompatFile = path.join(outputDir, `${wordA}-${wordB}.mp4`);
       try {
         fs.copyFileSync(langOutputFile, defaultCompatFile);
@@ -2170,8 +2171,8 @@ async function processSingleTask(
 
         log(localizeScriptLog(`✅ 【${item.label}】本地直传成功: ${item.cdnUrl}`), 'green');
 
-        // ，  R2  ，  100%
-        if (item.lang === 'zh') {
+        // 兼容机制：向 R2 上传一份默认无语言后缀的主视频，确保旧链接与根链接 100% 访问可用
+        if (item.lang === chosenLang || item.lang === 'en' || item.lang === 'zh') {
           const defaultCompatKey = `CompareEnglishWord/${cleanFolder}/${wordA}-${wordB}.mp4`;
           await uploadToR2(defaultCompatKey, fileBuffer, 'video/mp4').catch(() => null);
         }
