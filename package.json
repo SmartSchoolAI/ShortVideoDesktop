@@ -27,8 +27,11 @@
   "dependencies": {
     "@remotion/cli": "4.0.534",
     "@remotion/renderer": "4.0.534",
+    "dotenv": "^16.4.7",
     "electron-updater": "^6.3.9",
     "playwright-core": "^1.49.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
     "remotion": "4.0.534",
     "ws": "^8.18.0"
   },

@@ -1426,6 +1426,39 @@ function getRemotionExecutor(): { command: string; baseArgs: string[]; isNode: b
   return { command: 'npx', baseArgs: ['remotion'], isNode: false };
 }
 
+function buildEnhancedNodePath(): string {
+  const procResources = (process as any).resourcesPath || '';
+  const candidates = [
+    path.join(procResources, 'app.asar', 'node_modules'),
+    path.join(procResources, 'app.asar.unpacked', 'node_modules'),
+    path.resolve(ROOT_DIR, 'node_modules'),
+    path.resolve(ROOT_DIR, '..', 'node_modules'),
+    path.resolve(__dirname, '..', 'node_modules'),
+    path.resolve(__dirname, '..', '..', 'node_modules'),
+    path.resolve(process.cwd(), 'node_modules'),
+    'D:\\Github\\ShortVideo\\node_modules',
+    'd:\\Github\\ShortVideo\\node_modules',
+    process.env.NODE_PATH || '',
+  ];
+
+  const validPaths: string[] = [];
+  const seen = new Set<string>();
+
+  for (const p of candidates) {
+    if (!p) continue;
+    try {
+      if (p.includes('.asar') || fs.existsSync(p)) {
+        if (!seen.has(p)) {
+          seen.add(p);
+          validPaths.push(p);
+        }
+      }
+    } catch (_) {}
+  }
+
+  return validPaths.join(path.delimiter);
+}
+
 /**
  *   Remotion   ./BundledCodeCache/CompareEnglishWord
  *  ， ，  'Bundled code'  
@@ -1513,6 +1546,7 @@ function ensureRemotionBundle(forceRebuild = false): Promise<string> {
         env: {
           ...process.env,
           ...(executor.isNode ? { ELECTRON_RUN_AS_NODE: '1' } : {}),
+          NODE_PATH: buildEnhancedNodePath(),
           PUPPETEER_DISABLE_DEV_SHM_USAGE: 'true',
         },
       });
@@ -1693,6 +1727,7 @@ async function renderVideoWithRemotion(
       env: {
         ...process.env,
         ...(executor.isNode ? { ELECTRON_RUN_AS_NODE: '1' } : {}),
+        NODE_PATH: buildEnhancedNodePath(),
         PATH: newPath,
         Path: newPath,
         PUPPETEER_DISABLE_DEV_SHM_USAGE: 'true',

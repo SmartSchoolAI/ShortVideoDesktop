@@ -540,6 +540,33 @@ export class RenderManager {
       .join(delimiter);
     env.PATH = combined;
     env.Path = combined;
+
+    // 动态构建并注入完整的 NODE_PATH，确保 Electron 解包进程能正常加载 asar 及本地 node_modules (如 dotenv, react)
+    const nodePathCandidates = [
+      path.join(procResources, 'app.asar', 'node_modules'),
+      path.join(procResources, 'app.asar.unpacked', 'node_modules'),
+      path.join(app.getAppPath(), 'node_modules'),
+      'D:\\Github\\ShortVideo\\node_modules',
+      'd:\\Github\\ShortVideo\\node_modules',
+      process.env.NODE_PATH || '',
+    ];
+    const validNodePaths: string[] = [];
+    const seenNodePaths = new Set<string>();
+    for (const p of nodePathCandidates) {
+      if (!p) continue;
+      try {
+        if (p.includes('.asar') || fs.existsSync(p)) {
+          if (!seenNodePaths.has(p)) {
+            seenNodePaths.add(p);
+            validNodePaths.push(p);
+          }
+        }
+      } catch (_) {}
+    }
+    if (validNodePaths.length > 0) {
+      env.NODE_PATH = validNodePaths.join(delimiter);
+    }
+
     return env as NodeJS.ProcessEnv;
   }
 
