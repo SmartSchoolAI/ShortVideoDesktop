@@ -24,7 +24,7 @@
   <a href="https://app.shortvideo.ca"><img src="https://img.shields.io/badge/Web_在线制作-app.shortvideo.ca-success?style=flat-square" alt="Web Studio"></a>
   <a href="https://download.shortvideo.ca"><img src="https://img.shields.io/badge/客户端下载-Windows_%7C_macOS_%7C_Linux-orange?style=flat-square" alt="Download Client"></a>
   <a href="https://github.com/SmartSchoolAI/ShortVideoDesktop/releases"><img src="https://img.shields.io/badge/GitHub-版本发布-blue?style=flat-square" alt="GitHub Releases"></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/开源协议-MIT-green?style=flat-square" alt="License"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/开源协议-GPL--3.0-blue?style=flat-square" alt="License"></a>
 </p>
 
 ---
@@ -88,6 +88,7 @@
 
 ---
 
-## 📄 开源许可
+## 📄 开源与商业授权 (License & Terms)
 
-[MIT License](./LICENSE) © 2026 ShortVideo Team.
+* **ShortVideo Desktop (客户端)**：遵循 [GNU General Public License v3.0 (GPL-3.0)](./LICENSE) 协议开源。
+* **ShortVideo.ca (Web 服务与云端引擎)**：为商业专有闭源服务 (Proprietary / Closed Source)，保留所有权利。

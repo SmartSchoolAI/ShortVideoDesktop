@@ -24,7 +24,7 @@
   <a href="https://app.shortvideo.ca"><img src="https://img.shields.io/badge/Web_Studio-app.shortvideo.ca-success?style=flat-square" alt="Web Studio"></a>
   <a href="https://download.shortvideo.ca"><img src="https://img.shields.io/badge/Tải_Xuống-Windows_%7C_macOS_%7C_Linux-orange?style=flat-square" alt="Download Client"></a>
   <a href="https://github.com/SmartSchoolAI/ShortVideoDesktop/releases"><img src="https://img.shields.io/badge/GitHub-Phiên_Bản-blue?style=flat-square" alt="GitHub Releases"></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/Giấy_Phép-MIT-green?style=flat-square" alt="License"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/Giấy_Phép-GPL--3.0-blue?style=flat-square" alt="License"></a>
 </p>
 
 ---
@@ -64,6 +64,7 @@
 
 ---
 
-## 📄 Giấy Phép
+## 📄 Giấy Phép & Điều Khoản (License & Terms)
 
-[MIT License](./LICENSE) © 2026 ShortVideo Team.
+* **ShortVideo Desktop (Ứng dụng)**: Mã nguồn mở theo giấy phép [GNU General Public License v3.0 (GPL-3.0)](./LICENSE).
+* **ShortVideo.ca (Dịch vụ Web & Máy chủ đám mây)**: Là nền tảng thương mại đóng mã nguồn độc quyền (Proprietary / Closed Source). Bảo lưu mọi quyền.

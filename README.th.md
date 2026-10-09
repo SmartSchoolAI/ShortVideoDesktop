@@ -24,7 +24,7 @@
   <a href="https://app.shortvideo.ca"><img src="https://img.shields.io/badge/เว็บสตูดิโอ-app.shortvideo.ca-success?style=flat-square" alt="Web Studio"></a>
   <a href="https://download.shortvideo.ca"><img src="https://img.shields.io/badge/ดาวน์โหลด-Windows_%7C_macOS_%7C_Linux-orange?style=flat-square" alt="Download Client"></a>
   <a href="https://github.com/SmartSchoolAI/ShortVideoDesktop/releases"><img src="https://img.shields.io/badge/GitHub-Releases-blue?style=flat-square" alt="GitHub Releases"></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/สัญญาอนุญาต-MIT-green?style=flat-square" alt="License"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/สัญญาอนุญาต-GPL--3.0-blue?style=flat-square" alt="License"></a>
 </p>
 
 ---
@@ -62,6 +62,7 @@
 
 ---
 
-## 📄 ใบอนุญาต
+## 📄 สัญญาอนุญาตและข้อกำหนด (License & Terms)
 
-[MIT License](./LICENSE) © 2026 ShortVideo Team.
+* **ShortVideo Desktop (โปรแกรมไคลเอนต์)**: เป็นโอเพนซอร์สภายใต้สัญญาอนุญาต [GNU General Public License v3.0 (GPL-3.0)](./LICENSE)
+* **ShortVideo.ca (บริการเว็บและคลาวด์)**: เป็นแพลตฟอร์มเชิงพาณิชย์แบบปิด (Proprietary / Closed Source) สงวนลิขสิทธิ์ทั้งหมด

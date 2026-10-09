@@ -24,7 +24,7 @@
   <a href="https://app.shortvideo.ca"><img src="https://img.shields.io/badge/웹스튜디오-app.shortvideo.ca-success?style=flat-square" alt="Web Studio"></a>
   <a href="https://download.shortvideo.ca"><img src="https://img.shields.io/badge/다운로드-Windows_%7C_macOS_%7C_Linux-orange?style=flat-square" alt="Download Client"></a>
   <a href="https://github.com/SmartSchoolAI/ShortVideoDesktop/releases"><img src="https://img.shields.io/badge/GitHub-Releases-blue?style=flat-square" alt="GitHub Releases"></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/라이선스-MIT-green?style=flat-square" alt="License"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/라이선스-GPL--3.0-blue?style=flat-square" alt="License"></a>
 </p>
 
 ---
@@ -85,6 +85,7 @@
 
 ---
 
-## 📄 라이선스
+## 📄 라이선스 및 이용 약관 (License & Terms)
 
-[MIT License](./LICENSE) © 2026 ShortVideo Team.
+* **ShortVideo Desktop (클라이언트)**: [GNU General Public License v3.0 (GPL-3.0)](./LICENSE) 오픈소스 라이선스를 준수합니다.
+* **ShortVideo.ca (웹 서비스 및 클라우드 엔진)**: 비공개 상용 독점 서비스(Proprietary / Closed Source)이며, 모든 권리를 보유합니다.
