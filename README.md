@@ -1,11 +1,14 @@
 # 🎬 ShortVideo Desktop Client
-> **Official Cross-Platform Desktop Client for ShortVideo Platform**
+> **官方跨平台桌面客户端 | Official Cross-Platform Desktop Client**
+> 
+> 面向全球短视频创作者、知识科普、跨境电商与矩阵运营团队的桌面客户端，深度集成 Web Studio 创作与原生 Playwright / CDP 社交矩阵自动化安全发布。
 
 <p align="center">
-  <a href="#-中文介绍">🇨🇳 简体中文</a> |
+  <a href="#-中文详细介绍">🇨🇳 简体中文</a> |
   <a href="#-english-overview">🇺🇸 English</a> |
   <a href="#-日本語紹介">🇯🇵 日本語</a> |
-  <a href="#-한국어-소개">🇰🇷 한국어</a>
+  <a href="#-한국어-소개">🇰🇷 한국어</a> |
+  <a href="#-supported-languages-14">🌍 语言列表</a>
 </p>
 
 <p align="center">
@@ -18,7 +21,7 @@
 
 ---
 
-## 🇨🇳 中文介绍
+## 🇨🇳 中文详细介绍
 
 **ShortVideo** 是一款面向全球短视频创作者、知识科普、跨境电商与内容团队的自动化视频生成、多语言字幕本地化与矩阵发布桌面/Web平台。
 
@@ -51,63 +54,124 @@
 
 ## 🇺🇸 English Overview
 
-**ShortVideo Desktop** is the official cross-platform desktop application for **ShortVideo** (https://shortvideo.ca), built with Electron, TypeScript, and Playwright CDP.
+**ShortVideo Desktop** is the official cross-platform desktop client for the **ShortVideo** ecosystem (https://shortvideo.ca), engineered with Electron, TypeScript, and Playwright CDP automation.
 
 ### ✨ Key Features & Highlights
 
-1. 🌐 **Coverage of 14 Core High-CPM Languages Worldwide**:
-   * Supports Chinese (zh), English (en), Japanese (ja), Korean (ko), Vietnamese (vi), Thai (th), Indonesian (id), Spanish (es), French (fr), Portuguese (pt), German (de), Italian (it), Russian (ru), and Turkish (tr).
-2. 🤖 **Automated Social Publishing via Playwright & CDP**:
-   * Native automation for **WeChat Channels** and **Xiaohongshu (RED)** with human-like interactions and anti-bot protection.
-3. 📚 **All-Discipline Educational Content Support**:
-   * English, Mathematics, Physics, Chemistry, History, and Geography video generation.
-4. 💻 **Native Desktop Experience**:
-   * Seamless window controls, hardware acceleration, and integrated publishing tools.
-5. 💰 **Pay-As-You-Go, Zero Subscription Traps**:
-   * Ultra-low generation cost (only ¥2 - ¥4 per video) with transparent usage.
-6. 📱 **Continuous Platform Ecosystem Expansion**:
-   * YouTube, Channels, RED, TikTok/Douyin, and Instagram matrix publishing.
-7. 🎙️ **Neural AI Voice Models**:
-   * Lifelike speech synthesis in diverse languages, styles, and tones.
+1. 🌐 **Global High-CPM Market Reach (14 Core Languages)**:
+   * Covers Chinese (zh), English (en), Japanese (ja), Korean (ko), Vietnamese (vi), Thai (th), Indonesian (id), Spanish (es), French (fr), Portuguese (pt), German (de), Italian (it), Russian (ru), and Turkish (tr).
+   * Smart AI subtitle translation, multilingual typography, and dynamic sound-visual sync.
+
+2. 🤖 **Anti-Detection Social Matrix Automation (Playwright / CDP)**:
+   * Native automation for **WeChat Channels** and **Xiaohongshu (RED)** creator services.
+   * Leverages authentic CDP/Playwright protocols with humanized keystrokes, random typing intervals, and natural mouse navigation to safeguard creator accounts.
+
+3. 📚 **Comprehensive Cross-Disciplinary Knowledge Content**:
+   * One-click generation for subjects such as **English**, **Mathematics**, **Physics**, **Chemistry**, **History**, and **Geography**.
+
+4. 💻 **Unified Cloud Studio + Local Native App**:
+   * Cloud rendering in Web Studio coupled with native local client for desktop-level automation.
+
+5. 💰 **Transparent Pay-As-You-Go Pricing**:
+   * Zero mandatory subscriptions or lock-ins. Each premium video costs only **¥2 - ¥4 (~$0.28 - $0.56)**.
+
+6. 📱 **Expanding Multi-Platform Matrix**:
+   * Fully supports **YouTube**, **WeChat Channels**, and **Xiaohongshu (RED)**; **TikTok**, **Bilibili**, **Meta (Facebook)**, and **Instagram** are rapidly integrating.
+
+7. 🎙️ **Studio-Grade Neural Voices**:
+   * Rich library of ultra-realistic voice actors with nuanced emotional rendering and dialect adaptations.
+
+---
+
+## 🇯🇵 日本語紹介
+
+**ShortVideo Desktop** は、世界中のショート動画クリエイター、教育コンテンツ事業者、越境ECチーム向けに開発された自動動画制作・多言語展開・SNS自動投稿クライアントアプリです。
+
+### ✨ 特徴とハイライト
+1. 🌐 **世界14言語対応**：日本語、英語、中国語、韓国語、ベトナム語、タイ語、インドネシア語、スペイン語、フランス語、ポルトガル語、ドイツ語、イタリア語、ロシア語、トルコ語。
+2. 🤖 **Playwright / CDP 採用の安全な自動投稿**：微信視頻号（WeChat Channels）、小紅書（RED）に対応。人間らしい入力挙動を再現し、BANを防止。
+3. 📚 **全教科の知識解説動画に対応**：英語、数学、物理、化学、歴史、地理など幅広い分野を網羅。
+4. 💰 **明朗な従量課金制**：月額縛りなし、1動画あたり **約40〜80円（2〜4元）**。
+5. 🎙️ **高品質なAI音声合成**：感情豊かでリアルな多言語ナレーション。
+
+---
+
+## 🇰🇷 한국어 소개
+
+**ShortVideo Desktop**은 글로벌 숏폼 영상 제작자 및 크로스보더 크리에이터를 위한 올인원 자동 비디오 생성, 다국어 자막 번역 및 안전한 SNS 자동 배포 데스크톱 프로그램입니다.
+
+### ✨ 핵심 기능
+1. 🌐 **글로벌 14개 핵심 언어 완벽 지원** (한국어, 영어, 중국어, 일본어 등).
+2. 🤖 **Playwright / CDP 기반 안티 디텍션 자동 발행** (위챗 채널, 샤오홍슈 등).
+3. 📚 **수학, 과학, 어학 등 전 과목 지식 숏폼 영상 제작**.
+4. 💰 **합리적인 사용량 기반 과금제** (영상 1건당 약 400원~800원).
+5. 📱 **유튜브, 틱톡, 인스타그램 등 멀티 플랫폼 연동 지속 확장**.
+
+---
+
+<span id="-supported-languages-14"></span>
+## 🌍 支持语言映射汇总表 (Supported Languages)
+
+| 序号 | 语言名称 | 语言代码 | 国家/地区 | 官方/主要语言 | 适用市场与短视频生态特征 |
+| :---: | :--- | :---: | :--- | :---: | :--- |
+| 1 | **中文 (Chinese)** | `zh` | 中国 (CN) | 中文（普通话） | 短视频电商与内容生态最成熟，带货活跃 |
+| 2 | **英语 (English)** | `en` | 美国 (US) / 英国 (GB) | 英语 | 全球通用，高 CPM 广告单价，市场规模最大 |
+| 3 | **日语 (Japanese)** | `ja` | 日本 (JP) | 日语 | 高用户价值（ARPU），ACG / 游戏 / 知识生活 |
+| 4 | **韩语 (Korean)** | `ko` | 韩国 (KR) | 韩语 | 渗透率极高，付费意愿强，美妆与潮流爆发力大 |
+| 5 | **越南语 (Vietnamese)** | `vi` | 越南 (VN) | 越南语 | 东南亚短视频流量增长最快市场之一 |
+| 6 | **泰语 (Thai)** | `th` | 泰国 (TH) | 泰语 | 视觉与幽默短视频传播力强，直播与带货生态成熟 |
+| 7 | **印尼语 (Indonesian)** | `id` | 印度尼西亚 (ID) | 印尼语 | 东南亚人口第一大国，TikTok Shop 黄金腹地 |
+| 8 | **西班牙语 (Spanish)** | `es` | 西班牙 (ES) / 墨西哥 (MX) | 西班牙语 | 覆盖西班牙、整个拉丁美洲及北美次席受众 |
+| 9 | **法语 (French)** | `fr` | 法国 (FR) | 法语 | 欧洲核心高消费市场，高 CPM 广告收益 |
+| 10 | **葡萄牙语 (Portuguese)** | `pt` | 巴西 (BR) / 葡萄牙 (PT) | 葡萄牙语 | 主要是巴西（南美最大的短视频消费与娱乐大国） |
+| 11 | **俄语 (Russian)** | `ru` | 俄罗斯 (RU) | 俄语 | 独联体区域，Telegram 与本土短视频需求旺盛 |
+| 12 | **德语 (German)** | `de` | 德国 (DE) | 德语 | 欧洲经济龙头，高购买力与极高广告单价 |
+| 13 | **土耳其语 (Turkish)** | `tr` | 土耳其 (TR) | 土耳其语 | 跨亚欧枢纽，短视频社交与直播打赏意愿高 |
+| 14 | **意大利语 (Italian)** | `it` | 意大利 (IT) | 意大利语 | 欧洲主流消费市场，竞争相对小、回报稳定 |
 
 ---
 
 ## 🛠️ 本地开发与构建 (Development & Build)
 
 ### 必备环境 (Prerequisites)
-- Node.js >= 18
-- pnpm >= 8
+- **Node.js**: >= 18.0.0
+- **pnpm**: >= 8.0.0
 
 ### 1. 安装依赖
 ```bash
 pnpm install
 ```
 
-### 2. 运行本地开发调试
+### 2. 启动桌面客户端开发模式
 ```bash
 pnpm run dev
 ```
 
-### 3. 本地打包构建
+### 3. 本地编译与打包
 ```bash
-# 解包目录测试
+# 解包目录测试 (免打包安装验证)
 pnpm run pack
 
-# 生成跨平台正式安装包 (exe / dmg / AppImage)
+# 本地直接构建跨平台安装包 (.exe / .dmg / .AppImage)
 pnpm run dist
 ```
 
 ---
 
-## 🚀 自动化发布流 (CI / CD & Release)
+## 🚀 CI / CD 与纯云端内网秒级发布 (Release Workflow)
+
+本项目支持全自动云端多平台编译构建与 **0 本地流量消耗** 的秒级发布机制：
 
 ```bash
-# 1. 自动打 Tag 并推送到 GitHub (云端 GitHub Actions 开始并行编译三平台安装包)
+# 步骤 1：创建并推送版本 Tag (云端 GitHub Actions 立即自动并行打包 Windows / macOS / Linux 三端)
 pnpm run tagall
 
-# 2. 一键秒级直发 (自动关联云端产物，纯云端内网秒级挂载至 GitHub Release，本地 0 流量消耗)
+# 步骤 2：云端编译完成后，在本地敲一键发布 (GitHub 云端内网秒级将各端安装包挂载到 Release 页面)
 pnpm run release
 ```
+
+* 💡 **优势**：本地完全无需下载任何安装包（0 字节下载、0 字节上传），全部依靠 GitHub Actions 云端内网瞬间完成 Release 附件挂载。
+* 🔍 **演练模式**：可使用 `pnpm run release --dry-run` 预览云端构建产物状态与发布说明。
 
 ---
 
