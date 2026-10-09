@@ -412,10 +412,9 @@ export class RenderManager {
    * 解析可执行的物理工作目录（彻底过滤 .asar 虚拟路径，纯动态探测）
    */
   public resolvePhysicalWorkingDir(): string {
-    // 1. 用户自定义配置目录优先
-    const saved = this.loadSavedProjectDir();
-    if (saved && !saved.includes('.asar') && fs.existsSync(path.join(saved, 'package.json'))) {
-      return saved;
+    // 1. 已打包的独立客户端安装环境：直接使用 userData 目录，100% 独立免源码依赖
+    if (app.isPackaged) {
+      return app.getPath('userData');
     }
 
     // 2. 环境变量配置
@@ -423,7 +422,13 @@ export class RenderManager {
       return process.env.SHORTVIDEO_PROJECT_DIR;
     }
 
-    // 3. 动态探测开发环境（从当前进程工作目录或上下文向上递归寻找包含 package.json 的工程根目录）
+    // 3. 用户自定义配置目录
+    const saved = this.loadSavedProjectDir();
+    if (saved && !saved.includes('.asar') && fs.existsSync(path.join(saved, 'package.json'))) {
+      return saved;
+    }
+
+    // 4. 开发者模式动态探测工程根目录
     const candidateDirs = [
       process.cwd(),
       __dirname,
@@ -434,7 +439,6 @@ export class RenderManager {
     for (const startDir of candidateDirs) {
       if (!startDir || startDir.includes('.asar')) continue;
       let cur = path.resolve(startDir);
-      // 最多向上递归 4 层寻找含有 package.json 的工程根目录
       for (let i = 0; i < 4; i++) {
         if (!cur.includes('.asar') && fs.existsSync(path.join(cur, 'package.json'))) {
           return cur;
@@ -445,9 +449,7 @@ export class RenderManager {
       }
     }
 
-    // 4. 打包安装环境未找到源码工程时，返回可执行程序所在物理目录
-    const exeDir = path.dirname(process.execPath);
-    return exeDir && !exeDir.includes('.asar') ? exeDir : app.getPath('userData');
+    return app.getPath('userData');
   }
 
   /**
