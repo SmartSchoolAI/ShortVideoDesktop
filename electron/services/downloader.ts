@@ -8,8 +8,6 @@ import { APP_CONFIG } from '../config';
 
 export type DownloadProgressCallback = (downloadedBytes: number, totalBytes: number, percentText: string) => void;
 
-// 14 种受支持的核心语言代码
-const CORE_LANG_SUFFIXES = ['en', 'zh', 'ja', 'ko', 'vi', 'th', 'id', 'es', 'fr', 'pt', 'de', 'it', 'ru', 'tr'];
 
 /**
  * 校验本地缓存的文件是否为有效的二进制视频（防止服务器返回404的HTML错误页）
@@ -259,17 +257,14 @@ export async function ensureLocalVideoFile(
       const cleanPath = urlObj.pathname.split('?')[0];
       const ext = path.extname(cleanPath) || '.mp4';
       const baseName = path.basename(cleanPath, ext);
-      const hasLangSuffix = /_[a-z]{2,5}$/i.test(baseName);
+      const rawBase = baseName.replace(/_[a-z]{2,5}$/i, '');
 
-      if (!hasLangSuffix) {
-        // 如果原 URL 未带语言后缀（如 deadline-timeline.mp4），加入 _en, _zh 以及其他语言候选
-        const rawBase = baseName;
-        for (const lang of CORE_LANG_SUFFIXES) {
-          const candPath = cleanPath.replace(new RegExp(`${rawBase}\\${ext}$`), `${rawBase}_${lang}${ext}`);
-          const candUrl = `${urlObj.origin}${candPath}${urlObj.search}`;
-          if (!candidateUrls.includes(candUrl)) {
-            candidateUrls.push(candUrl);
-          }
+      // 若原 URL 带有语言后缀（如 flat-studio_en.mp4），将去除后缀的无后缀根文件加入唯一下一步备选（兼容历史旧版本渲染的 flat-studio.mp4）
+      if (/_ [a-z]{2,5}$/i.test(baseName) || /_[a-z]{2,5}$/i.test(baseName)) {
+        const rootPath = cleanPath.replace(new RegExp(`${baseName}\\${ext}$`), `${rawBase}${ext}`);
+        const rootUrl = `${urlObj.origin}${rootPath}${urlObj.search}`;
+        if (!candidateUrls.includes(rootUrl)) {
+          candidateUrls.push(rootUrl);
         }
       }
     } catch (_) { }
@@ -293,7 +288,7 @@ export async function ensureLocalVideoFile(
 
       try {
         if (i > 0) {
-          console.log(`[Downloader] 🔄 正在尝试备选多语言远程视频地址: ${currentUrl}`);
+          console.log(`[Downloader] 🔄 带有语言后缀的版本不存在，正在尝试根主视频地址: ${currentUrl}`);
         }
         const downloadedPath = await downloadFileStream(currentUrl, targetPath, onProgress);
         return downloadedPath;
