@@ -454,6 +454,41 @@ function syncWranglerDownloadVersion(rawVersion, isDryRun = false) {
   }
 }
 
+function syncPackageJsonVersion(rawVersion, isDryRun = false) {
+  const cleanVersion = extractCleanVersion(rawVersion);
+  if (!cleanVersion) {
+    return;
+  }
+
+  const pkgPath = path.resolve(__dirname, '../package.json');
+  if (!fs.existsSync(pkgPath)) {
+    console.log(`${c.yellow}${t('RELEASE_SYNC_PACKAGE_NOT_FOUND')}${c.reset}`);
+    return;
+  }
+
+  try {
+    const rawContent = fs.readFileSync(pkgPath, 'utf8');
+    const pkg = JSON.parse(rawContent);
+    const oldVersion = pkg.version;
+
+    if (oldVersion === cleanVersion) {
+      console.log(`${c.green}${t('RELEASE_SYNC_PACKAGE_ALREADY_LATEST', { version: cleanVersion })}${c.reset}`);
+      return;
+    }
+
+    if (isDryRun) {
+      console.log(`${c.cyan}[Dry-Run] 拟将 package.json 中的 version 从 "${oldVersion}" 更新为 "${cleanVersion}"${c.reset}`);
+      return;
+    }
+
+    pkg.version = cleanVersion;
+    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
+    console.log(`${c.green}${t('RELEASE_SYNC_PACKAGE_SUCCESS', { oldVersion, newVersion: cleanVersion })}${c.reset}`);
+  } catch (err) {
+    console.error(`${c.red}[Package Sync Error] ${err.message}${c.reset}`);
+  }
+}
+
 // 主程序
 async function main() {
   console.log(`\n${c.cyan}====================================================${c.reset}`);
@@ -478,7 +513,10 @@ async function main() {
     process.exit(1);
   }
 
-  // 自动同步更新 D:\Github\ShortVideo\wrangler.toml 中的 NEXT_PUBLIC_DOWNLOAD_VERSION 为纯净版本号 (不带 v)
+  // 1. 自动同步更新当前项目 package.json 中的 version 为纯净版本号 (不带 v)
+  syncPackageJsonVersion(targetTag, isDryRun);
+
+  // 2. 自动同步更新 D:\Github\ShortVideo\wrangler.toml 中的 NEXT_PUBLIC_DOWNLOAD_VERSION 为纯净版本号 (不带 v)
   syncWranglerDownloadVersion(targetTag, isDryRun);
 
   const prevTag = tags.find((t) => t !== targetTag) || '';
