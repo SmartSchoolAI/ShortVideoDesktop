@@ -32,7 +32,7 @@ function sha256Base64Url(str: string): string {
 
 class OAuthBridgeService {
   private server: http.Server | null = null;
-  private port: number = 39281;
+  private port: number = 39281 + ({ A: 0, B: 1, C: 2 }[APP_CONFIG?.channel || 'A'] || 0);
   private onTokenReceived: OAuthTokenCallback | null = null;
   private isListening: boolean = false;
   private pendingAuth: PendingAuth | null = null;

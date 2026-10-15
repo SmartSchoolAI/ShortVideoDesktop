@@ -3,7 +3,11 @@ import WebSocket from 'ws';
 import { WebContents } from 'electron';
 import { STEALTH_SCRIPT } from '../stealth/anti-detection';
 
-export const DEFAULT_CDP_PORT = 8315;
+import { APP_CONFIG } from '../config';
+
+const CHANNEL_PORT_OFFSET: Record<string, number> = { A: 0, B: 1, C: 2 };
+const channelOffset = CHANNEL_PORT_OFFSET[APP_CONFIG?.channel || 'A'] || 0;
+export const DEFAULT_CDP_PORT = 8315 + channelOffset;
 
 export interface CdpTargetInfo {
   id: string;

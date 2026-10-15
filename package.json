@@ -18,7 +18,6 @@
     "start": "tsc -p tsconfig.json && tsc -p tsconfig.render.json && node scripts/copy-electron-views.js && electron dist-electron/main.js",
     "render": "node dist-electron/scripts/scripts/CompareEnglishWord.js",
     "pack": "node scripts/clean-electron.js && tsc -p tsconfig.json && tsc -p tsconfig.render.json && node scripts/copy-electron-views.js && electron-builder --dir",
-    "dist": "node scripts/build-channel.js a",
     "dist:win:a": "node scripts/build-channel.js a --win",
     "dist:win:b": "node scripts/build-channel.js b --win",
     "dist:win:c": "node scripts/build-channel.js c --win",
