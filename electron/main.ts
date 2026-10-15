@@ -33,6 +33,10 @@ if (process.platform === 'win32') {
 // 统一应用名称与 TAG 版本号（杜绝显示底层 Electron 二进制版本号）
 app.setName(APP_CONFIG.appName);
 try {
+  const customUserDataPath = path.join(app.getPath('appData'), APP_CONFIG.appName);
+  app.setPath('userData', customUserDataPath);
+} catch {}
+try {
   (app as any).setVersion?.(APP_CONFIG.version.replace(/^v/, ''));
 } catch {}
 

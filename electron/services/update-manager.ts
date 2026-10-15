@@ -47,13 +47,15 @@ export class UpdateManager {
    */
   private ensureUpdateConfig(): void {
     try {
+      const channelSuffix = (APP_CONFIG?.channel || 'A').toLowerCase();
+      const updaterCacheDir = `shortvideo/update-${channelSuffix}`;
       const feedUrl = `${APP_CONFIG.downloadUrl.replace(/\/+$/, '')}/website/`;
       const yamlContent = [
         'owner: smartschoolai',
         'repo: ShortVideo',
         'provider: generic',
         `url: ${feedUrl}`,
-        'updaterCacheDirName: shortvideo/update',
+        `updaterCacheDirName: ${updaterCacheDir}`,
       ].join('\n') + '\n';
 
       // 自动清理历史遗留的独立根目录 %LOCALAPPDATA%\shortvideo-updater，归整到 shortvideo 统一目录下
@@ -65,7 +67,7 @@ export class UpdateManager {
         }
 
         // 自动清理 pending 目录中已生效的历史安装包与残留的临时碎片包，节约磁盘空间
-        const pendingDir = path.join(localAppData, 'shortvideo', 'update', 'pending');
+        const pendingDir = path.join(localAppData, 'shortvideo', `update-${channelSuffix}`, 'pending');
         if (fs.existsSync(pendingDir)) {
           const files = fs.readdirSync(pendingDir);
           const currentVersion = app.getVersion();

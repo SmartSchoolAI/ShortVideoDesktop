@@ -111,6 +111,10 @@ function buildChannel(channelKey, extraArgs = []) {
       appId: ch.appId,
       productName: ch.productName,
     },
+    publish: (baseConfig.publish || []).map((p) => ({
+      ...p,
+      updaterCacheDirName: `shortvideo/update-${ch.key.toLowerCase()}`,
+    })),
     protocols: [
       {
         name: `${ch.productName} Protocol`,
