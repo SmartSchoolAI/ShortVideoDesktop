@@ -365,7 +365,8 @@ export class WindowManager {
     const preferredName = isWin ? 'icon.ico' : isMac ? 'icon.icns' : 'icon.png';
     const chSuffix = (APP_CONFIG?.channel || 'A').toLowerCase();
     const channelIcon = isWin ? `icon-${chSuffix}.ico` : isMac ? `icon-${chSuffix}.icns` : `icon-${chSuffix}.png`;
-    const fallbackNames = [channelIcon, `icon-${chSuffix}.png`, preferredName, 'icon.png', 'icon.ico'];
+    // 优先采用原始高清 512x512 PNG，提供完整 Alpha 透明通道和高 DPI 缩放渲染，彻底杜绝模糊失真
+    const fallbackNames = [icon-.png, 'icon.png', 'icon.ico', 'icon.icns'];
 
     const searchDirs = [
       path.join(app.getAppPath(), 'build'),

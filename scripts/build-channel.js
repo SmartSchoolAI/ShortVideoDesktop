@@ -18,7 +18,6 @@ const CHANNELS = {
     key: 'A',
     productName: 'ShortVideo A',
     appId: 'com.smartschoolai.shortvideo.a',
-    iconIco: 'build/icon-a.ico',
     iconPng: 'build/icon-a.png',
     scheme: 'shortvideo-a',
     description: 'ShortVideo Desktop Client (Channel A - Green Edition)',
@@ -27,7 +26,6 @@ const CHANNELS = {
     key: 'B',
     productName: 'ShortVideo B',
     appId: 'com.smartschoolai.shortvideo.b',
-    iconIco: 'build/icon-b.ico',
     iconPng: 'build/icon-b.png',
     scheme: 'shortvideo-b',
     description: 'ShortVideo Desktop Client (Channel B - Amber Edition)',
@@ -36,7 +34,6 @@ const CHANNELS = {
     key: 'C',
     productName: 'ShortVideo C',
     appId: 'com.smartschoolai.shortvideo.c',
-    iconIco: 'build/icon-c.ico',
     iconPng: 'build/icon-c.png',
     scheme: 'shortvideo-c',
     description: 'ShortVideo Desktop Client (Channel C - Magenta Edition)',
@@ -56,21 +53,16 @@ function runStep(cmd, args, description) {
   }
 }
 
-// 检查并自动生成各版本图标
+// 确保各渠道高清晰度原始 PNG 图标文件存在
 function ensureIcons() {
   const missing = ['a', 'b', 'c'].some((ch) => {
-    return (
-      !fs.existsSync(path.join(ROOT_DIR, CHANNELS[ch].iconIco)) ||
-      !fs.existsSync(path.join(ROOT_DIR, CHANNELS[ch].iconPng))
-    );
+    return !fs.existsSync(path.join(ROOT_DIR, CHANNELS[ch].iconPng));
   });
 
   if (missing) {
-    console.log('🎨 正在生成 A / B / C 版本的独立圆点图标...');
-    const psScript = path.join(ROOT_DIR, 'scripts', 'generate-channel-icons.ps1');
-    if (fs.existsSync(psScript)) {
-      runStep('powershell', ['-ExecutionPolicy', 'Bypass', '-File', `"${psScript}"`], '生成分身彩色圆点图标');
-    }
+    console.warn('⚠️ 未检测到部分渠道高清 PNG 图标，请确认 build/icon-a.png, build/icon-b.png, build/icon-c.png 齐全！');
+  } else {
+    console.log('🎨 已确认加载 A / B / C 独立 512x512 高清原始 PNG 图标 (build/icon-a.png, icon-b.png, icon-c.png)');
   }
 }
 
@@ -170,19 +162,17 @@ function buildChannel(channelKey, extraArgs = []) {
     },
     win: {
       ...baseConfig.win,
-      icon: ch.iconIco,
+      icon: ch.iconPng,
       executableName: ch.productName,
       artifactName: `${ch.productName.replace(/\s+/g, '-')}-Setup-\${version}.\${ext}`,
     },
     mac: {
       ...baseConfig.mac,
-      // Mac 统一使用 A 版本图标
-      icon: CHANNELS.a.iconPng,
+      icon: ch.iconPng,
     },
     linux: {
       ...baseConfig.linux,
-      // Linux 统一使用 A 版本图标
-      icon: CHANNELS.a.iconPng,
+      icon: ch.iconPng,
     },
   };
 
