@@ -118,12 +118,18 @@ function buildChannel(channelKey, extraArgs = []) {
     protocols: [
       {
         name: `${ch.productName} Protocol`,
-        schemes: [ch.scheme, 'shortvideo'],
+        schemes: ch.key === 'A' ? [ch.scheme, 'shortvideo'] : [ch.scheme],
       },
     ],
+    nsis: {
+      ...baseConfig.nsis,
+      shortcutName: ch.productName,
+      uninstallDisplayName: ch.productName,
+    },
     win: {
       ...baseConfig.win,
       icon: ch.iconIco,
+      executableName: ch.productName,
       artifactName: `${ch.productName.replace(/\s+/g, '-')}-Setup-\${version}.\${ext}`,
     },
     mac: {
@@ -162,8 +168,8 @@ function main() {
 
   // 1. 清理并编译 TypeScript 与资源复制
   runStep('node', ['scripts/clean-electron.js'], '清理历史编译构建缓存');
-  runStep('tsc', ['-p', 'tsconfig.json'], '编译主进程 TypeScript');
-  runStep('tsc', ['-p', 'tsconfig.render.json'], '编译渲染进程 TypeScript');
+  runStep('npx', ['tsc', '-p', 'tsconfig.json'], '编译主进程 TypeScript');
+  runStep('npx', ['tsc', '-p', 'tsconfig.render.json'], '编译渲染进程 TypeScript');
   runStep('node', ['scripts/copy-electron-views.js'], '复制前端 HTML 视图资源');
 
   // 2. 确保图标齐全

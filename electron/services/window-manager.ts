@@ -363,7 +363,9 @@ export class WindowManager {
     const isMac = process.platform === 'darwin';
 
     const preferredName = isWin ? 'icon.ico' : isMac ? 'icon.icns' : 'icon.png';
-    const fallbackNames = [preferredName, 'icon.png', 'icon.ico'];
+    const chSuffix = (APP_CONFIG?.channel || 'A').toLowerCase();
+    const channelIcon = isWin ? `icon-${chSuffix}.ico` : isMac ? `icon-${chSuffix}.icns` : `icon-${chSuffix}.png`;
+    const fallbackNames = [channelIcon, `icon-${chSuffix}.png`, preferredName, 'icon.png', 'icon.ico'];
 
     const searchDirs = [
       path.join(app.getAppPath(), 'build'),
