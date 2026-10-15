@@ -74,12 +74,45 @@ function ensureIcons() {
   }
 }
 
+function cleanupProcessLocks() {
+  if (process.platform === 'win32') {
+    try {
+      spawnSync('taskkill', ['/F', '/IM', 'ShortVideo*.exe', '/T'], { stdio: 'ignore' });
+    } catch {}
+    try {
+      spawnSync('taskkill', ['/F', '/IM', '*Setup*.exe', '/T'], { stdio: 'ignore' });
+    } catch {}
+  }
+}
+
+function syncArtifactsToRoot(srcDir, dstDir) {
+  if (!fs.existsSync(srcDir)) return;
+  if (!fs.existsSync(dstDir)) {
+    fs.mkdirSync(dstDir, { recursive: true });
+  }
+  const files = fs.readdirSync(srcDir);
+  for (const f of files) {
+    const src = path.join(srcDir, f);
+    const dst = path.join(dstDir, f);
+    if (fs.statSync(src).isFile()) {
+      try {
+        fs.copyFileSync(src, dst);
+      } catch (err) {
+        console.warn(`[Build] 同步产物 ${f} 到根输出目录提示:`, err.message);
+      }
+    }
+  }
+}
+
 function buildChannel(channelKey, extraArgs = []) {
   const ch = CHANNELS[channelKey];
   if (!ch) {
     console.error(`❌ 未知的版本标识: ${channelKey}，仅支持 a, b, c, all`);
     process.exit(1);
   }
+
+  // 1. 打包前清理可能残留的文件句柄与相关进程
+  cleanupProcessLocks();
 
   console.log(`\n======================================================`);
   console.log(`🚀 开始打包 ShortVideo 版本 [${ch.key}] -> ${ch.productName}`);
@@ -102,10 +135,19 @@ function buildChannel(channelKey, extraArgs = []) {
   };
   fs.writeFileSync(path.join(distElectronDir, 'channel.json'), JSON.stringify(channelMeta, null, 2), 'utf8');
 
+  // 为每个渠道使用完全隔离的独立临时输出目录，彻底杜绝 NSIS win-unpacked 与 uninstaller 互斥占用冲突
+  const channelSubDir = `dist-release/${ch.key.toLowerCase()}`;
+  const absChannelSubDir = path.join(ROOT_DIR, channelSubDir);
+  const absRootDir = path.join(ROOT_DIR, 'dist-release');
+
   const channelConfig = {
     ...baseConfig,
     appId: ch.appId,
     productName: ch.productName,
+    directories: {
+      ...baseConfig.directories,
+      output: channelSubDir,
+    },
     extraMetadata: {
       channel: ch.key,
       appId: ch.appId,
@@ -148,8 +190,11 @@ function buildChannel(channelKey, extraArgs = []) {
   fs.writeFileSync(tempConfigFile, JSON.stringify(channelConfig, null, 2), 'utf8');
 
   try {
-    const builderArgs = ['electron-builder', '--config', `"${tempConfigFile}"`, ...extraArgs];
+    const builderArgs = ['electron-builder', '--config', tempConfigFile, ...extraArgs];
     runStep('npx', builderArgs, `执行 electron-builder 打包 [${ch.key}]`);
+
+    // 构建成功后，将子目录产物自动同步到统一根目录 dist-release/，完美兼容 Release 与 CI
+    syncArtifactsToRoot(absChannelSubDir, absRootDir);
   } finally {
     try {
       if (fs.existsSync(tempConfigFile)) {
@@ -166,7 +211,8 @@ function main() {
   const target = (argv[0] || 'a').toLowerCase();
   const extraArgs = argv.slice(1).filter((arg) => !['a', 'b', 'c', 'all'].includes(arg.toLowerCase()));
 
-  // 1. 清理并编译 TypeScript 与资源复制
+  // 1. 清理进程锁与历史编译构建缓存
+  cleanupProcessLocks();
   runStep('node', ['scripts/clean-electron.js'], '清理历史编译构建缓存');
   runStep('npx', ['tsc', '-p', 'tsconfig.json'], '编译主进程 TypeScript');
   runStep('npx', ['tsc', '-p', 'tsconfig.render.json'], '编译渲染进程 TypeScript');
@@ -177,11 +223,14 @@ function main() {
 
   // 3. 执行打包
   if (target === 'all') {
-    // 批量打包 Windows A, B, C 三个版本
+    // 批量打包 Windows A, B, C 三个版本，在版本之间保留释放时间缓冲
     console.log('\n📦 即将依次打包 Windows A、B、C 三个版本...');
     buildChannel('a', ['--win', ...extraArgs]);
+    cleanupProcessLocks();
     buildChannel('b', ['--win', ...extraArgs]);
+    cleanupProcessLocks();
     buildChannel('c', ['--win', ...extraArgs]);
+    cleanupProcessLocks();
     console.log('\n🎉 所有版本 (A、B、C) 均已成功打包输出！输出目录: dist-release/');
   } else {
     buildChannel(target, extraArgs);
