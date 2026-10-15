@@ -8,8 +8,8 @@ dist-electron/
 release/
 dist-release/
 build/*
-!build/icon.ico
-!build/icon.png
+!build/icon*.ico
+!build/icon*.png
 out/
 
 # Environment Variables & Secrets

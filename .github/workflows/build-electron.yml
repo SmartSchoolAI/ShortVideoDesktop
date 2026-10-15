@@ -97,11 +97,11 @@ jobs:
       - name: Compile Electron scripts
         run: pnpm run electron:compile
 
-      - name: Build Windows Package
+      - name: Build Windows Package (All Channels: A, B, C)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
-        run: pnpm exec electron-builder --win --x64 --publish never
+        run: node scripts/build-channel.js all --win --x64 --publish never
 
       - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
@@ -240,7 +240,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
-        run: pnpm exec electron-builder --mac --x64 --arm64 --publish never
+        run: node scripts/build-channel.js a --mac --x64 --arm64 --publish never
 
       - name: Upload macOS Artifacts
         uses: actions/upload-artifact@v4
@@ -380,7 +380,7 @@ jobs:
       - name: Build Linux Package
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm exec electron-builder --linux --x64 --publish never
+        run: node scripts/build-channel.js a --linux --x64 --publish never
 
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4

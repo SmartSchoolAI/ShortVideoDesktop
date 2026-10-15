@@ -109,9 +109,97 @@ export function getAppTagVersion(): string {
   return 'v0.1.6';
 }
 
+export interface AppChannelInfo {
+  channel: 'A' | 'B' | 'C';
+  appName: string;
+  appId: string;
+}
+
+/**
+ * 动态识别当前实例属于 A、B、C 哪个独立版本
+ * 支持环境变量、注入的 channel.json、package.json 元数据及进程文件名智能识别
+ */
+function getAppChannelInfo(): AppChannelInfo {
+  // 1. 优先读取 process.env.SHORTVIDEO_CHANNEL
+  const envChannel = (process.env.SHORTVIDEO_CHANNEL || '').trim().toUpperCase();
+  if (['A', 'B', 'C'].includes(envChannel)) {
+    return {
+      channel: envChannel as 'A' | 'B' | 'C',
+      appName: `ShortVideo ${envChannel}`,
+      appId: `com.smartschoolai.shortvideo.${envChannel.toLowerCase()}`,
+    };
+  }
+
+  // 2. 检查 channel.json (由 build-channel.js 编译/打包时注入)
+  try {
+    const candidates = [
+      path.resolve(__dirname, 'channel.json'),
+      path.resolve(__dirname, '../channel.json'),
+      path.resolve((process as any).resourcesPath || '', 'channel.json'),
+      path.resolve((process as any).resourcesPath || '', 'app.asar.unpacked', 'dist-electron', 'channel.json'),
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        const raw = JSON.parse(fs.readFileSync(p, 'utf-8'));
+        if (raw && raw.channel && ['A', 'B', 'C'].includes(String(raw.channel).toUpperCase())) {
+          const ch = String(raw.channel).toUpperCase() as 'A' | 'B' | 'C';
+          return {
+            channel: ch,
+            appName: raw.appName || `ShortVideo ${ch}`,
+            appId: raw.appId || `com.smartschoolai.shortvideo.${ch.toLowerCase()}`,
+          };
+        }
+      }
+    }
+  } catch {}
+
+  // 3. 检查 package.json 中 extraMetadata 注入的 channel
+  try {
+    const pkgCandidates = [
+      path.resolve(process.cwd(), 'package.json'),
+      path.resolve(__dirname, '../package.json'),
+      path.resolve((process as any).resourcesPath || '', 'app.asar', 'package.json'),
+    ];
+    for (const p of pkgCandidates) {
+      if (fs.existsSync(p)) {
+        const pkg = JSON.parse(fs.readFileSync(p, 'utf-8'));
+        if (pkg.channel && ['A', 'B', 'C'].includes(String(pkg.channel).toUpperCase())) {
+          const ch = String(pkg.channel).toUpperCase() as 'A' | 'B' | 'C';
+          return {
+            channel: ch,
+            appName: pkg.productName || `ShortVideo ${ch}`,
+            appId: pkg.appId || `com.smartschoolai.shortvideo.${ch.toLowerCase()}`,
+          };
+        }
+      }
+    }
+  } catch {}
+
+  // 4. 根据当前进程可执行文件名称智能推断 (如 ShortVideo-B.exe / ShortVideo B.exe)
+  try {
+    const execName = path.basename(process.execPath || '').toUpperCase();
+    if (execName.includes('-B') || execName.includes(' B')) {
+      return { channel: 'B', appName: 'ShortVideo B', appId: 'com.smartschoolai.shortvideo.b' };
+    }
+    if (execName.includes('-C') || execName.includes(' C')) {
+      return { channel: 'C', appName: 'ShortVideo C', appId: 'com.smartschoolai.shortvideo.c' };
+    }
+  } catch {}
+
+  // 5. 默认回退为 Channel A
+  return {
+    channel: 'A',
+    appName: 'ShortVideo A',
+    appId: 'com.smartschoolai.shortvideo.a',
+  };
+}
+
+const currentChannel = getAppChannelInfo();
+
 export const APP_CONFIG = {
-  appName: 'ShortVideo',
-  appId: 'com.smartschoolai.shortvideo',
+  channel: currentChannel.channel,
+  appName: currentChannel.appName,
+  appId: currentChannel.appId,
   version: getAppTagVersion(),
   siteUrl: defaultSiteOrigin,
   productionUrl: defaultSiteOrigin,

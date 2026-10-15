@@ -425,8 +425,8 @@ function registerIpcHandlers(): void {
 
 import { oauthBridge } from './services/oauth-bridge';
 
-// 保证单实例运行
-const gotTheLock = app.requestSingleInstanceLock();
+// 保证当前渠道独立单实例运行（A、B、C 各自拥有独立锁，支持同时并发运行）
+const gotTheLock = app.requestSingleInstanceLock({ channel: APP_CONFIG.channel });
 if (!gotTheLock) {
   app.quit();
 } else {
