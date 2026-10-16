@@ -1227,6 +1227,63 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
       "ru": "Успешная загрузка из источника! Автоматически получены изображения 01.png и 02.png из общего альбома.",
       "tr": "Kaynak indirme başarılı! Orijinal paylaşılan albümden 01.png ve 02.png resimleri alındı.",
     }
+  },
+  {
+    regex: /检测到 Chromium 内存不足 \(Out of memory\)，正在自动降级并发度为 1x 并重新尝试渲染\.\.\./g,
+    translations: {
+      "zh": "检测到 Chromium 内存不足 (Out of memory)，正在自动降级并发度为 1x 并重新尝试渲染...",
+      "en": "Detected Chromium out of memory, automatically reducing concurrency to 1x and retrying...",
+      "ja": "Chromium のメモリ不足を検出しました。並列度を 1x に自動縮小して再試行中...",
+      "ko": "Chromium 메모리 부족 감지, 동시성을 1x로 자동 축소하고 재시도 중...",
+      "vi": "Phát hiện Chromium thiếu bộ nhớ, tự động giảm số luồng xuống 1x và thử lại...",
+      "th": "ตรวจพบหน่วยความจำ Chromium ไม่เพียงพอ กำลังลดการทำงานพร้อมกันเป็น 1x และลองใหม่...",
+      "id": "Terdeteksi Chromium kehabisan memori, otomatis menurunkan konkurensi ke 1x dan mencoba lagi...",
+      "es": "Memoria insuficiente de Chromium detectada, reduciendo automáticamente la concurrencia a 1x y reintentando...",
+      "fr": "Mémoire Chromium insuffisante détectée, réduction de la concurrence à 1x et nouvel essai...",
+      "pt": "Memória insuficiente do Chromium detectada, reduzindo a concorrência para 1x e tentando novamente...",
+      "de": "Chromium-Speichermangel erkannt, Parallelität automatisch auf 1x reduziert und erneuter Versuch...",
+      "it": "Memoria insufficiente di Chromium rilevata, riduzione automatica della concorrenza a 1x e nuovo tentativo...",
+      "ru": "Обнаружена нехватка памяти Chromium, автоматическое снижение параллелизма до 1x и повторная попытка...",
+      "tr": "Chromium bellek yetersizliği algılandı, eşzamanlılık otomatik olarak 1x'e düşürülüyor ve yeniden deneniyor...",
+    }
+  },
+  {
+    regex: /降级并发重试渲染仍然失败[:：]\s*(.*)/g,
+    translations: {
+      "zh": "降级并发重试渲染仍然失败: $1",
+      "en": "Retry render after reducing concurrency still failed: $1",
+      "ja": "並列度を下げて再试行しましたがレンダリングに失敗しました: $1",
+      "ko": "동시성 축소 후 재시도 렌더링이 여전히 실패했습니다: $1",
+      "vi": "Thử lại kết xuất sau khi giảm đồng thời vẫn thất bại: $1",
+      "th": "ลองเรนเดอร์ใหม่หลังลดการทำงานพร้อมกันยังคงล้มเหลว: $1",
+      "id": "Mencoba kembali merender setelah menurunkan konkurensi masih gagal: $1",
+      "es": "El reintento de renderizado tras reducir la concurrencia aún falló: $1",
+      "fr": "Nouvel essai de rendu après réduction de la concurrence toujours échoué : $1",
+      "pt": "A nova tentativa de renderização após reduzir a concorrência ainda falhou: $1",
+      "de": "Wiederholter Rendering-Versuch nach Reduzierung der Parallelität fehlgeschlagen: $1",
+      "it": "Nuovo tentativo di rendering dopo la riduzione della concorrenza non riuscito: $1",
+      "ru": "Повторная попытка рендеринга после снижения параллелизма не удалась: $1",
+      "tr": "Eşzamanlılığı azalttıktan sonra işlemeyi yeniden deneme başarısız oldu: $1",
+    }
+  },
+  {
+    regex: /降级并发度 1x 重新渲染成功!/g,
+    translations: {
+      "zh": "降级并发度 1x 重新渲染成功!",
+      "en": "Successfully re-rendered after reducing concurrency to 1x!",
+      "ja": "並列度を 1x に縮小して再レンダリングに成功しました!",
+      "ko": "동시성을 1x로 축소한 후 재렌더링에 성공했습니다!",
+      "vi": "Kết xuất lại thành công sau khi giảm đồng thời xuống 1x!",
+      "th": "เรนเดอร์ใหม่สำเร็จหลังจากลดการทำงานพร้อมกันเป็น 1x!",
+      "id": "Berhasil merender ulang setelah menurunkan konkurensi ke 1x!",
+      "es": "¡Renderizado nuevamente con éxito tras reducir la concurrencia a 1x!",
+      "fr": "Rendu réussi après réduction de la concurrence à 1x !",
+      "pt": "Renderização bem-sucedida após reduzir a concorrência para 1x!",
+      "de": "Erfolgreich erneut gerendert nach Reduzierung der Parallelität auf 1x!",
+      "it": "Rendering completato con successo dopo aver ridotto la concorrenza a 1x!",
+      "ru": "Повторный рендеринг успешно завершен после снижения параллелизма до 1x!",
+      "tr": "Eşzamanlılık 1x'e düşürüldükten sonra yeniden işleme başarılı!",
+    }
   }
 ];
 
@@ -1565,7 +1622,7 @@ function isRemotionBundleValid(bundleDir: string): boolean {
     const readLen = Math.min(stat.size, 100000);
     const fd = fs.openSync(bundleJs, 'r');
     const buf = Buffer.alloc(readLen);
-    fs.readSync(fd, buf, 0, readLen, 0);
+    fs.readSync(fd, buf as any, 0, readLen, 0);
     fs.closeSync(fd);
     const head = buf.toString('utf8');
     if (head.includes('4.0.520') && !head.includes('4.0.534')) {
@@ -1706,20 +1763,21 @@ async function ensureBundleStaticAssets(bundleTarget: string, cleanFolder?: stri
   await Promise.all(downloads);
 }
 
-async function renderVideoWithRemotion(
+let globalAdaptiveConcurrency: number | null = null;
+
+async function executeRemotionRender(
   outputFile: string,
   props: Record<string, any>,
   concurrency?: number | string
 ): Promise<void> {
-  // ， ，Remotion   Bundled code
+  // 确保 Remotion 渲染包已就绪
   const bundleTarget = await ensureRemotionBundle();
 
-  // Remotion   Web   ( 、 、 )
+  // 同步本地静态素材
   log(localizeScriptLog(`📥 正在同步 Remotion 本地静态素材 (${getCdnDomain()}/CompareEnglishWord)...`), 'gray');
   await ensureBundleStaticAssets(bundleTarget, props.folder);
 
   return new Promise((resolve, reject) => {
-    // props  ，  shell  、 (#)  JSON
     const outputDir = path.dirname(outputFile);
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
@@ -1739,13 +1797,14 @@ async function renderVideoWithRemotion(
       '--log=info',
     ];
 
-    // Windows   ANGLE  ；Linux / macOS
+    // Windows 优化 ANGLE 与共享内存；Linux / macOS 设置沙箱及共享内存
     if (process.platform === 'win32') {
       args.push('--gl=angle');
-    }
-    // Linux  ，  Chromium
-    if (process.platform === 'linux') {
-      args.push('--chromium-options=--no-sandbox,--disable-setuid-sandbox');
+      args.push('--chromium-options=--disable-dev-shm-usage');
+    } else if (process.platform === 'linux') {
+      args.push('--chromium-options=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage');
+    } else {
+      args.push('--chromium-options=--disable-dev-shm-usage');
     }
 
     const finalConcurrency = concurrency || '2';
@@ -1777,8 +1836,6 @@ async function renderVideoWithRemotion(
     const currentPath = process.env.PATH || process.env.Path || '';
     const newPath = [...extraPaths, currentPath].filter(Boolean).join(path.delimiter);
 
-    // (  C:\Users\Administrator\AppData\Roaming\shortvideo)
-    // chrome-headless-shell
     const sharedAppDir = process.env.APPDATA
       ? path.join(process.env.APPDATA, 'shortvideo')
       : (process.platform === 'darwin'
@@ -1789,7 +1846,6 @@ async function renderVideoWithRemotion(
       try { fs.mkdirSync(sharedAppDir, { recursive: true }); } catch (_) {}
     }
 
-    // chrome-headless-shell
     const globalRemotionDir = path.join(sharedAppDir, '.remotion');
     const localRemotionDir = path.join(outputDir, '.remotion');
     if (!fs.existsSync(globalRemotionDir) && fs.existsSync(localRemotionDir)) {
@@ -1816,6 +1872,7 @@ async function renderVideoWithRemotion(
 
     let lastIsProgress = false;
     let stdoutBuffer = '';
+    let isOomError = false;
 
     const processLogChunk = (chunk: Buffer | string) => {
       stdoutBuffer += chunk.toString('utf-8');
@@ -1825,6 +1882,10 @@ async function renderVideoWithRemotion(
       for (const line of lines) {
         const trimmedLine = line.trim();
         if (!trimmedLine) continue;
+
+        if (/out of memory|ran out of memory|decrease the concurrency|memory or disk space/i.test(trimmedLine)) {
+          isOomError = true;
+        }
 
         const progressMatch = trimmedLine.match(/Rendered\s+(\d+)\/(\d+)(?:,\s*time remaining:\s*([0-9a-zA-Z\s]+))?/i);
         if (progressMatch) {
@@ -1856,6 +1917,9 @@ async function renderVideoWithRemotion(
 
     proc.on('close', (code) => {
       if (stdoutBuffer.trim()) {
+        if (/out of memory|ran out of memory|decrease the concurrency|memory or disk space/i.test(stdoutBuffer)) {
+          isOomError = true;
+        }
         if (lastIsProgress) process.stdout.write('\n');
         process.stdout.write(stdoutBuffer.trim() + '\n');
         lastIsProgress = false;
@@ -1865,7 +1929,13 @@ async function renderVideoWithRemotion(
       if (code === 0) {
         resolve();
       } else {
-        reject(new Error(localizeScriptLog(`Remotion 渲染进程异常退出，状态码: ${code}`)));
+        const errorMsg = isOomError
+          ? localizeScriptLog('检测到 Chromium 内存不足 (Out of memory)')
+          : localizeScriptLog(`Remotion 渲染进程异常退出，状态码: ${code}`);
+        const err: any = new Error(errorMsg);
+        err.isOom = isOomError;
+        err.exitCode = code;
+        reject(err);
       }
     });
 
@@ -1873,6 +1943,36 @@ async function renderVideoWithRemotion(
       reject(err);
     });
   });
+}
+
+async function renderVideoWithRemotion(
+  outputFile: string,
+  props: Record<string, any>,
+  concurrency?: number | string
+): Promise<void> {
+  const initialConcurrency = globalAdaptiveConcurrency ?? (concurrency || '2');
+  try {
+    await executeRemotionRender(outputFile, props, initialConcurrency);
+  } catch (err: any) {
+    const isOom = Boolean(err?.isOom) || /out of memory|ran out of memory|decrease the concurrency|memory or disk space/i.test(err?.message || '');
+    const currentNum = Number(initialConcurrency);
+    if (isOom && currentNum > 1) {
+      globalAdaptiveConcurrency = 1;
+      log(localizeScriptLog(`⚠️ 检测到 Chromium 内存不足 (Out of memory)，正在自动降级并发度为 1x 并重新尝试渲染...`), 'yellow');
+      if (fs.existsSync(outputFile)) {
+        try { fs.unlinkSync(outputFile); } catch {}
+      }
+      try {
+        await executeRemotionRender(outputFile, props, 1);
+        log(localizeScriptLog(`✅ 降级并发度 1x 重新渲染成功!`), 'green');
+        return;
+      } catch (retryErr: any) {
+        const msg = retryErr?.message || String(retryErr);
+        throw new Error(localizeScriptLog(`降级并发重试渲染仍然失败: ${msg}`));
+      }
+    }
+    throw err;
+  }
 }
 
 export interface RenderWorkerOptions {
@@ -2537,7 +2637,8 @@ async function main() {
   const baseUrlArg = args.find((a) => a.startsWith('--url='));
   const baseUrl = baseUrlArg ? baseUrlArg.replace('--url=', '') : DEFAULT_API_BASE;
   const concurrencyArg = args.find((a) => a.startsWith('--concurrency='));
-  const concurrency = concurrencyArg ? concurrencyArg.replace('--concurrency=', '') : '2';
+  const envConcurrency = process.env.REMOTION_CONCURRENCY;
+  const concurrency = concurrencyArg ? concurrencyArg.replace('--concurrency=', '') : (envConcurrency || '2');
   const langArg = args.find((a) => a.startsWith('--lang=') || a.startsWith('--target-lang='));
   const targetLang = langArg ? langArg.split('=')[1]?.trim().toLowerCase() : undefined;
   if (targetLang) {
