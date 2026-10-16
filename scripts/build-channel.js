@@ -67,13 +67,18 @@ function ensureBuilderWasmPatched() {
       const toolFile = path.join(iconsCacheDir, sub, 'icon-tool.js');
       if (fs.existsSync(toolFile)) {
         let code = fs.readFileSync(toolFile, 'utf8');
-        const oldPattern = 'var vipsInstance = null;\nasync function getVips() {\n  if (vipsInstance) return vipsInstance;';
-        if (code.includes(oldPattern)) {
-          const patched = code.replace(
+        if (!code.includes('var vipsPromise = null;')) {
+          code = code.replace(
             /var vipsInstance = null;\s*async function getVips\(\) \{[\s\S]*?return vipsInstance;\s*\}/,
-            `var vipsPromise = null;\nasync function getVips() {\n  if (!vipsPromise) {\n    vipsPromise = (async () => {\n      const wasmBuffer = (0, import_fs2.readFileSync)((0, import_path2.join)(__dirname, "vips.wasm"));\n      return await VipsFactory({\n        dynamicLibraries: [],\n        instantiateWasm: (imports, receiveInstance) => {\n          WebAssembly.instantiate(wasmBuffer, imports).then((result) => {\n            receiveInstance(result.instance, result.module);\n          });\n          return {};\n        }\n      });\n    })();\n  }\n  return vipsPromise;\n}`
+            `var vipsPromise = null;\nfunction getVips() {\n  if (!vipsPromise) {\n    vipsPromise = VipsFactory({ dynamicLibraries: [] });\n  }\n  return vipsPromise;\n}`
           );
-          fs.writeFileSync(toolFile, patched, 'utf8');
+          fs.writeFileSync(toolFile, code, 'utf8');
+        } else if (code.includes('instantiateWasm')) {
+          code = code.replace(
+            /var vipsPromise = null;\s*async function getVips\(\) \{[\s\S]*?return vipsPromise;\s*\}/,
+            `var vipsPromise = null;\nfunction getVips() {\n  if (!vipsPromise) {\n    vipsPromise = VipsFactory({ dynamicLibraries: [] });\n  }\n  return vipsPromise;\n}`
+          );
+          fs.writeFileSync(toolFile, code, 'utf8');
         }
       }
     }
