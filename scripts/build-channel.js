@@ -54,8 +54,35 @@ function runStep(cmd, args, description) {
   }
 }
 
+// 自动检测并修复 electron-builder 官方 icons 转换工具的并发竞态 Bug，确保直接使用 PNG 打包时绝对稳定
+function ensureBuilderWasmPatched() {
+  try {
+    const localAppData = process.env.LOCALAPPDATA || (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : '');
+    if (!localAppData) return;
+    const iconsCacheDir = path.join(localAppData, 'electron-builder', 'Cache', 'icons@1.1.0');
+    if (!fs.existsSync(iconsCacheDir)) return;
+
+    const subDirs = fs.readdirSync(iconsCacheDir);
+    for (const sub of subDirs) {
+      const toolFile = path.join(iconsCacheDir, sub, 'icon-tool.js');
+      if (fs.existsSync(toolFile)) {
+        let code = fs.readFileSync(toolFile, 'utf8');
+        const oldPattern = 'var vipsInstance = null;\nasync function getVips() {\n  if (vipsInstance) return vipsInstance;';
+        if (code.includes(oldPattern)) {
+          const patched = code.replace(
+            /var vipsInstance = null;\s*async function getVips\(\) \{[\s\S]*?return vipsInstance;\s*\}/,
+            `var vipsPromise = null;\nasync function getVips() {\n  if (!vipsPromise) {\n    vipsPromise = (async () => {\n      const wasmBuffer = (0, import_fs2.readFileSync)((0, import_path2.join)(__dirname, "vips.wasm"));\n      return await VipsFactory({\n        dynamicLibraries: [],\n        instantiateWasm: (imports, receiveInstance) => {\n          WebAssembly.instantiate(wasmBuffer, imports).then((result) => {\n            receiveInstance(result.instance, result.module);\n          });\n          return {};\n        }\n      });\n    })();\n  }\n  return vipsPromise;\n}`
+          );
+          fs.writeFileSync(toolFile, patched, 'utf8');
+        }
+      }
+    }
+  } catch (_) {}
+}
+
 // 确保各渠道高清晰度原始 PNG 图标文件存在
 function ensureIcons() {
+  ensureBuilderWasmPatched();
   const missing = ['a', 'b', 'c'].some((ch) => {
     return !fs.existsSync(path.join(ROOT_DIR, CHANNELS[ch].iconPng));
   });
