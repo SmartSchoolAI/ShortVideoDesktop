@@ -1156,6 +1156,23 @@ const DICTIONARY = {
     ru: 'Выполнить electron-builder для [{key}]',
     tr: '[{key}] için electron-builder çalıştır',
   },
+  // ── Run Dev Channel ──
+  DEV_CHANNEL_START: {
+    zh: '🚀 正在以 [Channel {channel}] 启动本地 Electron 调试实例...',
+    en: '🚀 Starting local Electron development instance with [Channel {channel}]...',
+    ja: '🚀 [Channel {channel}] でローカル Electron 開発インスタンスを起動中...',
+    ko: '🚀 [Channel {channel}] 로 로컬 Electron 개발 인스턴스를 시작하는 중...',
+    vi: '🚀 Đang khởi chạy phiên bản gỡ lỗi Electron cục bộ với [Channel {channel}]...',
+    th: '🚀 กำลังเริ่มต้นอินสแตนซ์การดีบัก Electron ภายในเครื่องด้วย [Channel {channel}]...',
+    id: '🚀 Memulai instans pengembangan Electron lokal dengan [Channel {channel}]...',
+    es: '🚀 Iniciando instancia de desarrollo local de Electron con [Channel {channel}]...',
+    fr: '🚀 Démarrage de l\'instance de développement Electron locale avec [Channel {channel}]...',
+    pt: '🚀 Iniciando instância de desenvolvimento local do Electron com [Channel {channel}]...',
+    de: '🚀 Starte lokale Electron-Entwicklungsinstanz mit [Channel {channel}]...',
+    it: '🚀 Avvio dell\'istanza di sviluppo Electron locale con [Channel {channel}]...',
+    ru: '🚀 Запуск локального экземпляра разработки Electron с [Channel {channel}]...',
+    tr: '🚀 [Channel {channel}] ile yerel Electron geliştirme örneği başlatılıyor...',
+  },
 };
 
 function t(key, params = {}) {

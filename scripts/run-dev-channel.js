@@ -4,9 +4,10 @@
  */
 const { spawn } = require('child_process');
 const path = require('path');
+const { t } = require('./i18n');
 
 const channel = (process.argv[2] || 'A').toUpperCase();
-console.log(`\n🚀 正在以 [Channel ${channel}] 启动本地 Electron 调试实例...`);
+console.log(`\n${t('DEV_CHANNEL_START', { channel })}`);
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 
