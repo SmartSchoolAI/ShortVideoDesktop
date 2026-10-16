@@ -150,13 +150,15 @@ export class UpdateManager {
     // 确保更新配置文件就绪
     this.ensureUpdateConfig();
 
-    // 配置更新源 Feed URL 并强制锁定本地缓存统一目录
+    // 配置更新源 Feed URL 并强制锁定本地缓存统一目录（按 A / B / C 渠道隔离缓存目录）
+    const channelSuffix = (APP_CONFIG?.channel || 'A').toLowerCase();
+    const updaterCacheDir = `shortvideo/update-${channelSuffix}`;
     const feedUrl = `${APP_CONFIG.downloadUrl.replace(/\/+$/, '')}/website/`;
     try {
       autoUpdater.setFeedURL({
         provider: 'generic',
         url: feedUrl,
-        updaterCacheDirName: 'shortvideo/update',
+        updaterCacheDirName: updaterCacheDir,
       } as any);
     } catch (e: any) {
       console.warn('[UpdateManager] 配置 Feed URL 异常:', e?.message || e);

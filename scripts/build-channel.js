@@ -8,6 +8,7 @@
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { t } = require('./i18n');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const BUILD_DIR = path.join(ROOT_DIR, 'build');
@@ -41,14 +42,14 @@ const CHANNELS = {
 };
 
 function runStep(cmd, args, description) {
-  console.log(`\n⏳ ${description}...`);
+  console.log(`\n${t('BUILD_CHANNEL_STEP_START', { desc: description })}`);
   const res = spawnSync(cmd, args, {
     cwd: ROOT_DIR,
     stdio: 'inherit',
     shell: true,
   });
   if (res.status !== 0) {
-    console.error(`❌ 执行失败: ${description} (退出码: ${res.status})`);
+    console.error(t('BUILD_CHANNEL_STEP_FAILED', { desc: description, code: res.status }));
     process.exit(res.status || 1);
   }
 }
@@ -60,9 +61,9 @@ function ensureIcons() {
   });
 
   if (missing) {
-    console.warn('⚠️ 未检测到部分渠道高清 PNG 图标，请确认 build/icon-a.png, build/icon-b.png, build/icon-c.png 齐全！');
+    console.warn(t('BUILD_CHANNEL_MISSING_ICON'));
   } else {
-    console.log('🎨 已确认加载 A / B / C 独立 512x512 高清原始 PNG 图标 (build/icon-a.png, icon-b.png, icon-c.png)');
+    console.log(t('BUILD_CHANNEL_CONFIRMED_ICON'));
   }
 }
 
@@ -99,7 +100,7 @@ function syncArtifactsToRoot(srcDir, dstDir) {
 function buildChannel(channelKey, extraArgs = []) {
   const ch = CHANNELS[channelKey];
   if (!ch) {
-    console.error(`❌ 未知的版本标识: ${channelKey}，仅支持 a, b, c, all`);
+    console.error(t('BUILD_CHANNEL_UNKNOWN_KEY', { key: channelKey }));
     process.exit(1);
   }
 
@@ -107,9 +108,9 @@ function buildChannel(channelKey, extraArgs = []) {
   cleanupProcessLocks();
 
   console.log(`\n======================================================`);
-  console.log(`🚀 开始打包 ShortVideo 版本 [${ch.key}] -> ${ch.productName}`);
+  console.log(t('BUILD_CHANNEL_START', { key: ch.key, productName: ch.productName }));
   console.log(`🆔 App ID: ${ch.appId}`);
-  console.log(`🎨 图标: ${ch.iconIco}`);
+  console.log(t('BUILD_CHANNEL_ICON', { icon: ch.iconPng }));
   console.log(`======================================================`);
 
   // 读取基础配置并注入定制属性
@@ -181,7 +182,7 @@ function buildChannel(channelKey, extraArgs = []) {
 
   try {
     const builderArgs = ['electron-builder', '--config', tempConfigFile, ...extraArgs];
-    runStep('npx', builderArgs, `执行 electron-builder 打包 [${ch.key}]`);
+    runStep('npx', builderArgs, t('BUILD_CHANNEL_EXEC_BUILDER', { key: ch.key }));
 
     // 构建成功后，将子目录产物自动同步到统一根目录 dist-release/，完美兼容 Release 与 CI
     syncArtifactsToRoot(absChannelSubDir, absRootDir);
@@ -193,7 +194,7 @@ function buildChannel(channelKey, extraArgs = []) {
     } catch (_) {}
   }
 
-  console.log(`✅ [${ch.key}] 版本打包成功！`);
+  console.log(t('BUILD_CHANNEL_SUCCESS', { key: ch.key }));
 }
 
 function main() {
@@ -203,10 +204,10 @@ function main() {
 
   // 1. 清理进程锁与历史编译构建缓存
   cleanupProcessLocks();
-  runStep('node', ['scripts/clean-electron.js'], '清理历史编译构建缓存');
-  runStep('npx', ['tsc', '-p', 'tsconfig.json'], '编译主进程 TypeScript');
-  runStep('npx', ['tsc', '-p', 'tsconfig.render.json'], '编译渲染进程 TypeScript');
-  runStep('node', ['scripts/copy-electron-views.js'], '复制前端 HTML 视图资源');
+  runStep('node', ['scripts/clean-electron.js'], t('BUILD_CHANNEL_CLEAN_CACHE'));
+  runStep('npx', ['tsc', '-p', 'tsconfig.json'], t('BUILD_CHANNEL_COMPILE_MAIN_TS'));
+  runStep('npx', ['tsc', '-p', 'tsconfig.render.json'], t('BUILD_CHANNEL_COMPILE_RENDER_TS'));
+  runStep('node', ['scripts/copy-electron-views.js'], t('BUILD_CHANNEL_COPY_VIEWS'));
 
   // 2. 确保图标齐全
   ensureIcons();
@@ -214,14 +215,14 @@ function main() {
   // 3. 执行打包
   if (target === 'all') {
     // 批量打包 Windows A, B, C 三个版本，在版本之间保留释放时间缓冲
-    console.log('\n📦 即将依次打包 Windows A、B、C 三个版本...');
+    console.log(`\n${t('BUILD_CHANNEL_ALL_START')}`);
     buildChannel('a', ['--win', ...extraArgs]);
     cleanupProcessLocks();
     buildChannel('b', ['--win', ...extraArgs]);
     cleanupProcessLocks();
     buildChannel('c', ['--win', ...extraArgs]);
     cleanupProcessLocks();
-    console.log('\n🎉 所有版本 (A、B、C) 均已成功打包输出！输出目录: dist-release/');
+    console.log(`\n${t('BUILD_CHANNEL_ALL_SUCCESS')}`);
   } else {
     buildChannel(target, extraArgs);
   }

@@ -441,7 +441,7 @@ function syncWranglerDownloadVersion(rawVersion, isDryRun = false) {
       }
 
       if (isDryRun) {
-        console.log(`${c.cyan}[Dry-Run] 拟将 ${wranglerPath} 中的 NEXT_PUBLIC_DOWNLOAD_VERSION 从 "${currentVal}" 更新为 "${cleanVersion}"${c.reset}`);
+        console.log(`${c.cyan}${t('RELEASE_SYNC_WRANGLER_DRY_RUN', { file: wranglerPath, oldVersion: currentVal, newVersion: cleanVersion })}${c.reset}`);
         return;
       }
 
@@ -477,7 +477,7 @@ function syncPackageJsonVersion(rawVersion, isDryRun = false) {
     }
 
     if (isDryRun) {
-      console.log(`${c.cyan}[Dry-Run] 拟将 package.json 中的 version 从 "${oldVersion}" 更新为 "${cleanVersion}"${c.reset}`);
+      console.log(`${c.cyan}${t('RELEASE_SYNC_PACKAGE_DRY_RUN', { oldVersion, newVersion: cleanVersion })}${c.reset}`);
       return;
     }
 
