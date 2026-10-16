@@ -1151,6 +1151,82 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
       "ru": "Непрерывный захват задач конвейера",
       "tr": "Ardışık düzen sürekli görev alma",
     }
+  },
+  {
+    regex: /检测到当前目录缺少图片素材，正在检查是否为共享视频并自动溯源查找原专辑图片\.\.\./g,
+    translations: {
+      "zh": "检测到当前目录缺少图片素材，正在检查是否为共享视频并自动溯源查找原专辑图片...",
+      "en": "Missing image assets in current directory, checking if shared video to trace source album images...",
+      "ja": "現在のディレクトリに画像素材が見つかりません。共有アルバムの元画像を追跡確認中...",
+      "ko": "현재 디렉터리에 이미지 에셋이 없습니다. 공유 비디오인지 확인하고 원본 앨범 이미지를 추적 중...",
+      "vi": "Thiếu tài nguyên hình ảnh trong thư mục hiện tại, đang kiểm tra video chia sẻ để tìm hình ảnh gốc...",
+      "th": "ไม่พบรูปภาพในไดเรกทอรีปัจจุบัน กำลังตรวจสอบว่าเป็นวิดีโอที่แชร์และค้นหารูปภาพต้นฉบับ...",
+      "id": "Aset gambar tidak ditemukan di direktori saat ini, memeriksa apakah video bersama untuk melacak gambar asli...",
+      "es": "Faltan recursos de imagen en el directorio actual, verificando si es compartido para rastrear imágenes originales...",
+      "fr": "Images manquantes dans le répertoire actuel, vérification du partage pour récupérer les images sources...",
+      "pt": "Imagens ausentes no diretório atual, verificando compartilhamento para obter imagens originais...",
+      "de": "Bildmaterial im aktuellen Verzeichnis fehlt, prüfe Freigabequelle zum Auffinden der Originalbilder...",
+      "it": "Immagini mancanti nella directory corrente, verifica condivisione per tracciare le immagini sorgente...",
+      "ru": "Изображения отсутствуют в текущем каталоге, проверка общего доступа для поиска исходных изображений...",
+      "tr": "Mevcut dizinde resim materyali eksik, paylaşılan video olup olmadığı kontrol ediliyor ve kaynak albüm resimleri aranıyor...",
+    }
+  },
+  {
+    regex: /成功定位到共享来源专辑: 用户 \[(.*?)\], 路径 \[(.*?)\]/g,
+    translations: {
+      "zh": "成功定位到共享来源专辑: 用户 [$1], 路径 [$2]",
+      "en": "Successfully located source shared album: User [$1], Path [$2]",
+      "ja": "共有元アルバムを特定しました: ユーザー [$1], パス [$2]",
+      "ko": "공유 원본 앨범 확인 완료: 사용자 [$1], 경로 [$2]",
+      "vi": "Đã định vị album nguồn được chia sẻ: Người dùng [$1], Đường dẫn [$2]",
+      "th": "ระบุอัลบั้มต้นทางที่แชร์สำเร็จ: ผู้ใช้ [$1], เส้นทาง [$2]",
+      "id": "Berhasil menemukan album sumber bersama: Pengguna [$1], Jalur [$2]",
+      "es": "Álbum compartido de origen localizado: Usuario [$1], Ruta [$2]",
+      "fr": "Album source partagé localisé avec succès : Utilisateur [$1], Chemin [$2]",
+      "pt": "Álbum de origem compartilhado localizado: Usuário [$1], Caminho [$2]",
+      "de": "Geteiltes Quellalbum erfolgreich ermittelt: Benutzer [$1], Pfad [$2]",
+      "it": "Album sorgente condiviso individuato: Utente [$1], Percorso [$2]",
+      "ru": "Успешно найден исходный общий альбом: Пользователь [$1], Путь [$2]",
+      "tr": "Paylaşılan kaynak albüm başarıyla belirlendi: Kullanıcı [$1], Yol [$2]",
+    }
+  },
+  {
+    regex: /正在从原共享专辑路径下载 01\.png 与 02\.png\.\.\./g,
+    translations: {
+      "zh": "正在从原共享专辑路径下载 01.png 与 02.png...",
+      "en": "Downloading 01.png and 02.png from source shared album path...",
+      "ja": "共有元のアルバムパスから 01.png と 02.png をダウンロード中...",
+      "ko": "원본 공유 앨범 경로에서 01.png 및 02.png 다운로드 중...",
+      "vi": "Đang tải xuống 01.png và 02.png từ đường dẫn album chia sẻ gốc...",
+      "th": "กำลังดาวน์โหลด 01.png และ 02.png จากพาธของอัลบั้มที่แชร์...",
+      "id": "Mengunduh 01.png dan 02.png dari jalur album sumber bersama...",
+      "es": "Descargando 01.png y 02.png desde la ruta del álbum compartido original...",
+      "fr": "Téléchargement de 01.png et 02.png depuis le chemin de l'album source...",
+      "pt": "Baixando 01.png e 02.png do caminho do álbum compartilhado de origem...",
+      "de": "01.png und 02.png aus dem Pfad des geteilten Quellalbums herunterladen...",
+      "it": "Download di 01.png e 02.png dal percorso dell'album condiviso sorgente...",
+      "ru": "Загрузка 01.png и 02.png из исходного каталога общего альбома...",
+      "tr": "Kaynak paylaşılan albüm yolundan 01.png ve 02.png indiriliyor...",
+    }
+  },
+  {
+    regex: /溯源下载成功！已自动获取原共享专辑的 01\.png 与 02\.png 图片素材。/g,
+    translations: {
+      "zh": "溯源下载成功！已自动获取原共享专辑的 01.png 与 02.png 图片素材。",
+      "en": "Source fallback download successful! Acquired 01.png and 02.png from original shared album.",
+      "ja": "追跡ダウンロード成功！元の共有アルバムから 01.png と 02.png を取得しました。",
+      "ko": "추적 다운로드 성공! 원본 공유 앨범의 01.png 및 02.png 이미지 에셋을 가져왔습니다.",
+      "vi": "Tải xuống nguồn thành công! Đã tự động lấy ảnh 01.png và 02.png từ album gốc.",
+      "th": "ดาวน์โหลดจากต้นฉบับสำเร็จ! รับรูปภาพ 01.png และ 02.png จากอัลบั้มแชร์เรียบร้อยแล้ว",
+      "id": "Unduh sumber berhasil! Mengambil gambar 01.png dan 02.png dari album asli.",
+      "es": "¡Descarga de origen exitosa! Se obtuvieron 01.png y 02.png del álbum compartido original.",
+      "fr": "Téléchargement source réussi ! 01.png et 02.png récupérés depuis l'album partagé d'origine.",
+      "pt": "Download de origem bem-sucedido! Imagens 01.png e 02.png obtidas do álbum original.",
+      "de": "Quell-Download erfolgreich! 01.png und 02.png aus Original-Freigabealbum bezogen.",
+      "it": "Download sorgente riuscito! 01.png e 02.png recuperati dall'album originale condiviso.",
+      "ru": "Успешная загрузка из источника! Автоматически получены изображения 01.png и 02.png из общего альбома.",
+      "tr": "Kaynak indirme başarılı! Orijinal paylaşılan albümden 01.png ve 02.png resimleri alındı.",
+    }
   }
 ];
 
@@ -1931,16 +2007,78 @@ async function processSingleTask(
     durationSeconds = maxSpeechEndTime;
   }
 
-  // 3)   01   02
+  // 3) 准备 01 与 02 两张核心图片
   const localImg01Path = path.join(assetsDir, '01.png');
   const localImg02Path = path.join(assetsDir, '02.png');
   const rawImg01Url = task.img01Path ? task.img01Path.split('?')[0] : `${cdnFolderUrl}/01.png`;
   const rawImg02Url = task.img02Path ? task.img02Path.split('?')[0] : `${cdnFolderUrl}/02.png`;
 
-  const [img1Ok, img2Ok] = await Promise.all([
+  let [img1Ok, img2Ok] = await Promise.all([
     downloadFile(rawImg01Url, localImg01Path, 3000),
     downloadFile(rawImg02Url, localImg02Path, 3000),
   ]);
+
+  // 若当前目录未获取到完整的 01.png 或 02.png，自动溯源查找原共享者专辑目录获取图片
+  if (!img1Ok || !img2Ok) {
+    log(localizeScriptLog(`🔍 检测到当前目录缺少图片素材，正在检查是否为共享视频并自动溯源查找原专辑图片...`), 'yellow');
+
+    let sourceImg01Url = task.sourceImg01Path || summaryData?.sourceImg01Path || '';
+    let sourceImg02Url = task.sourceImg02Path || summaryData?.sourceImg02Path || '';
+    let sourceFolderPath = task.sourceFolderPath || summaryData?.sourceFolderPath || '';
+    let sourceUserEmail = task.sourceUserEmail || summaryData?.sourceUserEmail || '';
+
+    if (sourceFolderPath && (!sourceImg01Url || !sourceImg02Url)) {
+      const cleanSrcFolder = sourceFolderPath.replace(/^CompareEnglishWord\//, '').replace(/^\/+|\/+$/g, '');
+      if (!sourceImg01Url) sourceImg01Url = `${getCdnDomain()}/CompareEnglishWord/${cleanSrcFolder}/01.png`;
+      if (!sourceImg02Url) sourceImg02Url = `${getCdnDomain()}/CompareEnglishWord/${cleanSrcFolder}/02.png`;
+    }
+
+    if (!sourceImg01Url || !sourceImg02Url) {
+      try {
+        const traceRes = await fetch(`${baseUrl.replace(/\/+$/, '')}/api/video/compare-english-word/tasks/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(CURRENT_AUTH_TOKEN ? { Authorization: `Bearer ${CURRENT_AUTH_TOKEN}` } : {}),
+          },
+          body: JSON.stringify({
+            action: 'get_share_source_media',
+            taskId: taskId,
+            videoId: task.videoId,
+            folderId: task.folderId,
+            folderPath: task.folderPath,
+            wordA: task.wordA,
+            wordB: task.wordB,
+          }),
+        });
+        if (traceRes.ok) {
+          const traceData = await traceRes.json();
+          if (traceData && traceData.success) {
+            sourceImg01Url = traceData.sourceImg01Url || sourceImg01Url;
+            sourceImg02Url = traceData.sourceImg02Url || sourceImg02Url;
+            sourceFolderPath = traceData.sourceFolderPath || sourceFolderPath;
+            sourceUserEmail = traceData.sourceUserEmail || sourceUserEmail;
+          }
+        }
+      } catch (err: any) {
+        log(localizeScriptLog(`溯源共享来源专辑接口请求异常: ${err.message}`), 'yellow');
+      }
+    }
+
+    if (sourceImg01Url && sourceImg02Url) {
+      log(localizeScriptLog(`📂 成功定位到共享来源专辑: 用户 [${sourceUserEmail || '未知'}], 路径 [${sourceFolderPath || '源目录'}]`), 'blue');
+      log(localizeScriptLog(`📥 正在从原共享专辑路径下载 01.png 与 02.png...`), 'yellow');
+      const [srcImg1Ok, srcImg2Ok] = await Promise.all([
+        downloadFile(sourceImg01Url.split('?')[0], localImg01Path, 3000),
+        downloadFile(sourceImg02Url.split('?')[0], localImg02Path, 3000),
+      ]);
+      if (srcImg1Ok && srcImg2Ok) {
+        img1Ok = true;
+        img2Ok = true;
+        log(localizeScriptLog(`✅ 溯源下载成功！已自动获取原共享专辑的 01.png 与 02.png 图片素材。`), 'green');
+      }
+    }
+  }
 
   if (!img1Ok || !img2Ok) {
     log(localizeScriptLog(`❌ 图片素材准备失败: 01.png 或 02.png 无法下载或损坏，拦截渲染。`), 'red');
