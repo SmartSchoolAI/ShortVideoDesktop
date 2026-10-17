@@ -1626,14 +1626,26 @@ function isRemotionBundleValid(bundleDir: string): boolean {
     return false;
   }
 
+  // 基础完整性校验：bundle.js 必须具备合理大小（正常约为 2.4MB，防止文件截断或损坏）
+  try {
+    const stat = fs.statSync(bundleJs);
+    if (stat.size < 500000) {
+      return false;
+    }
+  } catch (_) {
+    return false;
+  }
+
   const versionFile = path.join(bundleDir, 'remotion-version.json');
   if (fs.existsSync(versionFile)) {
     try {
       const data = JSON.parse(fs.readFileSync(versionFile, 'utf8'));
-      if (data && data.version === '4.0.534') {
-        return true;
+      if (data && data.version !== '4.0.534') {
+        return false;
       }
-    } catch (_) {}
+    } catch (_) {
+      return false;
+    }
   }
 
   try {
@@ -1674,22 +1686,9 @@ function copyDirSafe(srcDir: string, destDir: string): void {
 }
 
 /**
- * 确保 Remotion 渲染核心目录 ./BundledCodeCache/CompareEnglishWord 就绪
- * 桌面控制台完全独立运行，100% 免源码依赖：直接加载本地缓存或安装包自带的预编译渲染核心
+ * 动态检索可用的内置预编译渲染包路径
  */
-let bundlePromise: Promise<string> | null = null;
-
-function ensureRemotionBundle(forceRebuild = false): Promise<string> {
-  const indexHtml = path.join(BUNDLE_CACHE_DIR, 'index.html');
-  if (!forceRebuild && isRemotionBundleValid(BUNDLE_CACHE_DIR)) {
-    log(localizeScriptLog(`⚡ 检测到已有 Remotion 渲染核心缓存 (4.0.534): ${BUNDLE_CACHE_DIR}，直接复用免打包`), 'green');
-    return Promise.resolve(BUNDLE_CACHE_DIR);
-  } else if (!forceRebuild && fs.existsSync(indexHtml)) {
-    log(localizeScriptLog(`🧹 检测到 Remotion 缓存版本过期 (非 4.0.534)，自动清理并刷新: ${BUNDLE_CACHE_DIR}`), 'yellow');
-    try { fs.rmSync(BUNDLE_CACHE_DIR, { recursive: true, force: true }); } catch (_) {}
-  }
-
-  // 优先从安装包内置资源或自身工程 build/remotion-bundle 加载（完全无外部源码依赖）
+function getBuiltinBundleDir(): string | null {
   const exeDir = process.execPath ? path.dirname(process.execPath) : '';
   const procResourcesPath =
     process.env.ELECTRON_RESOURCES_PATH ||
@@ -1710,21 +1709,59 @@ function ensureRemotionBundle(forceRebuild = false): Promise<string> {
 
   for (const bDir of builtInBundleDirs) {
     if (isRemotionBundleValid(bDir)) {
-      log(localizeScriptLog(`📦 检测到客户端内置预编译 Remotion 渲染核心 (${bDir})，正在注入运行缓存...`), 'green');
-      try {
-        if (!fs.existsSync(BUNDLE_CACHE_DIR)) {
-          fs.mkdirSync(BUNDLE_CACHE_DIR, { recursive: true });
-        }
-        // 使用支持 asar 虚拟流的安全复制，秒级固化至运行缓存
-        copyDirSafe(bDir, BUNDLE_CACHE_DIR);
-        if (fs.existsSync(indexHtml)) {
-          log(localizeScriptLog(`✅ 内置 Remotion 渲染核心固化就绪: ${BUNDLE_CACHE_DIR}，免源码秒级执行！`), 'green');
-          return Promise.resolve(BUNDLE_CACHE_DIR);
-        }
-      } catch (cpErr: any) {
-        log(localizeScriptLog(`⚠️ 复制内置资源警告: ${cpErr.message}，直接挂载内置核心路径使用`), 'yellow');
-        return Promise.resolve(bDir);
+      return bDir;
+    }
+  }
+  return null;
+}
+
+/**
+ * 确保 Remotion 渲染核心目录 ./BundledCodeCache/CompareEnglishWord 就绪
+ * 桌面控制台完全独立运行，100% 免源码依赖：直接加载本地缓存或安装包自带的预编译渲染核心
+ */
+let bundlePromise: Promise<string> | null = null;
+
+function ensureRemotionBundle(forceRebuild = false): Promise<string> {
+  const indexHtml = path.join(BUNDLE_CACHE_DIR, 'index.html');
+  const cacheBundleJs = path.join(BUNDLE_CACHE_DIR, 'bundle.js');
+  const builtinDir = getBuiltinBundleDir();
+
+  // 若存在内置预编译包，且当前缓存的 bundle.js 大小与内置包不一致，说明内置包已更新或本地缓存已损坏，自动清理重建
+  let cacheStale = false;
+  if (builtinDir && fs.existsSync(cacheBundleJs)) {
+    try {
+      const builtinSize = fs.statSync(path.join(builtinDir, 'bundle.js')).size;
+      const cacheSize = fs.statSync(cacheBundleJs).size;
+      if (builtinSize > 0 && Math.abs(builtinSize - cacheSize) > 0) {
+        cacheStale = true;
       }
+    } catch (_) {}
+  }
+
+  if (!forceRebuild && !cacheStale && isRemotionBundleValid(BUNDLE_CACHE_DIR)) {
+    log(localizeScriptLog(`⚡ 检测到已有 Remotion 渲染核心缓存 (4.0.534): ${BUNDLE_CACHE_DIR}，直接复用免打包`), 'green');
+    return Promise.resolve(BUNDLE_CACHE_DIR);
+  } else if (!forceRebuild && (fs.existsSync(indexHtml) || cacheStale)) {
+    log(localizeScriptLog(`🧹 检测到 Remotion 缓存版本过期或不完整，自动清理并刷新: ${BUNDLE_CACHE_DIR}`), 'yellow');
+    try { fs.rmSync(BUNDLE_CACHE_DIR, { recursive: true, force: true }); } catch (_) {}
+  }
+
+  // 优先从安装包内置资源或自身工程 build/remotion-bundle 加载（完全无外部源码依赖）
+  if (builtinDir) {
+    log(localizeScriptLog(`📦 检测到客户端内置预编译 Remotion 渲染核心 (${builtinDir})，正在注入运行缓存...`), 'green');
+    try {
+      if (!fs.existsSync(BUNDLE_CACHE_DIR)) {
+        fs.mkdirSync(BUNDLE_CACHE_DIR, { recursive: true });
+      }
+      // 使用支持 asar 虚拟流的安全复制，秒级固化至运行缓存
+      copyDirSafe(builtinDir, BUNDLE_CACHE_DIR);
+      if (fs.existsSync(indexHtml) && isRemotionBundleValid(BUNDLE_CACHE_DIR)) {
+        log(localizeScriptLog(`✅ 内置 Remotion 渲染核心固化就绪: ${BUNDLE_CACHE_DIR}，免源码秒级执行！`), 'green');
+        return Promise.resolve(BUNDLE_CACHE_DIR);
+      }
+    } catch (cpErr: any) {
+      log(localizeScriptLog(`⚠️ 复制内置资源警告: ${cpErr.message}，直接挂载内置核心路径使用`), 'yellow');
+      return Promise.resolve(builtinDir);
     }
   }
 
