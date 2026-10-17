@@ -54,7 +54,7 @@ function runStep(cmd, args, description) {
   }
 }
 
-// 自动检测并修复 electron-builder 官方 icons 转换工具的并发竞态 Bug，确保直接使用 PNG 打包时绝对稳定
+// 自动检测并修复 electron-builder 官方 icons 转换工具的并发竞态与 WebAssembly.Memory 1GB OOM 崩溃 Bug
 function ensureBuilderWasmPatched() {
   try {
     const localAppData = process.env.LOCALAPPDATA || (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : '');
@@ -67,17 +67,72 @@ function ensureBuilderWasmPatched() {
       const toolFile = path.join(iconsCacheDir, sub, 'icon-tool.js');
       if (fs.existsSync(toolFile)) {
         let code = fs.readFileSync(toolFile, 'utf8');
+        let modified = false;
+
+        // 1. 修复单例竞态
         if (!code.includes('var vipsPromise = null;')) {
           code = code.replace(
             /var vipsInstance = null;\s*async function getVips\(\) \{[\s\S]*?return vipsInstance;\s*\}/,
             `var vipsPromise = null;\nfunction getVips() {\n  if (!vipsPromise) {\n    vipsPromise = VipsFactory({ dynamicLibraries: [] });\n  }\n  return vipsPromise;\n}`
           );
-          fs.writeFileSync(toolFile, code, 'utf8');
-        } else if (code.includes('instantiateWasm')) {
+          modified = true;
+        }
+
+        // 2. 针对 Windows 环境：优先使用系统原生轻量图像引擎处理 ICO 转换，彻底杜绝 WebAssembly 1GB 虚拟内存申请失败导致的 OOM 崩溃
+        if (!code.includes('// PATCHED_NATIVE_ICO_GENERATOR_V2')) {
+          const nativeIcoPatch = `// PATCHED_NATIVE_ICO_GENERATOR_V2
+async function createIco(inputBuffer, outputDir) {
+  if (process.platform === 'win32') {
+    try {
+      const { spawnSync } = require('child_process');
+      const tempSrc = (0, import_path4.join)(outputDir, '__raw_source.png');
+      const tempPs1 = (0, import_path4.join)(outputDir, '__resizer.ps1');
+      (0, import_fs4.writeFileSync)(tempSrc, inputBuffer);
+      const psContent = [
+        'Add-Type -AssemblyName System.Drawing',
+        '$img = [System.Drawing.Image]::FromFile($args[0])',
+        '$sizes = @(16, 24, 32, 48, 64, 128, 256)',
+        'foreach ($s in $sizes) {',
+        '  $bmp = New-Object System.Drawing.Bitmap($img, $s, $s)',
+        '  $dest = Join-Path $args[1] ($s.ToString() + \".png\")',
+        '  $bmp.Save($dest, [System.Drawing.Imaging.ImageFormat]::Png)',
+        '  $bmp.Dispose()',
+        '}',
+        '$img.Dispose()'
+      ].join('\\r\\n');
+      (0, import_fs4.writeFileSync)(tempPs1, psContent, 'utf8');
+      const res = spawnSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', tempPs1, tempSrc, outputDir], { windowsHide: true });
+      if (res.status === 0) {
+        const frames = [];
+        for (const size of ICO_SIZES) {
+          const frameFile = (0, import_path4.join)(outputDir, size + '.png');
+          if ((0, import_fs4.existsSync)(frameFile)) {
+            frames.push({ size, png: (0, import_fs4.readFileSync)(frameFile) });
+            try { (0, import_fs4.unlinkSync)(frameFile); } catch (_) {}
+          }
+        }
+        try { (0, import_fs4.unlinkSync)(tempSrc); } catch (_) {}
+        try { (0, import_fs4.unlinkSync)(tempPs1); } catch (_) {}
+        if (frames.length === ICO_SIZES.length) {
+          (0, import_fs4.writeFileSync)((0, import_path4.join)(outputDir, "icon.ico"), packIco(frames));
+          return;
+        }
+      }
+    } catch (_) {}
+  }
+  const frames = await Promise.all(
+    ICO_SIZES.map(async (size) => ({ size, png: await resizeWithLanczos(inputBuffer, size) }))
+  );
+  (0, import_fs4.writeFileSync)((0, import_path4.join)(outputDir, "icon.ico"), packIco(frames));
+}`;
           code = code.replace(
-            /var vipsPromise = null;\s*async function getVips\(\) \{[\s\S]*?return vipsPromise;\s*\}/,
-            `var vipsPromise = null;\nfunction getVips() {\n  if (!vipsPromise) {\n    vipsPromise = VipsFactory({ dynamicLibraries: [] });\n  }\n  return vipsPromise;\n}`
+            /(?:\/\/\s*PATCHED_NATIVE_ICO_GENERATOR[\s\S]*?)?async function createIco\(inputBuffer, outputDir\) \{[\s\S]*?\(0, import_fs4\.writeFileSync\)\(\(0, import_path4\.join\)\(outputDir, "icon\.ico"\), packIco\(frames\)\);\s*\}/,
+            nativeIcoPatch
           );
+          modified = true;
+        }
+
+        if (modified) {
           fs.writeFileSync(toolFile, code, 'utf8');
         }
       }
