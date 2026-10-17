@@ -1907,6 +1907,9 @@ async function executeRemotionRender(
         PATH: newPath,
         Path: newPath,
         PUPPETEER_DISABLE_DEV_SHM_USAGE: 'true',
+        // 确保 Remotion 渲染内 Chromium 使用绝对 CDN 地址加载图片，而非退化为 localhost:3000
+        NEXT_PUBLIC_DOWNLOAD_BASE_URL: process.env.NEXT_PUBLIC_DOWNLOAD_BASE_URL || getCdnDomain() || 'https://download.shortvideo.ca',
+        DOWNLOAD_BASE_URL: process.env.DOWNLOAD_BASE_URL || getCdnDomain() || 'https://download.shortvideo.ca',
       },
     });
 
