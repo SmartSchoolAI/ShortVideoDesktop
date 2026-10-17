@@ -1741,21 +1741,32 @@ function ensureRemotionBundle(forceRebuild = false): Promise<string> {
  */
 async function ensureBundleStaticAssets(bundleTarget: string, cleanFolder?: string): Promise<void> {
   const downloadBaseUrl = getCdnDomain().replace(/\/+$/, '');
-  const cewDir = path.join(bundleTarget, 'CompareEnglishWord');
-  if (!fs.existsSync(cewDir)) {
-    fs.mkdirSync(cewDir, { recursive: true });
+
+  // Remotion CLI 本地静态服务根目录为 bundleTarget/public (若存在) 或 bundleTarget
+  const targetDirs = [path.join(bundleTarget, 'CompareEnglishWord')];
+  const publicDir = path.join(bundleTarget, 'public');
+  if (fs.existsSync(publicDir)) {
+    targetDirs.push(path.join(publicDir, 'CompareEnglishWord'));
   }
 
+  for (const cewDir of targetDirs) {
+    if (!fs.existsSync(cewDir)) {
+      fs.mkdirSync(cewDir, { recursive: true });
+    }
+  }
+
+  // 针对主目录执行下载
+  const primaryDir = targetDirs[0];
   const downloads: Promise<boolean>[] = [];
 
-  // 1.  : https://download.shortvideo.ca/CompareEnglishWord/background.mp3
-  const bgmDest = path.join(cewDir, 'background.mp3');
+  // 1. 公共音频: https://download.shortvideo.ca/CompareEnglishWord/background.mp3
+  const bgmDest = path.join(primaryDir, 'background.mp3');
   const bgmUrl = `${downloadBaseUrl}/CompareEnglishWord/background.mp3`;
   downloads.push(downloadFile(bgmUrl, bgmDest, 1000));
 
-  // 2.  : https://download.shortvideo.ca/CompareEnglishWord/style01/01.png ~ 06.png (  style02)
+  // 2. 底图素材: https://download.shortvideo.ca/CompareEnglishWord/style01/01.png ~ 06.png (以及 style02)
   for (const style of ['style01', 'style02']) {
-    const styleDir = path.join(cewDir, style);
+    const styleDir = path.join(primaryDir, style);
     if (!fs.existsSync(styleDir)) {
       fs.mkdirSync(styleDir, { recursive: true });
     }
@@ -1767,9 +1778,9 @@ async function ensureBundleStaticAssets(bundleTarget: string, cleanFolder?: stri
     }
   }
 
-  // 3.  : 01.png, 02.png, audio_en.mp3
+  // 3. 任务素材: 01.png, 02.png, audio_en.mp3
   if (cleanFolder) {
-    const taskDir = path.join(cewDir, cleanFolder);
+    const taskDir = path.join(primaryDir, cleanFolder);
     if (!fs.existsSync(taskDir)) {
       fs.mkdirSync(taskDir, { recursive: true });
     }
@@ -1780,6 +1791,14 @@ async function ensureBundleStaticAssets(bundleTarget: string, cleanFolder?: stri
   }
 
   await Promise.all(downloads);
+
+  // 若存在 public 目录，同步至 public/CompareEnglishWord，确保 Remotion 本地 Web 服务器 (http://localhost:3000) 100% 命中静态资源
+  if (targetDirs.length > 1) {
+    const publicCewDir = targetDirs[1];
+    try {
+      copyDirSafe(primaryDir, publicCewDir);
+    } catch (_) {}
+  }
 }
 
 let globalAdaptiveConcurrency: number | null = null;
