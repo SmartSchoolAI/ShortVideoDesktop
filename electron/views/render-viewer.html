@@ -1590,7 +1590,28 @@
         }
       },
       {
-        pattern: /(?:⚠️\s*)?检测到 Chromium 内存不足\s*\(Out of memory\)[，,]\s*正在自动降级并发度为\s*1x\s*并重新尝试渲染\.\.\./i,
+        pattern: /(?:⚠️\s*)?\[内存告警\]\s*2x\s*并发下系统内存受限\s*\(x264 malloc failed\)/i,
+        templates: {
+          zh: '⚠️ [内存告警] 2x 并发下系统内存受限 (x264 malloc failed)',
+          en: '⚠️ [Memory Warning] System memory constrained at 2x concurrency (x264 malloc failed)',
+          ja: '⚠️ [メモリ警告] 2x 並列でシステムメモリが制限されました (x264 malloc failed)',
+          ko: '⚠️ [메모리 경고] 2x 동시성에서 시스템 메모리가 제한되었습니다 (x264 malloc failed)',
+          vi: '⚠️ [Cảnh báo bộ nhớ] Bộ nhớ hệ thống bị hạn chế ở mức đồng thời 2x (x264 malloc failed)',
+          th: '⚠️ [คำเตือนหน่วยความจำ] หน่วยความจำระบบจำกัดที่การทำงานพร้อมกัน 2x (x264 malloc failed)',
+          id: '⚠️ [Peringatan Memori] Memori sistem terbatas pada konkurensi 2x (x264 malloc failed)',
+          es: '⚠️ [Advertencia de memoria] Memoria del sistema limitada en concurrencia 2x (x264 malloc failed)',
+          fr: '⚠️ [Avertissement mémoire] Mémoire système limitée à une concurrence 2x (x264 malloc failed)',
+          pt: '⚠️ [Aviso de memória] Memória do sistema limitada em concorrência 2x (x264 malloc failed)',
+          de: '⚠️ [Speicherwarnung] Systemspeicher begrenzt bei 2x Parallelität (x264 malloc failed)',
+          it: '⚠️ [Avviso memoria] Memoria di sistema limitata a concorrenza 2x (x264 malloc failed)',
+          ru: '⚠️ [Предупреждение о памяти] Ограничение системной памяти при параллелизме 2x (x264 malloc failed)',
+          tr: '⚠️ [Bellek Uyarısı] 2x eşzamanlılıkta sistem belleği yetersiz (x264 malloc failed)',
+          bn: '⚠️ [মেমোরি সতর্কতা] ২x কনকারেন্সিতে মেমোরি ঘাটতি (x264 malloc failed)',
+          ur: '⚠️ [میموری وارننگ] 2x کنکرنسی پر سسٹم میموری محدود (x264 malloc failed)',
+        }
+      },
+      {
+        pattern: /(?:⚠️\s*)?检测到(?:渲染|Chromium)\s*内存不足\s*\(.*?\)[，,]\s*正在自动降级并发度为\s*1x\s*并重新尝试渲染\.\.\./i,
         templates: {
           zh: '⚠️ 检测到 Chromium 内存不足 (Out of memory)，正在自动降级并发度为 1x 并重新尝试渲染...',
           en: '⚠️ Detected Chromium out of memory, automatically reducing concurrency to 1x and retrying...',

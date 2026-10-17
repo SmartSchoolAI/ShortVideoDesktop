@@ -1229,6 +1229,25 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
     }
   },
   {
+    regex: /⚠️?\s*\[(?:内存|资源)告警\]\s*2x\s*并发下系统(?:内存|资源)受限\s*\(.*?\)/g,
+    translations: {
+      "zh": "⚠️ [内存告警] 2x 并发下系统资源受限 (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "en": "⚠️ [Resource Warning] System resources constrained at 2x concurrency (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "ja": "⚠️ [リソース警告] 2x 並列でシステムリソースが制限されました (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "ko": "⚠️ [리소스 경고] 2x 동시성에서 시스템 리소스가 제한되었습니다 (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "vi": "⚠️ [Cảnh báo tài nguyên] Tài nguyên hệ thống bị hạn chế ở mức 2x (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "th": "⚠️ [คำเตือนทรัพยากร] ทรัพยากรระบบจำกัดที่การทำงานพร้อมกัน 2x (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "id": "⚠️ [Peringatan Sumber Daya] Sumber daya sistem terbatas pada konkurensi 2x (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "es": "⚠️ [Advertencia de recursos] Recursos del sistema limitados en concurrencia 2x (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "fr": "⚠️ [Avertissement ressources] Ressources système limitées à 2x (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "pt": "⚠️ [Aviso de recursos] Recursos do sistema limitados em concorrência 2x (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "de": "⚠️ [Ressourcenwarnung] Systemressourcen begrenzt bei 2x Parallelität (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "it": "⚠️ [Avviso risorse] Risorse di sistema limitate a concorrenza 2x (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "ru": "⚠️ [Предупреждение о ресурсах] Ограничение системных ресурсов при параллелизме 2x (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "tr": "⚠️ [Kaynak Uyarısı] 2x eşzamanlılıkta sistem kaynakları yetersiz (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+    }
+  },
+  {
     regex: /检测到 Chromium 内存不足 \(Out of memory\)，正在自动降级并发度为 1x 并重新尝试渲染\.\.\./g,
     translations: {
       "zh": "检测到 Chromium 内存不足 (Out of memory)，正在自动降级并发度为 1x 并重新尝试渲染...",
@@ -1764,6 +1783,7 @@ async function ensureBundleStaticAssets(bundleTarget: string, cleanFolder?: stri
 }
 
 let globalAdaptiveConcurrency: number | null = null;
+const OOM_ERROR_REGEX = /out of memory|ran out of memory|decrease the concurrency|memory or disk space|malloc.*failed|failed to allocate|quit with code 3752568763|generic error in an external library|ERR_INSUFFICIENT_RESOURCES|Target closed|Page\.bringToFront/i;
 
 async function executeRemotionRender(
   outputFile: string,
@@ -1807,7 +1827,8 @@ async function executeRemotionRender(
       args.push('--chromium-options=--disable-dev-shm-usage');
     }
 
-    const finalConcurrency = concurrency || '2';
+    const defaultConcurrency = '2';
+    const finalConcurrency = concurrency || defaultConcurrency;
     args.push(`--concurrency=${finalConcurrency}`);
 
     log(localizeScriptLog(`🚀 执行渲染命令 (并发: ${finalConcurrency}x): ${executor.command} ${args.join(' ')}`), 'gray');
@@ -1873,6 +1894,10 @@ async function executeRemotionRender(
     let lastIsProgress = false;
     let stdoutBuffer = '';
     let isOomError = false;
+    let hasLoggedOomWarning = false;
+
+    // 过滤掉内部 FFmpeg 与浏览器崩溃时倾泻的大量底层编译配置、模块版本、以及堆栈调试杂音
+    const NOISY_FFMPEG_LOG_REGEX = /^(?:ffmpeg version|built with|configuration:\s*--prefix|libavutil|libavcodec|libavformat|libavdevice|libavfilter|libswscale|libswresample|libpostproc|\[swscaler\s*@|\[libx264\s*@|\[vost#|\[vf#|\[out#|Conversion failed!|Nothing was written into output file|Terminating thread with return code|Task finished with error code|at renderFramesProc|at async renderFrameWithOptionToReject|Error:\s*FFmpeg quit with code|x264\s*\[error\]:\s*malloc.*failed|.*net::ERR_INSUFFICIENT_RESOURCES|.*ProtocolError:\s*Protocol error|.*Target closed|.*remotion\.dev\/docs\/target-closed)/i;
 
     const processLogChunk = (chunk: Buffer | string) => {
       stdoutBuffer += chunk.toString('utf-8');
@@ -1883,8 +1908,21 @@ async function executeRemotionRender(
         const trimmedLine = line.trim();
         if (!trimmedLine) continue;
 
-        if (/out of memory|ran out of memory|decrease the concurrency|memory or disk space/i.test(trimmedLine)) {
+        if (OOM_ERROR_REGEX.test(trimmedLine)) {
           isOomError = true;
+          if (!hasLoggedOomWarning) {
+            hasLoggedOomWarning = true;
+            if (lastIsProgress) {
+              process.stdout.write('\n');
+              lastIsProgress = false;
+            }
+            log(localizeScriptLog('⚠️ [内存告警] 2x 并发下系统资源受限 (ERR_INSUFFICIENT_RESOURCES / malloc failed)'), 'yellow');
+          }
+        }
+
+        // 屏蔽 FFmpeg 崩溃时底层的冗长日志输出
+        if (NOISY_FFMPEG_LOG_REGEX.test(trimmedLine)) {
+          continue;
         }
 
         const progressMatch = trimmedLine.match(/Rendered\s+(\d+)\/(\d+)(?:,\s*time remaining:\s*([0-9a-zA-Z\s]+))?/i);
@@ -1917,12 +1955,22 @@ async function executeRemotionRender(
 
     proc.on('close', (code) => {
       if (stdoutBuffer.trim()) {
-        if (/out of memory|ran out of memory|decrease the concurrency|memory or disk space/i.test(stdoutBuffer)) {
+        if (OOM_ERROR_REGEX.test(stdoutBuffer)) {
           isOomError = true;
+          if (!hasLoggedOomWarning) {
+            hasLoggedOomWarning = true;
+            if (lastIsProgress) {
+              process.stdout.write('\n');
+              lastIsProgress = false;
+            }
+            log(localizeScriptLog('⚠️ [内存告警] 2x 并发下系统资源受限 (ERR_INSUFFICIENT_RESOURCES / malloc failed)'), 'yellow');
+          }
         }
-        if (lastIsProgress) process.stdout.write('\n');
-        process.stdout.write(stdoutBuffer.trim() + '\n');
-        lastIsProgress = false;
+        if (!NOISY_FFMPEG_LOG_REGEX.test(stdoutBuffer.trim())) {
+          if (lastIsProgress) process.stdout.write('\n');
+          process.stdout.write(stdoutBuffer.trim() + '\n');
+          lastIsProgress = false;
+        }
       } else if (lastIsProgress) {
         process.stdout.write('\n');
       }
@@ -1930,7 +1978,7 @@ async function executeRemotionRender(
         resolve();
       } else {
         const errorMsg = isOomError
-          ? localizeScriptLog('检测到 Chromium 内存不足 (Out of memory)')
+          ? localizeScriptLog('检测到渲染内存不足 (Out of memory / malloc failed)')
           : localizeScriptLog(`Remotion 渲染进程异常退出，状态码: ${code}`);
         const err: any = new Error(errorMsg);
         err.isOom = isOomError;
@@ -1950,15 +1998,16 @@ async function renderVideoWithRemotion(
   props: Record<string, any>,
   concurrency?: number | string
 ): Promise<void> {
-  const initialConcurrency = globalAdaptiveConcurrency ?? (concurrency || '2');
+  const defaultConcurrency = '2';
+  const initialConcurrency = globalAdaptiveConcurrency ?? (concurrency || defaultConcurrency);
   try {
     await executeRemotionRender(outputFile, props, initialConcurrency);
   } catch (err: any) {
-    const isOom = Boolean(err?.isOom) || /out of memory|ran out of memory|decrease the concurrency|memory or disk space/i.test(err?.message || '');
+    const isOom = Boolean(err?.isOom) || OOM_ERROR_REGEX.test(err?.message || '');
     const currentNum = Number(initialConcurrency);
     if (isOom && currentNum > 1) {
       globalAdaptiveConcurrency = 1;
-      log(localizeScriptLog(`⚠️ 检测到 Chromium 内存不足 (Out of memory)，正在自动降级并发度为 1x 并重新尝试渲染...`), 'yellow');
+      log(localizeScriptLog(`⚠️ 检测到渲染内存不足 (Out of memory / malloc failed)，正在自动降级并发度为 1x 并重新尝试渲染...`), 'yellow');
       if (fs.existsSync(outputFile)) {
         try { fs.unlinkSync(outputFile); } catch {}
       }
@@ -2638,14 +2687,15 @@ async function main() {
   const baseUrl = baseUrlArg ? baseUrlArg.replace('--url=', '') : DEFAULT_API_BASE;
   const concurrencyArg = args.find((a) => a.startsWith('--concurrency='));
   const envConcurrency = process.env.REMOTION_CONCURRENCY;
-  const concurrency = concurrencyArg ? concurrencyArg.replace('--concurrency=', '') : (envConcurrency || '2');
+  const isElectronClient = args.includes('--client=electron') || args.some((a) => a.startsWith('--client=electron')) || process.env.SHORTVIDEO_CLIENT_MODE === 'electron';
+  const defaultConcurrency = '2';
+  const concurrency = concurrencyArg ? concurrencyArg.replace('--concurrency=', '') : (envConcurrency || defaultConcurrency);
   const langArg = args.find((a) => a.startsWith('--lang=') || a.startsWith('--target-lang='));
   const targetLang = langArg ? langArg.split('=')[1]?.trim().toLowerCase() : undefined;
   if (targetLang) {
     process.env.SHORTVIDEO_LANG = targetLang;
   }
 
-  const isElectronClient = args.includes('--client=electron') || args.some((a) => a.startsWith('--client=electron')) || process.env.SHORTVIDEO_CLIENT_MODE === 'electron';
   const scopeArg = args.find((a) => a.startsWith('--scope='));
   const clientScope: 'current_user' | 'all_users' = scopeArg
     ? (scopeArg.split('=')[1]?.trim() as 'current_user' | 'all_users')

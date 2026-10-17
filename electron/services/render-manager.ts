@@ -671,6 +671,7 @@ export class RenderManager {
         `--client=electron`,
         `--scope=current_user`,
         `--lang=${currentLang}`,
+        `--concurrency=2`,
       ];
 
       const effectiveResourcesPath = process.resourcesPath || path.join(path.dirname(process.execPath), 'resources');
