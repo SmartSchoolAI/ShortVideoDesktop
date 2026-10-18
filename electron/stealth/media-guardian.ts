@@ -11,11 +11,11 @@
  * 
  * 守护机制：
  * 1. 深度穿透全文档（DOM + Shadow DOM + 同源 iframe）实时扫描所有媒体元素；
- * 2. 同源视频防重音独占：若存在多个加载相同视频源的 <video>，仅保留视口面积最大的可见主视频，其余强制永久静音；
- * 3. 辅助组件特征精准识别（封面、缩略图、裁剪器、不可见小尺寸节点）强制静音锁定；
- * 4. 原生原型链 Hook (HTMLMediaElement.prototype.play) 与全局事件捕获，实施全局单一音频独占策略；
- * 5. 属性深度劫持锁定（Object.defineProperty 锁定辅助媒体 muted 为 true，防止脚本意外解静音）；
- * 6. 采用与 anti-detection 相同的 makeNative 原型保护，确保 toString() 为 [native code]，杜绝机器人反爬风险。
+ * 2. 动态主播放器判定（Primary Player Detection）：实时根据几何渲染面积与祖先容器识别出唯一的主要预览播放器；
+ * 3. 辅助组件（封面、缩略图、裁剪器、不可见小尺寸节点）强制静音；
+ * 4. 同源防重机制：若同一视频源存在多个实例，仅面积最大的主实例有发声权，其余同源实例强制静音；
+ * 5. 音频独占播放守护：当主播放器发声时，暂停并静音同页其余媒体；
+ * 6. 原生 makeNative 深度封装，彻底规避反爬检测。
  */
 
 export function generateMediaGuardianScript(): string {
@@ -119,109 +119,85 @@ export function generateMediaGuardianScript(): string {
       }
     }
 
-    // 2. 识别主播放器 vs 辅助媒体
-    // 微信视频号发表页：左侧手机框为大尺寸主播放器（宽一般 > 180, 高一般 > 280）
-    // 封面选择、卡片抽帧、动态图生成的 video 尺寸通常较小或不可见，或置于封面容器中
-    function isAuxiliaryMedia(media) {
-      if (!media || !(media instanceof HTMLMediaElement)) return false;
-
+    // 检查元素是否明确处于封面/缩略图/裁剪器等辅助容器中
+    function isInAuxiliaryContainer(media) {
+      if (!media || !(media instanceof HTMLElement)) return false;
       try {
-        const rect = media.getBoundingClientRect();
-
-        // 不可见、零尺寸或极小缩略图尺寸
-        if (rect.width < 140 || rect.height < 140) return true;
-
-        const style = window.getComputedStyle(media);
-        if (style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity || '1') < 0.1) {
-          return true;
-        }
-
-        // 检查父级祖先是否包含封面、卡片、缩略图、裁剪等关键词
         const auxAncestor = media.closest(
           '.cover-wrap, .cover-preview, .poster-wrap, .thumb-wrap, .crop-container, ' +
           '[class*="cover"], [class*="thumb"], [class*="crop"], [class*="poster"], ' +
           '[class*="cut"], [class*="frame-picker"], [data-type*="cover"], [data-type*="thumb"]'
         );
-        if (auxAncestor) {
-          return true;
-        }
-      } catch (e) {}
-
-      return false;
+        return Boolean(auxAncestor);
+      } catch (e) {
+        return false;
+      }
     }
 
-    // 3. 永久锁定媒体静音（防止微信前端代码通过 JS 重新设置 muted = false）
-    const mutedLockedElements = new WeakSet();
-    function lockMediaMuted(media) {
+    // 2. 动态主播放器判定算法（Primary Player Detection）
+    // 返回当前页面上唯一的合法主视频播放器（面积最大且不在辅助容器内的可见视频）
+    function findPrimaryVideo(videoList) {
+      if (!videoList || videoList.length === 0) return null;
+      if (videoList.length === 1) {
+        // 唯有一个视频时，只要不在封面容器中即为主视频
+        return isInAuxiliaryContainer(videoList[0]) ? null : videoList[0];
+      }
+
+      // 候选视频：排除明确处于封面容器中的视频
+      const candidates = videoList.filter(v => !isInAuxiliaryContainer(v));
+      if (candidates.length === 0) return null;
+      if (candidates.length === 1) return candidates[0];
+
+      // 多个候选视频时，计算其渲染几何尺寸面积
+      let maxArea = -1;
+      let primary = candidates[0];
+
+      for (const v of candidates) {
+        try {
+          const rect = v.getBoundingClientRect();
+          const area = rect.width * rect.height;
+          // 若处于隐藏状态（display: none, visibility: hidden, opacity: 0）则面积视为 0
+          const style = window.getComputedStyle(v);
+          const isHidden = style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity || '1') < 0.1;
+          const effectiveArea = isHidden ? 0 : area;
+
+          if (effectiveArea > maxArea) {
+            maxArea = effectiveArea;
+            primary = v;
+          }
+        } catch (e) {}
+      }
+
+      return primary;
+    }
+
+    // 3. 原生静音操作函数（安全修改，不造成不可逆的原型污染）
+    function muteMediaElement(media) {
       if (!media || !(media instanceof HTMLMediaElement)) return;
       try {
-        media.muted = true;
-        media.volume = 0;
-
-        if (!mutedLockedElements.has(media)) {
-          mutedLockedElements.add(media);
-          try {
-            Object.defineProperty(media, 'muted', {
-              get: function() { return true; },
-              set: function() { /* 拒绝解静音 */ },
-              configurable: true
-            });
-            Object.defineProperty(media, 'volume', {
-              get: function() { return 0; },
-              set: function() { /* 拒绝调大音量 */ },
-              configurable: true
-            });
-          } catch (e) {}
-        }
+        if (!media.muted) media.muted = true;
+        if (media.volume > 0) media.volume = 0;
       } catch (e) {}
     }
 
-    // 4. 同源及同屏视频音频独占决策器
-    function enforceAudioExclusivity(triggerMedia) {
+    // 4. 音频独占与同源防重音守护核心决策
+    function applyAudioExclusivity(triggerMedia) {
       try {
         const allMedia = getAllMediaElements();
         const videoList = allMedia.filter(m => m.tagName === 'VIDEO');
+        const primaryVideo = findPrimaryVideo(videoList);
 
-        // A. 基础过滤：直接静音所有符合辅助特征的媒体
         for (const m of allMedia) {
-          if (isAuxiliaryMedia(m)) {
-            lockMediaMuted(m);
+          // 如果该元素被明确判定为主视频播放器，则不强制静音（保留创作者正常的试听与音量控制权）
+          if (m === primaryVideo) {
+            continue;
           }
+
+          // 其余所有视频（封面截帧、缩略图、同源副视频、不可见小尺寸节点）一律强制静音
+          muteMediaElement(m);
         }
 
-        // B. 同源防重杀：若存在加载同一视频源的多个视频，只保留面积最大的那个发声
-        if (videoList.length > 1) {
-          const srcGroups = new Map();
-          for (const v of videoList) {
-            const cleanSrc = getCleanMediaSrc(v);
-            if (!cleanSrc) continue;
-            if (!srcGroups.has(cleanSrc)) {
-              srcGroups.set(cleanSrc, []);
-            }
-            srcGroups.get(cleanSrc).push(v);
-          }
-
-          for (const [, group] of srcGroups) {
-            if (group.length > 1) {
-              // 按可见物理面积从大到小排序
-              group.sort((a, b) => {
-                const rA = a.getBoundingClientRect();
-                const rB = b.getBoundingClientRect();
-                return (rB.width * rB.height) - (rA.width * rA.height);
-              });
-
-              // 第 0 个保留为主视频，其余所有同源视频一律强制静音锁定
-              for (let i = 1; i < group.length; i++) {
-                lockMediaMuted(group[i]);
-                try {
-                  if (!group[i].paused) group[i].pause();
-                } catch (e) {}
-              }
-            }
-          }
-        }
-
-        // C. 独占发声：若某个主媒体处于有声播放状态，暂停并静音其余媒体
+        // 若当前有某个主媒体正处于有声播放状态，确保其余非当前媒体暂停并静音
         if (triggerMedia && !triggerMedia.muted && triggerMedia.volume > 0) {
           for (const m of allMedia) {
             if (m === triggerMedia) continue;
@@ -229,8 +205,7 @@ export function generateMediaGuardianScript(): string {
               if (!m.paused) {
                 m.pause();
               }
-              m.muted = true;
-              m.volume = 0;
+              muteMediaElement(m);
             } catch (e) {}
           }
         }
@@ -242,12 +217,16 @@ export function generateMediaGuardianScript(): string {
     if (typeof originalPlay === 'function') {
       const guardedPlay = function play() {
         try {
-          if (isAuxiliaryMedia(this)) {
-            // 辅助媒体允许其静音播放以完成截帧/解码，但绝不允许输出任何声音
-            lockMediaMuted(this);
+          const allMedia = getAllMediaElements();
+          const videoList = allMedia.filter(m => m.tagName === 'VIDEO');
+          const primaryVideo = findPrimaryVideo(videoList);
+
+          if (this !== primaryVideo) {
+            // 非主播放器尝试调用 play()，强制静音以完成后台抽帧/seek，绝不出声
+            muteMediaElement(this);
           } else {
-            // 主媒体有声播放，立即触发音频独占
-            enforceAudioExclusivity(this);
+            // 主播放器尝试调用 play()，立即对同页其余媒体实施独占
+            applyAudioExclusivity(this);
           }
         } catch (e) {}
         return originalPlay.apply(this, arguments);
@@ -265,10 +244,14 @@ export function generateMediaGuardianScript(): string {
       if (!target || !(target instanceof HTMLMediaElement)) return;
 
       try {
-        if (isAuxiliaryMedia(target)) {
-          lockMediaMuted(target);
+        const allMedia = getAllMediaElements();
+        const videoList = allMedia.filter(m => m.tagName === 'VIDEO');
+        const primaryVideo = findPrimaryVideo(videoList);
+
+        if (target !== primaryVideo) {
+          muteMediaElement(target);
         } else {
-          enforceAudioExclusivity(target);
+          applyAudioExclusivity(target);
         }
       } catch (e) {}
     }
@@ -276,30 +259,23 @@ export function generateMediaGuardianScript(): string {
     window.addEventListener('play', handlePlayEvent, true);
     window.addEventListener('playing', handlePlayEvent, true);
 
-    // 7. MutationObserver 监听动态插入的媒体元素，秒级静音辅助组件
+    // 7. MutationObserver 监听动态插入的媒体元素
     const observer = new MutationObserver((mutations) => {
       try {
-        let hasNewMedia = false;
+        let hasMedia = false;
         for (const m of mutations) {
           for (const node of m.addedNodes) {
-            if (node.nodeType === 1) { // Element
+            if (node.nodeType === 1) {
               if (node.tagName === 'VIDEO' || node.tagName === 'AUDIO') {
-                hasNewMedia = true;
-                if (isAuxiliaryMedia(node)) lockMediaMuted(node);
-              } else if (node.querySelectorAll) {
-                const subMedia = node.querySelectorAll('video, audio');
-                if (subMedia.length > 0) {
-                  hasNewMedia = true;
-                  for (const sm of subMedia) {
-                    if (isAuxiliaryMedia(sm)) lockMediaMuted(sm);
-                  }
-                }
+                hasMedia = true;
+              } else if (node.querySelectorAll && node.querySelectorAll('video, audio').length > 0) {
+                hasMedia = true;
               }
             }
           }
         }
-        if (hasNewMedia) {
-          enforceAudioExclusivity();
+        if (hasMedia) {
+          applyAudioExclusivity();
         }
       } catch (e) {}
     });
@@ -316,10 +292,10 @@ export function generateMediaGuardianScript(): string {
       }
     } catch (e) {}
 
-    // 8. 周期性守护心跳（每 1 秒校验一次，防止异步挂载或状态变更导致的漏网双音频）
+    // 8. 周期性守护心跳（每 1 秒校验一次，动态跟踪与修正多媒体状态）
     setInterval(() => {
       try {
-        enforceAudioExclusivity();
+        applyAudioExclusivity();
 
         const mediaList = getAllMediaElements();
         let audiblePlayingList = [];
@@ -330,29 +306,26 @@ export function generateMediaGuardianScript(): string {
           }
         }
 
-        // 若发现存在 2 个或以上正在同时发声的播放器，仅保留视口面积最大的主要播放器，将其余强制静音
+        // 若发现存在 2 个或以上正在同时发声的播放器，仅保留主要播放器，将其余强制暂停并静音
         if (audiblePlayingList.length > 1) {
-          audiblePlayingList.sort((a, b) => {
-            const rA = a.getBoundingClientRect();
-            const rB = b.getBoundingClientRect();
-            return (rB.width * rB.height) - (rA.width * rA.height);
-          });
+          const videoList = mediaList.filter(m => m.tagName === 'VIDEO');
+          const primary = findPrimaryVideo(videoList);
 
-          // 保留第 0 个（最大主要播放器），暂停并静音其余
-          for (let i = 1; i < audiblePlayingList.length; i++) {
-            const extra = audiblePlayingList[i];
-            try {
-              extra.pause();
-              lockMediaMuted(extra);
-            } catch (e) {}
+          for (const extra of audiblePlayingList) {
+            if (extra !== primary) {
+              try {
+                extra.pause();
+                muteMediaElement(extra);
+              } catch (e) {}
+            }
           }
         }
       } catch (e) {}
     }, 1000);
 
-    // 初始扫描当前页面已有媒体
+    // 初始执行一次全局守护
     try {
-      enforceAudioExclusivity();
+      applyAudioExclusivity();
     } catch (e) {}
 
   } catch (err) {}
