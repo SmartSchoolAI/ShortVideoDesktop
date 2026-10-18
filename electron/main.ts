@@ -51,6 +51,9 @@ app.commandLine.appendSwitch('log-level', '3'); // 过滤掉 Chromium 内部非�
 // 关闭 AutomationControlled 标记（navigator.webdriver 底层来源）
 app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
 app.commandLine.appendSwitch('disable-infobars'); // 消除自动化受控通知条提示
+
+// 严格对标真实 Chrome 行为：启用手势激活自动播放策略，杜绝未经用户点击的隐藏/辅助视频后台自启发声
+app.commandLine.appendSwitch('autoplay-policy', 'user-gesture-required');
 // lang 跟随系统 Chromium 默认，macOS/Linux 强制 zh-CN 会被平台识别为语言环境异常
 
 // 启用真实 GPU 加速渲染，防止 SwiftShader 软件渲染特征暴露（WebGL 指纹）

@@ -4,6 +4,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { APP_CONFIG } from '../config';
 import { STEALTH_SCRIPT } from '../stealth/anti-detection';
+import { MEDIA_GUARDIAN_SCRIPT } from '../stealth/media-guardian';
 import { cdpBridge, CdpPageClient } from './cdp-bridge';
 import { sessionKeeper } from './session-keeper';
 import { systemLogger } from '../utils/logger';
@@ -1129,9 +1130,14 @@ export class WindowManager {
       view.webContents.setWindowOpenHandler(({ url }) => {
         try {
           if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
-            view.webContents.loadURL(url).catch((e) => {
-              console.warn(`[WindowManager] 窗口内重定向失败 (${platformId}):`, e.message);
-            });
+            const currentUrl = view.webContents.getURL() || '';
+            const cleanCur = currentUrl.split('#')[0];
+            const cleanTarget = url.split('#')[0];
+            if (cleanCur !== cleanTarget) {
+              view.webContents.loadURL(url).catch((e) => {
+                console.warn(`[WindowManager] 窗口内重定向失败 (${platformId}):`, e.message);
+              });
+            }
           }
         } catch (e: any) {
           console.warn(`[WindowManager] setWindowOpenHandler 异常 (${platformId}):`, e.message);
@@ -1204,6 +1210,15 @@ export class WindowManager {
     try {
       target.view.webContents.focus();
     } catch { }
+
+    // 多 Tab 音频隔离：仅允许当前激活的 Tab 输出音频，后台所有非激活 Tab 强制静音，杜绝串音与重叠播放
+    for (const [id, tab] of this.tabs) {
+      if (tab.view && !tab.view.webContents.isDestroyed()) {
+        try {
+          tab.view.webContents.setAudioMuted(id !== tabId);
+        } catch { }
+      }
+    }
 
     // 动态同步更新系统原生窗口标题（包含当前激活功能模块名称）
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
@@ -1401,6 +1416,7 @@ export class WindowManager {
         const url = webContents.getURL() || '';
         if (isGoogleOAuthUrl(url)) return; // 跳过 Google 账号页面，保持其原生 API 完整性
         webContents.executeJavaScript(STEALTH_SCRIPT).catch(() => { });
+        webContents.executeJavaScript(MEDIA_GUARDIAN_SCRIPT).catch(() => { });
       } catch { }
     };
 
