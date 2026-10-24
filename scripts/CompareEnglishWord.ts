@@ -1411,12 +1411,16 @@ async function fetchWaitingTasks(
   }
 }
 
+export type VideoModule = 'compare-english-word' | 'ap-calculus-mcq';
+
 async function claimNextTask(
   baseUrl: string,
   token: string = CURRENT_AUTH_TOKEN,
-  scope: 'current_user' | 'all_users' = (IS_ELECTRON_CLIENT ? 'current_user' : 'all_users')
+  scope: 'current_user' | 'all_users' = (IS_ELECTRON_CLIENT ? 'current_user' : 'all_users'),
+  module: VideoModule = 'compare-english-word'
 ): Promise<any | null> {
-  const targetUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/compare-english-word/tasks/`;
+  const endpoint = module === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
+  const targetUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/${endpoint}/tasks/`;
   try {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -1434,6 +1438,7 @@ async function claimNextTask(
     if (!res.ok) return null;
     const data = await res.json();
     if (data && data.success && data.task) {
+      data.task.__module = module;
       return data.task;
     }
     return null;
@@ -1442,7 +1447,19 @@ async function claimNextTask(
   }
 }
 
-// ── 2.   ─────────────────────────────────────────────
+async function claimNextTaskAnyModule(
+  baseUrl: string,
+  token: string = CURRENT_AUTH_TOKEN,
+  scope: 'current_user' | 'all_users' = (IS_ELECTRON_CLIENT ? 'current_user' : 'all_users')
+): Promise<any | null> {
+  const cewTask = await claimNextTask(baseUrl, token, scope, 'compare-english-word');
+  if (cewTask) return cewTask;
+  const mcqTask = await claimNextTask(baseUrl, token, scope, 'ap-calculus-mcq');
+  if (mcqTask) return mcqTask;
+  return null;
+}
+
+// ── 2. 更新任务状态 ─────────────────────────────────────────────
 async function updateTaskStatus(
   baseUrl: string,
   taskId: string | number,
@@ -1451,9 +1468,11 @@ async function updateTaskStatus(
   folderPath?: string,
   videoSize?: number,
   videos?: Record<string, string>,
-  token: string = CURRENT_AUTH_TOKEN
+  token: string = CURRENT_AUTH_TOKEN,
+  module: VideoModule = 'compare-english-word'
 ): Promise<boolean> {
-  const targetUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/compare-english-word/tasks/`;
+  const endpoint = module === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
+  const targetUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/${endpoint}/tasks/`;
   try {
     return await retryOperation(
       async () => {
@@ -1490,7 +1509,7 @@ async function updateTaskStatus(
   }
 }
 
-// ── 2.1   MP4   Cloudflare R2 ─────────────────────────
+// ── 2.1 服务端代理上传 MP4 产物至 Cloudflare R2 ─────────────────────────
 async function uploadVideoViaServerProxy(
   baseUrl: string,
   taskId: string | number,
@@ -1499,9 +1518,11 @@ async function uploadVideoViaServerProxy(
   filename: string,
   folderPath?: string,
   token: string = CURRENT_AUTH_TOKEN,
-  isFinished: boolean = false
+  isFinished: boolean = false,
+  module: VideoModule = 'compare-english-word'
 ): Promise<{ success: boolean; cdnUrl?: string; error?: string }> {
-  const targetUrl = new URL(`${baseUrl.replace(/\/+$/, '')}/api/video/compare-english-word/upload-video`);
+  const endpoint = module === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
+  const targetUrl = new URL(`${baseUrl.replace(/\/+$/, '')}/api/video/${endpoint}/upload-video`);
   targetUrl.searchParams.set('taskId', String(taskId));
   targetUrl.searchParams.set('lang', lang);
   targetUrl.searchParams.set('filename', filename);
@@ -1534,7 +1555,7 @@ async function uploadVideoViaServerProxy(
         method: 'POST',
         headers,
         body: new Uint8Array(fileBytes),
-        signal: AbortSignal.timeout(180000), // 3
+        signal: AbortSignal.timeout(180000), // 3分钟超时
       });
 
       const data = await res.json().catch(() => ({}));
@@ -1844,14 +1865,17 @@ const OOM_ERROR_REGEX = /out of memory|ran out of memory|decrease the concurrenc
 async function executeRemotionRender(
   outputFile: string,
   props: Record<string, any>,
-  concurrency?: number | string
+  concurrency?: number | string,
+  compositionId: string = 'CompareEnglishWord'
 ): Promise<void> {
   // 确保 Remotion 渲染包已就绪
   const bundleTarget = await ensureRemotionBundle();
 
-  // 同步本地静态素材
-  log(localizeScriptLog(`📥 正在同步 Remotion 本地静态素材 (${getCdnDomain()}/CompareEnglishWord)...`), 'gray');
-  await ensureBundleStaticAssets(bundleTarget, props.folder);
+  // 仅在 CompareEnglishWord 渲染时同步专用本地静态素材
+  if (compositionId === 'CompareEnglishWord') {
+    log(localizeScriptLog(`📥 正在同步 Remotion 本地静态素材 (${getCdnDomain()}/CompareEnglishWord)...`), 'gray');
+    await ensureBundleStaticAssets(bundleTarget, props.folder);
+  }
 
   return new Promise((resolve, reject) => {
     const outputDir = path.dirname(outputFile);
@@ -1866,7 +1890,7 @@ async function executeRemotionRender(
       ...executor.baseArgs,
       'render',
       bundleTarget,
-      'CompareEnglishWord',
+      compositionId,
       outputFile,
       `--props=${propsFilePath}`,
       '--disable-web-security',
@@ -2055,12 +2079,13 @@ async function executeRemotionRender(
 async function renderVideoWithRemotion(
   outputFile: string,
   props: Record<string, any>,
-  concurrency?: number | string
+  concurrency?: number | string,
+  compositionId: string = 'CompareEnglishWord'
 ): Promise<void> {
   const defaultConcurrency = '2';
   const initialConcurrency = globalAdaptiveConcurrency ?? (concurrency || defaultConcurrency);
   try {
-    await executeRemotionRender(outputFile, props, initialConcurrency);
+    await executeRemotionRender(outputFile, props, initialConcurrency, compositionId);
   } catch (err: any) {
     const isOom = Boolean(err?.isOom) || OOM_ERROR_REGEX.test(err?.message || '');
     const currentNum = Number(initialConcurrency);
@@ -2071,7 +2096,7 @@ async function renderVideoWithRemotion(
         try { fs.unlinkSync(outputFile); } catch {}
       }
       try {
-        await executeRemotionRender(outputFile, props, 1);
+        await executeRemotionRender(outputFile, props, 1, compositionId);
         log(localizeScriptLog(`✅ 降级并发度 1x 重新渲染成功!`), 'green');
         return;
       } catch (retryErr: any) {
@@ -2090,12 +2115,198 @@ export interface RenderWorkerOptions {
   scope?: 'current_user' | 'all_users';
 }
 
-// ── 4.   ────────────────────────────────────────────
+/**
+ * 专门处理微积分 AP Calculus MCQ 视频渲染流水线
+ * 包含：中文视频渲染 (ApCalculusMCQ-Demo-ZH) 与 英文视频渲染 (ApCalculusMCQ-Demo-EN) 双版本自动生产与上云
+ */
+async function processApCalculusTask(
+  task: any,
+  baseUrl: string,
+  options: RenderWorkerOptions = {}
+) {
+  const taskId = task.videoId || task.id;
+  const rawFolder = (task.folderPath || '').trim();
+  const cleanFolder = rawFolder
+    .replace(/^\/+|\/+$/g, '')
+    .replace(/^ApCalculusMCQ\//, '') || `task_${taskId}`;
+
+  const rawEmail = (task.userEmail || '').trim();
+  const safeUserEmail = rawEmail
+    ? rawEmail.replace(/[\\/:*?"<>|]/g, '_')
+    : 'default_user';
+
+  let rawVideoName = cleanFolder;
+  if (!rawVideoName) {
+    rawVideoName = (task.title || '').trim() || `mcq_${taskId}`;
+  }
+  const safeVideoName = path.basename(rawVideoName)
+    .replace(/[\\/:*?"<>|]/g, '_')
+    .replace(/\s+/g, '_');
+
+  const baseOutputDir = resolveBaseOutputDir();
+  const outputDir = path.join(baseOutputDir, 'ApCalculusMCQ', safeUserEmail, safeVideoName);
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+
+  log(`\n============================================================`, 'blue');
+  log(localizeScriptLog(`🎬 [微积分 MCQ] 开始渲染任务: [${taskId}] ${safeVideoName}`), 'blue');
+  log(localizeScriptLog(`📂 本地输出目录: ${outputDir}`), 'gray');
+  log(`============================================================`, 'blue');
+
+  // 解析 summaryData
+  let questionData: any = task.summaryData;
+  if (typeof questionData === 'string') {
+    try {
+      questionData = JSON.parse(questionData);
+    } catch (_) {
+      questionData = {};
+    }
+  } else {
+    questionData = { ...(questionData || {}) };
+  }
+
+  // 确保获取云端最新最完整的微积分题目结构与声学逐词对齐结果
+  try {
+    const summaryCdnUrl = `${getCdnDomain()}/ApCalculusMCQ/${cleanFolder}/summary.json?_t=${Date.now()}`;
+    const sRes = await fetch(summaryCdnUrl);
+    if (sRes.ok) {
+      const remoteData = await sRes.json();
+      if (remoteData && typeof remoteData === 'object') {
+        questionData = { ...remoteData, ...questionData };
+        log(localizeScriptLog(`📥 已从云端同步最新微积分剧本与时间戳数据 (summary.json)`), 'gray');
+      }
+    }
+  } catch (_) { }
+
+  // 1. 渲染中文版本
+  const zhOutputFile = path.join(outputDir, `${safeVideoName}_zh.mp4`);
+  log(localizeScriptLog(`\n[1/2] 正在渲染中文视频 (ApCalculusMCQ-Demo-ZH)...`), 'blue');
+  const zhProps = {
+    question: questionData,
+    lang: 'zh',
+    showAudio: true,
+  };
+  await renderVideoWithRemotion(zhOutputFile, zhProps, options.concurrency, 'ApCalculusMCQ-Demo-ZH');
+  log(localizeScriptLog(`✅ 中文视频渲染完成: ${zhOutputFile}`), 'green');
+
+  // 2. 渲染英文版本
+  const enOutputFile = path.join(outputDir, `${safeVideoName}_en.mp4`);
+  log(localizeScriptLog(`\n[2/2] 正在渲染英文视频 (ApCalculusMCQ-Demo-EN)...`), 'blue');
+  const enProps = {
+    question: questionData,
+    lang: 'en',
+    showAudio: true,
+  };
+  await renderVideoWithRemotion(enOutputFile, enProps, options.concurrency, 'ApCalculusMCQ-Demo-EN');
+  log(localizeScriptLog(`✅ 英文视频渲染完成: ${enOutputFile}`), 'green');
+
+  // 3. 上传视频
+  const uploadedVideos: Record<string, string> = {};
+  let primaryCdnUrl = '';
+  let primarySize = 0;
+
+  if (fs.existsSync(zhOutputFile)) {
+    primarySize = fs.statSync(zhOutputFile).size;
+  }
+
+  if (options.skipUpload) {
+    log(localizeScriptLog(`⏩ 跳过云端上传 (--skip-upload)`), 'gray');
+    primaryCdnUrl = zhOutputFile;
+    uploadedVideos['zh'] = zhOutputFile;
+    uploadedVideos['en'] = enOutputFile;
+  } else {
+    // 上传中文视频
+    log(localizeScriptLog(`\n☁️ 正在上传中文视频...`), 'blue');
+    let zhCdn = '';
+    if (HAS_R2_CONFIG) {
+      const r2Key = `ApCalculusMCQ/${cleanFolder}/${safeVideoName}_zh.mp4`;
+      const uploaded = await uploadToR2(r2Key, fs.readFileSync(zhOutputFile), 'video/mp4');
+      if (uploaded) zhCdn = `${getCdnDomain()}/${r2Key}`;
+    } else {
+      const res = await uploadVideoViaServerProxy(
+        baseUrl,
+        taskId,
+        'zh',
+        zhOutputFile,
+        `${safeVideoName}_zh.mp4`,
+        task.folderPath,
+        CURRENT_AUTH_TOKEN,
+        false,
+        'ap-calculus-mcq'
+      );
+      if (res.success && res.cdnUrl) zhCdn = res.cdnUrl;
+    }
+    if (zhCdn) {
+      uploadedVideos['zh'] = zhCdn;
+      primaryCdnUrl = zhCdn;
+      log(localizeScriptLog(`✅ 中文视频上传成功: ${zhCdn}`), 'green');
+    }
+
+    // 上传英文视频
+    log(localizeScriptLog(`\n☁️ 正在上传英文视频...`), 'blue');
+    let enCdn = '';
+    if (HAS_R2_CONFIG) {
+      const r2Key = `ApCalculusMCQ/${cleanFolder}/${safeVideoName}_en.mp4`;
+      const uploaded = await uploadToR2(r2Key, fs.readFileSync(enOutputFile), 'video/mp4');
+      if (uploaded) enCdn = `${getCdnDomain()}/${r2Key}`;
+    } else {
+      const res = await uploadVideoViaServerProxy(
+        baseUrl,
+        taskId,
+        'en',
+        enOutputFile,
+        `${safeVideoName}_en.mp4`,
+        task.folderPath,
+        CURRENT_AUTH_TOKEN,
+        true,
+        'ap-calculus-mcq'
+      );
+      if (res.success && res.cdnUrl) enCdn = res.cdnUrl;
+    }
+    if (enCdn) {
+      uploadedVideos['en'] = enCdn;
+      if (!primaryCdnUrl) primaryCdnUrl = enCdn;
+      log(localizeScriptLog(`✅ 英文视频上传成功: ${enCdn}`), 'green');
+    }
+  }
+
+  // 4. 更新任务状态为已完成
+  log(localizeScriptLog(`\n📝 正在更新微积分视频任务状态为已完成 (video_finished)...`), 'blue');
+  const updateSuccess = await updateTaskStatus(
+    baseUrl,
+    taskId,
+    'video_finished',
+    primaryCdnUrl,
+    task.folderPath,
+    primarySize,
+    uploadedVideos,
+    CURRENT_AUTH_TOKEN,
+    'ap-calculus-mcq'
+  );
+
+  if (updateSuccess) {
+    log(localizeScriptLog(`🎉 [微积分 MCQ] 任务 [${taskId}] 全部渲染与上传完成!`), 'green');
+  } else {
+    log(localizeScriptLog(`⚠️ [微积分 MCQ] 任务 [${taskId}] 视频已生成，但更新服务端状态失败`), 'yellow');
+  }
+}
+
+// ── 4. 单任务渲染调度 ────────────────────────────────────────────
 async function processSingleTask(
   task: any,
   baseUrl: string,
   options: RenderWorkerOptions = {}
 ) {
+  // 识别微积分 AP Calculus MCQ 模块任务并执行双语渲染流程
+  if (
+    task.__module === 'ap-calculus-mcq' ||
+    task.course ||
+    (typeof task.folderPath === 'string' && task.folderPath.includes('ApCalculusMCQ')) ||
+    task.question
+  ) {
+    return await processApCalculusTask(task, baseUrl, options);
+  }
   const taskId = task.videoId || task.id;
   const rawFolder = (task.folderPath || '').trim();
   const cleanFolder = rawFolder
@@ -2631,9 +2842,13 @@ async function triggerQueue(
       if (!task) {
         // 尝试即刻连贯抢占下一个任务，实现批量任务流水线无缝渲染，免除空档等待
         const clientScope = options.scope || (IS_ELECTRON_CLIENT ? 'current_user' : 'all_users');
-        const nextTask = await claimNextTask(baseUrl, CURRENT_AUTH_TOKEN, clientScope);
+        const nextTask = await claimNextTaskAnyModule(baseUrl, CURRENT_AUTH_TOKEN, clientScope);
         if (nextTask) {
-          log(localizeScriptLog(`\n⚡ [流水线接续抢单] 成功锁定待渲染任务: [${nextTask.videoId || nextTask.id}] ${nextTask.wordA} vs ${nextTask.wordB}`), 'green');
+          const modName = nextTask.__module === 'ap-calculus-mcq' ? '[微积分 MCQ]' : '[对比学单词]';
+          const taskDesc = nextTask.__module === 'ap-calculus-mcq'
+            ? `${nextTask.title || nextTask.folderPath || nextTask.id}`
+            : `${nextTask.wordA} vs ${nextTask.wordB}`;
+          log(localizeScriptLog(`\n⚡ [流水线接续抢单] 成功锁定待渲染任务: ${modName} [${nextTask.videoId || nextTask.id}] ${taskDesc}`), 'green');
           task = nextTask;
         } else {
           break;
@@ -2646,7 +2861,8 @@ async function triggerQueue(
       } catch (err: any) {
         log(localizeScriptLog(`❌ 任务 [${currentRunningTaskId}] 执行异常: ${err.message}，已自动恢复为待渲染状态`), 'red');
         if (currentRunningTaskId) {
-          await updateTaskStatus(baseUrl, currentRunningTaskId, 'waiting_render', undefined, task.folderPath).catch(() => null);
+          const mod: VideoModule = task.__module === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
+          await updateTaskStatus(baseUrl, currentRunningTaskId, 'waiting_render', undefined, task.folderPath, undefined, undefined, CURRENT_AUTH_TOKEN, mod).catch(() => null);
         }
       } finally {
         currentRunningTaskId = null;
@@ -2658,17 +2874,18 @@ async function triggerQueue(
   }
 }
 
-// ── 6. SSE   ( ) ────────────────────────────────
-async function startSSEListener(
+// ── 6. SSE 任务实时下发监听 (全模块多路长连接) ────────────────────────────────
+async function listenSSEForModule(
   baseUrl: string,
+  module: VideoModule,
   options: RenderWorkerOptions = {}
 ) {
-  // Next.js trailingSlash: true  ，  308
-  const eventsUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/compare-english-word/events/`;
+  const eventsUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/${module}/events/`;
+  const modLabel = module === 'ap-calculus-mcq' ? '微积分 MCQ' : '对比学单词';
 
   while (true) {
     try {
-      log(localizeScriptLog(`📡 正在建立 SSE 实时任务下发长连接: ${eventsUrl}...`), 'blue');
+      log(localizeScriptLog(`📡 正在建立 [${modLabel}] SSE 实时任务下发长连接: ${eventsUrl}...`), 'blue');
       const headers: Record<string, string> = {
         'Accept': 'text/event-stream',
         'Cache-Control': 'no-cache',
@@ -2682,7 +2899,7 @@ async function startSSEListener(
         throw new Error(localizeScriptLog(`无法建立 SSE 连接 (HTTP ${res.status})`));
       }
 
-      log(localizeScriptLog(`⚡ SSE 任务长连接已打通！已进入「即时事件下发」监听状态。`), 'green');
+      log(localizeScriptLog(`⚡ [${modLabel}] SSE 任务长连接已打通！已进入「即时事件下发」监听状态。`), 'green');
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder('utf-8');
@@ -2698,7 +2915,7 @@ async function startSSEListener(
 
         for (const block of parts) {
           const trimmed = block.trim();
-          if (!trimmed || trimmed.startsWith(':')) continue; 
+          if (!trimmed || trimmed.startsWith(':')) continue;
 
           let eventName = 'message';
           let dataStr = '';
@@ -2714,27 +2931,43 @@ async function startSSEListener(
           if (eventName === 'new_task' && dataStr) {
             try {
               const clientScope = options.scope || (IS_ELECTRON_CLIENT ? 'current_user' : 'all_users');
-              const claimedTask = await claimNextTask(baseUrl, CURRENT_AUTH_TOKEN, clientScope);
+              const claimedTask = await claimNextTask(baseUrl, CURRENT_AUTH_TOKEN, clientScope, module);
               if (claimedTask) {
-                log(localizeScriptLog(`\n🔔 [SSE 抢单成功] 成功锁定待渲染任务: [${claimedTask.videoId || claimedTask.id}] ${claimedTask.wordA} vs ${claimedTask.wordB}`), 'green');
+                const taskDesc = module === 'ap-calculus-mcq'
+                  ? `${claimedTask.title || claimedTask.folderPath || claimedTask.id}`
+                  : `${claimedTask.wordA} vs ${claimedTask.wordB}`;
+                log(localizeScriptLog(`\n🔔 [${modLabel} SSE 抢单成功] 成功锁定待渲染任务: [${claimedTask.videoId || claimedTask.id}] ${taskDesc}`), 'green');
                 enqueueRenderTask(claimedTask, baseUrl, options);
               } else {
-                log(localizeScriptLog(`\n🔔 [SSE 消息触发] 任务已被其他 Worker 提前锁定或非当前用户任务，跳过`), 'gray');
+                log(localizeScriptLog(`\n🔔 [${modLabel} SSE 消息触发] 任务已被其他 Worker 提前锁定或非当前用户任务，跳过`), 'gray');
               }
             } catch (err: any) {
-              log(localizeScriptLog(`解析或抢占 SSE 任务异常: ${err.message}`), 'red');
+              log(localizeScriptLog(`解析或抢占 [${modLabel}] SSE 任务异常: ${err.message}`), 'red');
             }
           } else if (eventName === 'ready') {
-            log(localizeScriptLog(`📡 服务端确认长连接就绪 (SSE Ready)`), 'gray');
+            log(localizeScriptLog(`📡 服务端确认 [${modLabel}] 长连接就绪 (SSE Ready)`), 'gray');
           }
         }
       }
     } catch (err: any) {
-      log(localizeScriptLog(`SSE 长连接中断: ${err.message}，5秒后自动重连...`), 'yellow');
+      log(localizeScriptLog(`[${modLabel}] SSE 长连接中断: ${err.message}，5秒后自动重连...`), 'yellow');
     }
 
     await new Promise((resolve) => setTimeout(resolve, 5000));
   }
+}
+
+async function startSSEListener(
+  baseUrl: string,
+  options: RenderWorkerOptions = {}
+) {
+  // 同时监听 CompareEnglishWord 与 ApCalculusMCQ 两个频道的任务下发
+  listenSSEForModule(baseUrl, 'compare-english-word', options).catch((err) => {
+    log(localizeScriptLog(`[对比学单词] SSE 线程异常: ${err.message}`), 'red');
+  });
+  listenSSEForModule(baseUrl, 'ap-calculus-mcq', options).catch((err) => {
+    log(localizeScriptLog(`[微积分 MCQ] SSE 线程异常: ${err.message}`), 'red');
+  });
 }
 
 // ── 7. 主启动入口 / 调度循环 ───────────────────────────────────────────
@@ -2803,9 +3036,13 @@ async function main() {
     try {
       // 如果当前已有任务正在执行或队列非空，跳过主动轮询，避免超额抢单
       if (!isProcessingQueue && pendingQueue.length === 0 && currentRunningTaskId == null) {
-        const claimedTask = await claimNextTask(baseUrl, CURRENT_AUTH_TOKEN, clientScope);
+        const claimedTask = await claimNextTaskAnyModule(baseUrl, CURRENT_AUTH_TOKEN, clientScope);
         if (claimedTask) {
-          log(localizeScriptLog(`\n⚡ [轮询抢单] 成功锁定待渲染任务: [${claimedTask.videoId || claimedTask.id}] ${claimedTask.wordA} vs ${claimedTask.wordB}`), 'green');
+          const modName = claimedTask.__module === 'ap-calculus-mcq' ? '[微积分 MCQ]' : '[对比学单词]';
+          const taskDesc = claimedTask.__module === 'ap-calculus-mcq'
+            ? `${claimedTask.title || claimedTask.folderPath || claimedTask.id}`
+            : `${claimedTask.wordA} vs ${claimedTask.wordB}`;
+          log(localizeScriptLog(`\n⚡ [轮询抢单] 成功锁定待渲染任务: ${modName} [${claimedTask.videoId || claimedTask.id}] ${taskDesc}`), 'green');
           enqueueRenderTask(claimedTask, baseUrl, options);
         } else if (!isProcessingQueue && currentRunningTaskId == null) {
           process.stdout.write(localizeScriptLog(`\r渲染调度服务端连接正常，当前队列中没有视频任务，等待中...\n`));
