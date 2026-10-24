@@ -12,5 +12,5 @@
     "esModuleInterop": true,
     "strict": false
   },
-  "include": ["scripts/CompareEnglishWord.ts", "src/functions/r2-client.ts"]
+  "include": ["scripts/RenderWorker.ts", "scripts/CompareEnglishWord.ts", "src/functions/r2-client.ts"]
 }

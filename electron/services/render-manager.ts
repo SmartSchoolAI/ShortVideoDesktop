@@ -579,15 +579,20 @@ export class RenderManager {
    * 彻底摆脱 pnpm / package.json 依赖，直接用 node 执行打包后的 JS
    */
   private resolveRenderScriptPath(): string {
-    const candidates = [
-      // 安装包环境：asar 解包后 resources 目录
-      path.join(process.resourcesPath || '', 'app.asar.unpacked', 'dist-electron', 'scripts', 'scripts', 'CompareEnglishWord.js'),
-      path.join(process.resourcesPath || '', 'dist-electron', 'scripts', 'scripts', 'CompareEnglishWord.js'),
-      // 开发环境：tsc 输出 dist-electron/scripts/scripts/CompareEnglishWord.js
-      path.join(__dirname, '..', 'dist-electron', 'scripts', 'scripts', 'CompareEnglishWord.js'),
-      path.join(__dirname, 'scripts', 'scripts', 'CompareEnglishWord.js'),
-      path.join(app.getAppPath(), 'dist-electron', 'scripts', 'scripts', 'CompareEnglishWord.js'),
-    ];
+    const scriptNames = ['RenderWorker.js', 'CompareEnglishWord.js'];
+    const candidates: string[] = [];
+
+    for (const name of scriptNames) {
+      candidates.push(
+        // 安装包环境：asar 解包后 resources 目录
+        path.join(process.resourcesPath || '', 'app.asar.unpacked', 'dist-electron', 'scripts', 'scripts', name),
+        path.join(process.resourcesPath || '', 'dist-electron', 'scripts', 'scripts', name),
+        // 开发环境：tsc 输出 dist-electron/scripts/scripts/
+        path.join(__dirname, '..', 'dist-electron', 'scripts', 'scripts', name),
+        path.join(__dirname, 'scripts', 'scripts', name),
+        path.join(app.getAppPath(), 'dist-electron', 'scripts', 'scripts', name)
+      );
+    }
     return candidates.find((p) => fs.existsSync(p)) || candidates[0];
   }
 

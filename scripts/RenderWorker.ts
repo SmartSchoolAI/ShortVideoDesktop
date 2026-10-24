@@ -1,0 +1,3071 @@
+#!/usr/bin/env tsx
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import crypto from 'crypto';
+import { spawn, execSync } from 'child_process';
+import { uploadToR2, CDN_BASE_DOMAIN } from '../src/functions/r2-client';
+
+// Material download helper function
+async function downloadFile(url: string, destPath: string, minSizeBytes = 1000): Promise<boolean> {
+  try {
+    const parentDir = path.dirname(destPath);
+    if (!fs.existsSync(parentDir)) {
+      fs.mkdirSync(parentDir, { recursive: true });
+    }
+
+    // Reuse if local file already exists and meets minimum size requirements
+    if (fs.existsSync(destPath)) {
+      const stats = fs.statSync(destPath);
+      if (stats.size >= minSizeBytes) {
+        return true;
+      }
+    }
+
+    // Attempt up to 2 downloads with a 10-second timeout
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const res = await fetch(url, {
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+          signal: AbortSignal.timeout(10000),
+        });
+        if (!res.ok) {
+          if (attempt < 2) {
+            await new Promise((r) => setTimeout(r, 1000));
+            continue;
+          }
+          return false;
+        }
+        const arrayBuffer = await res.arrayBuffer();
+        if (arrayBuffer.byteLength < minSizeBytes) return false;
+
+        fs.writeFileSync(destPath, new Uint8Array(arrayBuffer));
+        return true;
+      } catch (_) {
+        if (attempt >= 2) return false;
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
+    return false;
+  } catch (err: any) {
+    return false;
+  }
+}
+
+// Probe exact audio duration using ffprobe
+function getMediaExactDuration(filePath: string): number | null {
+  if (!fs.existsSync(filePath)) return null;
+  try {
+    const cmd = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`;
+    const stdout = execSync(cmd, { encoding: 'utf-8', timeout: 4000, stdio: ['ignore', 'pipe', 'ignore'] });
+    const val = parseFloat(stdout.trim());
+    if (!isNaN(val) && val > 0) {
+      return Number(val.toFixed(3));
+    }
+  } catch (e) {}
+  return null;
+}
+
+// Apply slight pitch shift to MP4 audio track
+// ： （Hz） ，
+// ：ffmpeg rubberband  （ ），  asetrate+atempo
+// pitchCents:  （ ），1  = 1/100  ≈ 0.058%
+// ±5~10 ，±2~6
+async function applyAudioPitchShift(mp4Path: string, pitchCents: number): Promise<boolean> {
+  if (!pitchCents || pitchCents === 0) return true;
+  if (!fs.existsSync(mp4Path)) return false;
+
+  const tmpPath = mp4Path.replace(/\.mp4$/, `_pitchshift_tmp.mp4`);
+
+  // pitch ratio = 2^(cents/1200)，  asetrate
+  const pitchRatio = Math.pow(2, pitchCents / 1200);
+  // asetrate  （  44100   48000，  48000  ）
+  const baseSampleRate = 48000;
+  const shiftedSampleRate = Math.round(baseSampleRate * pitchRatio);
+
+  // rubberband（ ， ）
+  // ：asetrate  （ ）+ atempo
+  const strategies: Array<{ name: string; audioFilter: string }> = [
+    {
+      name: 'rubberband',
+      audioFilter: `rubberband=pitch=${pitchRatio.toFixed(6)}`,
+    },
+    {
+      name: 'asetrate+atempo',
+      // asetrate  / （ ），atempo
+      audioFilter: `asetrate=${shiftedSampleRate},aresample=${baseSampleRate},atempo=${(1 / pitchRatio).toFixed(6)}`,
+    },
+  ];
+
+  for (const strategy of strategies) {
+    try {
+      // ffmpeg  ：  copy，
+      const cmd = [
+        'ffmpeg', '-y',
+        '-i', `"${mp4Path}"`,
+        '-vcodec', 'copy',
+        '-af', `"${strategy.audioFilter}"`,
+        '-acodec', 'aac',
+        '-b:a', '192k',
+        `"${tmpPath}"`,
+      ].join(' ');
+
+      execSync(cmd, { timeout: 120000, stdio: 'pipe' });
+
+      if (fs.existsSync(tmpPath) && fs.statSync(tmpPath).size > 10000) {
+        fs.renameSync(tmpPath, mp4Path);
+        return true;
+      }
+    } catch (_e) {
+      // ，
+      if (fs.existsSync(tmpPath)) {
+        try { fs.unlinkSync(tmpPath); } catch (_) {}
+      }
+    }
+  }
+
+  return false;
+}
+
+// Load multi-tier environment variables
+// 1.  ：  .env   .env.desktop
+// 2.  ：  .env，  .env.desktop
+function loadEnv() {
+  const procResourcesPath = (process as any).resourcesPath || '';
+  const isPackaged = Boolean(
+    procResourcesPath ||
+    __dirname.includes('.asar') ||
+    (process.env.ELECTRON_RUN_AS_NODE === '1' && !fs.existsSync(path.resolve(__dirname, '../../package.json')))
+  );
+
+  const candidatePaths = isPackaged
+    ? [
+        path.join(procResourcesPath, '.env.desktop'),
+        path.join(procResourcesPath, 'app.asar.unpacked', '.env.desktop'),
+        path.resolve(process.cwd(), '.env.desktop'),
+        path.resolve(__dirname, '../.env.desktop'),
+        path.resolve(__dirname, '../../.env.desktop'),
+      ].filter(Boolean)
+    : [
+        path.resolve(process.cwd(), '.env.desktop'),
+        path.resolve(__dirname, '../.env.desktop'),
+        path.resolve(__dirname, '../../.env.desktop'),
+        path.resolve(process.cwd(), '.env'),
+        path.resolve(process.cwd(), '.env.local'),
+        path.resolve(__dirname, '../.env'),
+        path.resolve(__dirname, '../.env.local'),
+      ].filter(Boolean);
+
+  for (const envPath of candidatePaths) {
+    if (fs.existsSync(envPath)) {
+      try {
+        const lines = fs.readFileSync(envPath, 'utf-8').split('\n');
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith('#')) continue;
+          const idx = trimmed.indexOf('=');
+          if (idx > 0) {
+            const key = trimmed.slice(0, idx).trim();
+            const val = trimmed.slice(idx + 1).trim().replace(/(^["'])|(["']$)/g, '');
+            if (!process.env[key]) {
+              process.env[key] = val;
+            }
+          }
+        }
+      } catch (e) {}
+      break;
+    }
+  }
+}
+loadEnv();
+
+// 、  Token
+function extractAuthToken(): string {
+  const args = process.argv.slice(2);
+  for (const a of args) {
+    if (a.startsWith('--token=')) {
+      return a.slice(8).trim();
+    }
+  }
+  if (process.env.SHORTVIDEO_AUTH_TOKEN && process.env.SHORTVIDEO_AUTH_TOKEN.trim()) {
+    return process.env.SHORTVIDEO_AUTH_TOKEN.trim();
+  }
+  if (process.env.AUTH_TOKEN && process.env.AUTH_TOKEN.trim()) {
+    return process.env.AUTH_TOKEN.trim();
+  }
+
+  // user_session.json
+  try {
+    const candidateDirs = [
+      path.join(process.env.APPDATA || '', 'shortvideo'),
+      path.join(process.env.APPDATA || '', 'ShortVideo'),
+      path.join(process.env.HOME || '', '.config', 'shortvideo'),
+      path.join(process.env.HOME || '', '.config', 'ShortVideo'),
+      path.join(os.homedir(), 'AppData', 'Roaming', 'shortvideo'),
+      path.join(os.homedir(), 'AppData', 'Roaming', 'ShortVideo'),
+      path.resolve(__dirname, '..'),
+    ];
+    for (const d of candidateDirs) {
+      if (!d) continue;
+      const sFile = path.join(d, 'user_session.json');
+      if (fs.existsSync(sFile)) {
+        const raw = fs.readFileSync(sFile, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (parsed?.token && typeof parsed.token === 'string') {
+          return parsed.token.trim();
+        }
+      }
+    }
+  } catch (_) {}
+
+  return '';
+}
+
+function decryptStoredToken(raw: string): string {
+  if (!raw || typeof raw !== 'string') return '';
+  const trimmed = raw.trim();
+  // 1.   JWT Token (xxx.yyy.zzz)，
+  if (/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(trimmed)) {
+    return trimmed;
+  }
+  // 2.   AES-256-CBC   JWT Token
+  try {
+    const keyHex = process.env.NEXT_PUBLIC_AESKEY || '68656c6c6f20776f726c64203132333435363738';
+    const ivHex = process.env.NEXT_PUBLIC_AESIV || '31323334353637383930313233343536';
+    const key = Buffer.from(keyHex.padEnd(64, '0'), 'hex');
+    const iv = Buffer.from(ivHex, 'hex');
+    const decipher = crypto.createDecipheriv('aes-256-cbc', key as any, iv as any);
+    let decrypted = decipher.update(trimmed, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    if (decrypted) {
+      try {
+        const parsed = JSON.parse(decrypted);
+        if (typeof parsed === 'string') return parsed.trim();
+        if (parsed && typeof parsed.token === 'string') return parsed.token.trim();
+      } catch {
+        return decrypted.trim();
+      }
+    }
+  } catch (_) {}
+  return trimmed;
+}
+
+const CURRENT_AUTH_TOKEN = decryptStoredToken(extractAuthToken());
+
+
+const DEFAULT_API_BASE =
+  process.env.SHORTVIDEO_API_BASE ||
+  process.env.NEXT_PUBLIC_APP_SITE_URL ||
+  process.env.NEXT_PUBLIC_SITE_ORIGIN ||
+  'https://app.shortvideo.ca';
+const getCdnDomain = () => process.env.NEXT_PUBLIC_DOWNLOAD_BASE_URL || CDN_BASE_DOMAIN || '';
+const POLL_INTERVAL_MS = 30000; // 30
+function resolveSafeRootDir(): string {
+  if (process.env.SHORTVIDEO_ROOT_DIR && !process.env.SHORTVIDEO_ROOT_DIR.includes('.asar')) {
+    return process.env.SHORTVIDEO_ROOT_DIR;
+  }
+  if (!__dirname.includes('.asar')) {
+    return path.resolve(__dirname, '..');
+  }
+  // app.asar  ， ，  .asar   ENOTDIR
+  const fallbackBase = process.env.APPDATA || process.env.HOME || os.homedir();
+  return path.join(fallbackBase, 'ShortVideo');
+}
+
+const ROOT_DIR = resolveSafeRootDir();
+
+/**
+ *  ：
+ * 1.   SHORTVIDEO_OUTPUT_DIR（ ，  %APPDATA%/shortvideo/out）
+ * 2.   APPDATA/shortvideo/out  
+ * 3.   out
+ */
+function resolveBaseOutputDir(): string {
+  if (process.env.SHORTVIDEO_OUTPUT_DIR && !process.env.SHORTVIDEO_OUTPUT_DIR.includes('.asar')) {
+    return process.env.SHORTVIDEO_OUTPUT_DIR;
+  }
+  if (__dirname.includes('.asar') || (process as any).resourcesPath) {
+    const fallbackBase = process.env.APPDATA || process.env.HOME || os.homedir();
+    return path.join(fallbackBase, 'shortvideo', 'out');
+  }
+  return path.join(ROOT_DIR, 'out');
+}
+
+// Cloudflare R2
+const HAS_R2_CONFIG = Boolean(
+  process.env.R2_ACCOUNT_ID &&
+  process.env.R2_ACCESS_KEY_ID &&
+  process.env.R2_SECRET_ACCESS_KEY
+);
+
+// CLI rendering script multi-language (14 languages) mechanism
+const SCRIPT_VALID_LANGS = ['zh', 'en', 'ja', 'ko', 'vi', 'th', 'id', 'es', 'fr', 'pt', 'de', 'it', 'ru', 'tr'] as const;
+type ScriptSupportedLang = typeof SCRIPT_VALID_LANGS[number];
+
+function normalizeScriptLang(lang?: string | null): ScriptSupportedLang {
+  if (!lang) return 'zh';
+  const clean = String(lang).toLowerCase().trim();
+  if ((SCRIPT_VALID_LANGS as readonly string[]).includes(clean)) {
+    return clean as ScriptSupportedLang;
+  }
+  const prefix = clean.split(/[-_]/)[0];
+  if ((SCRIPT_VALID_LANGS as readonly string[]).includes(prefix)) {
+    return prefix as ScriptSupportedLang;
+  }
+  return 'zh';
+}
+
+const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<ScriptSupportedLang, string>> }> = [
+  {
+    regex: /网络操作/g,
+    translations: {
+      "zh": "Network operation",
+      "en": "Network operation",
+      "ja": "Network operation",
+      "ko": "네트워크 작업",
+      "vi": "Thao tác mạng",
+      "th": "การดำเนินการเครือข่าย",
+      "id": "Operasi jaringan",
+      "es": "Operación de red",
+      "fr": "Opération réseau",
+      "pt": "Operação de rede",
+      "de": "Netzwerkoperation",
+      "it": "Operazione di rete",
+      "ru": "Сетевая операция",
+      "tr": "Ağ işlemi",
+    }
+  },
+  {
+    regex: /中文字幕/g,
+    translations: {
+      "zh": "Chinese Subtitles",
+      "en": "Chinese Subtitles",
+      "ja": "Chinese Subtitles",
+      "ko": "중국어 자막",
+      "vi": "Phụ đề tiếng Trung",
+      "th": "ซับไตเติลภาษาจีน",
+      "id": "Subtitel Bahasa Mandarin",
+      "es": "Subtítulos en chino",
+      "fr": "Sous-titres chinois",
+      "pt": "Legendas em chinês",
+      "de": "Chinesische Untertitel",
+      "it": "Sottotitoli in cinese",
+      "ru": "Китайские субтитры",
+      "tr": "Çince Altyazı",
+    }
+  },
+  {
+    regex: /纯英文/g,
+    translations: {
+      "zh": "English Only",
+      "en": "English Only",
+      "ja": "English Only",
+      "ko": "영어 전용",
+      "vi": "Chỉ tiếng Anh",
+      "th": "ภาษาอังกฤษเท่านั้น",
+      "id": "Hanya Bahasa Inggris",
+      "es": "Solo inglés",
+      "fr": "Anglais uniquement",
+      "pt": "Apenas inglês",
+      "de": "Nur Englisch",
+      "it": "Solo inglese",
+      "ru": "Только английский",
+      "tr": "Sadece İngilizce",
+    }
+  },
+  {
+    regex: /日文字幕/g,
+    translations: {
+      "zh": "Japanese Subtitles",
+      "en": "Japanese Subtitles",
+      "ja": "Japanese Subtitles",
+      "ko": "일본어 자막",
+      "vi": "Phụ đề tiếng Nhật",
+      "th": "ซับไตเติลภาษาญี่ปุ่น",
+      "id": "Subtitel Bahasa Jepang",
+      "es": "Subtítulos en japonés",
+      "fr": "Sous-titres japonais",
+      "pt": "Legendas em japonês",
+      "de": "Japanische Untertitel",
+      "it": "Sottotitoli in giapponese",
+      "ru": "Японские субтитры",
+      "tr": "Japonca Altyazı",
+    }
+  },
+  {
+    regex: /韩文字幕/g,
+    translations: {
+      "zh": "Korean Subtitles",
+      "en": "Korean Subtitles",
+      "ja": "Korean Subtitles",
+      "ko": "한국어 자막",
+      "vi": "Phụ đề tiếng Hàn",
+      "th": "ซับไตเติลเกาหลี",
+      "id": "Subtitel Bahasa Korea",
+      "es": "Subtítulos en coreano",
+      "fr": "Sous-titres coréens",
+      "pt": "Legendas em coreano",
+      "de": "Koreanische Untertitel",
+      "it": "Sottotitoli in coreano",
+      "ru": "Корейские субтитры",
+      "tr": "Korece Altyazı",
+    }
+  },
+  {
+    regex: /越南文字幕/g,
+    translations: {
+      "zh": "Vietnamese Subtitles",
+      "en": "Vietnamese Subtitles",
+      "ja": "Vietnamese Subtitles",
+      "ko": "베트남어 자막",
+      "vi": "Phụ đề tiếng Việt",
+      "th": "ซับไตเติลเวียดนาม",
+      "id": "Subtitel Bahasa Vietnam",
+      "es": "Subtítulos en vietnamita",
+      "fr": "Sous-titres vietnamiens",
+      "pt": "Legendas em vietnamita",
+      "de": "Vietnamesische Untertitel",
+      "it": "Sottotitoli in vietnamita",
+      "ru": "Вьетнамские субтитры",
+      "tr": "Vietnamca Altyazı",
+    }
+  },
+  {
+    regex: /泰文字幕/g,
+    translations: {
+      "zh": "Thai Subtitles",
+      "en": "Thai Subtitles",
+      "ja": "Thai Subtitles",
+      "ko": "태국어 자막",
+      "vi": "Phụ đề tiếng Thái",
+      "th": "ซับไตเติลไทย",
+      "id": "Subtitel Bahasa Thailand",
+      "es": "Subtítulos en tailandés",
+      "fr": "Sous-titres thaïlandais",
+      "pt": "Legendas em tailandês",
+      "de": "Thailändische Untertitel",
+      "it": "Sottotitoli in tailandese",
+      "ru": "Тайские субтитры",
+      "tr": "Tayca Altyazı",
+    }
+  },
+  {
+    regex: /印尼文字幕/g,
+    translations: {
+      "zh": "Indonesian Subtitles",
+      "en": "Indonesian Subtitles",
+      "ja": "Indonesian Subtitles",
+      "ko": "인도네시아어 자막",
+      "vi": "Phụ đề tiếng Indonesia",
+      "th": "ซับไตเติลอินโดนีเซีย",
+      "id": "Subtitel Bahasa Indonesia",
+      "es": "Subtítulos en indonesio",
+      "fr": "Sous-titres indonésiens",
+      "pt": "Legendas em indonésio",
+      "de": "Indonesische Untertitel",
+      "it": "Sottotitoli in indonesiano",
+      "ru": "Индонезийские субтитры",
+      "tr": "Endonezce Altyazı",
+    }
+  },
+  {
+    regex: /西班牙文字幕/g,
+    translations: {
+      "zh": "Spanish Subtitles",
+      "en": "Spanish Subtitles",
+      "ja": "Spanish Subtitles",
+      "ko": "스페인어 자막",
+      "vi": "Phụ đề tiếng Tây Ban Nha",
+      "th": "ซับไตเติลสเปน",
+      "id": "Subtitel Bahasa Spanyol",
+      "es": "Subtítulos en español",
+      "fr": "Sous-titres espagnols",
+      "pt": "Legendas em espanhol",
+      "de": "Spanische Untertitel",
+      "it": "Sottotitoli in spagnolo",
+      "ru": "Испанские субтитры",
+      "tr": "İspanyolca Altyazı",
+    }
+  },
+  {
+    regex: /法文字幕/g,
+    translations: {
+      "zh": "French Subtitles",
+      "en": "French Subtitles",
+      "ja": "French Subtitles",
+      "ko": "프랑스어 자막",
+      "vi": "Phụ đề tiếng Pháp",
+      "th": "ซับไตเติลฝรั่งเศส",
+      "id": "Subtitel Bahasa Prancis",
+      "es": "Subtítulos en francés",
+      "fr": "Sous-titres français",
+      "pt": "Legendas em francês",
+      "de": "Französische Untertitel",
+      "it": "Sottotitoli in francese",
+      "ru": "Французские субтитры",
+      "tr": "Fransızca Altyazı",
+    }
+  },
+  {
+    regex: /葡萄牙文字幕/g,
+    translations: {
+      "zh": "Portuguese Subtitles",
+      "en": "Portuguese Subtitles",
+      "ja": "Portuguese Subtitles",
+      "ko": "포르투갈어 자막",
+      "vi": "Phụ đề tiếng Bồ Đào Nha",
+      "th": "ซับไตเติลโปรตุเกส",
+      "id": "Subtitel Bahasa Portugis",
+      "es": "Subtítulos en portugués",
+      "fr": "Sous-titres portugais",
+      "pt": "Legendas em português",
+      "de": "Portugiesische Untertitel",
+      "it": "Sottotitoli in portoghese",
+      "ru": "Португальские субтитры",
+      "tr": "Portekizce Altyazı",
+    }
+  },
+  {
+    regex: /德文字幕/g,
+    translations: {
+      "zh": "German Subtitles",
+      "en": "German Subtitles",
+      "ja": "German Subtitles",
+      "ko": "독일어 자막",
+      "vi": "Phụ đề tiếng Đức",
+      "th": "ซับไตเติลเยอรมัน",
+      "id": "Subtitel Bahasa Jerman",
+      "es": "Subtítulos en alemán",
+      "fr": "Sous-titres allemands",
+      "pt": "Legendas em alemão",
+      "de": "Deutsche Untertitel",
+      "it": "Sottotitoli in tedesco",
+      "ru": "Немецкие субтитры",
+      "tr": "Almanca Altyazı",
+    }
+  },
+  {
+    regex: /意大利文字幕/g,
+    translations: {
+      "zh": "Italian Subtitles",
+      "en": "Italian Subtitles",
+      "ja": "Italian Subtitles",
+      "ko": "이탈리아어 자막",
+      "vi": "Phụ đề tiếng Ý",
+      "th": "ซับไตเติลอิตาลี",
+      "id": "Subtitel Bahasa Italia",
+      "es": "Subtítulos en italiano",
+      "fr": "Sous-titres italiens",
+      "pt": "Legendas em italiano",
+      "de": "Italienische Untertitel",
+      "it": "Sottotitoli in italiano",
+      "ru": "Итальянские субтитры",
+      "tr": "İtalyanca Altyazı",
+    }
+  },
+  {
+    regex: /俄文字幕/g,
+    translations: {
+      "zh": "Russian Subtitles",
+      "en": "Russian Subtitles",
+      "ja": "Russian Subtitles",
+      "ko": "러시아어 자막",
+      "vi": "Phụ đề tiếng Nga",
+      "th": "ซับไตเติลรัสเซีย",
+      "id": "Subtitel Bahasa Rusia",
+      "es": "Subtítulos en ruso",
+      "fr": "Sous-titres russes",
+      "pt": "Legendas em russo",
+      "de": "Russische Untertitel",
+      "it": "Sottotitoli in russo",
+      "ru": "Русские субтитры",
+      "tr": "Rusça Altyazı",
+    }
+  },
+  {
+    regex: /土耳其文字幕/g,
+    translations: {
+      "zh": "Turkish Subtitles",
+      "en": "Turkish Subtitles",
+      "ja": "Turkish Subtitles",
+      "ko": "터키어 자막",
+      "vi": "Phụ đề tiếng Thổ Nhĩ Kỳ",
+      "th": "ซับไตเติลตุรกี",
+      "id": "Subtitel Bahasa Turki",
+      "es": "Subtítulos en turco",
+      "fr": "Sous-titres turcs",
+      "pt": "Legendas em turco",
+      "de": "Türkische Untertitel",
+      "it": "Sottotitoli in turco",
+      "ru": "Турецкие субтитры",
+      "tr": "Türkçe Altyazı",
+    }
+  },
+  {
+    regex: /根据任务语言设定检测到 (\d+) 种渲染版本，即将开始渲染[:：]/g,
+    translations: {
+      "zh": "Detected $1 render versions based on task language settings, starting render:",
+      "en": "Detected $1 render versions based on task language settings, starting render:",
+      "ja": "Detected $1 render versions based on task language settings, starting render:",
+      "ko": "작업 언어 설정에 따라 $1개 렌더링 버전이 감지되었습니다. 렌더링을 시작합니다:",
+      "vi": "Đã phát hiện $1 phiên bản render dựa trên cài đặt ngôn ngữ, chuẩn bị bắt đầu render:",
+      "th": "ตรวจพบ $1 เวอร์ชันเรนเดอร์ตามการตั้งค่าภาษา กำลังเริ่มเรนเดอร์:",
+      "id": "Mendeteksi $1 versi render berdasarkan pengaturan bahasa, memulai render:",
+      "es": "Se detectaron $1 versiones de renderizado según la configuración de idioma, iniciando:",
+      "fr": "Détection de $1 versions de rendu basées sur la langue, démarrage du rendu :",
+      "pt": "Detectadas $1 versões de renderização com base no idioma, iniciando:",
+      "de": "$1 Rendering-Versionen basierend auf den Sprachoptionen erkannt, Rendering wird gestartet:",
+      "it": "Rilevate $1 versioni di rendering in base alla lingua, avvio del rendering:",
+      "ru": "Обнаружено $1 версий рендеринга на основе настроек языка, запуск рендеринга:",
+      "tr": "Görev dil ayarlarına göre $1 işleme sürümü algılandı, işleme başlatılıyor:",
+    }
+  },
+  {
+    regex: /正在执行【(.*?)】渲染 \((.*?)\)\.\.\./g,
+    translations: {
+      "zh": "正在执行【$1】渲染 ($2)...",
+      "en": "Executing [$1] rendering ($2)...",
+      "ja": "【$1】のレンダリングを実行中 ($2)...",
+      "ko": "【$1】 렌더링 실행 중 ($2)...",
+      "vi": "Đang thực hiện render [$1] ($2)...",
+      "th": "กำลังเรนเดอร์ [$1] ($2)...",
+      "id": "Mengeksekusi rendering [$1] ($2)...",
+      "es": "Ejecutando renderizado de [$1] ($2)...",
+      "fr": "Exécution du rendu [$1] ($2)...",
+      "pt": "Executando renderização de [$1] ($2)...",
+      "de": "Rendering von [$1] wird ausgeführt ($2)...",
+      "it": "Esecuzione rendering di [$1] ($2)...",
+      "ru": "Выполнение рендеринга [$1] ($2)...",
+      "tr": "[$1] işlemesi yürütülüyor ($2)...",
+    }
+  },
+  {
+    regex: /【(.*?)】渲染完成! 耗时[:：]\s*(.*?)s \| 文件大小[:：]\s*(.*?) MB/g,
+    translations: {
+      "zh": "[$1] render completed! Time: $2s | File size: $3 MB",
+      "en": "[$1] render completed! Time: $2s | File size: $3 MB",
+      "ja": "[$1] render completed! Time: $2s | File size: $3 MB",
+      "ko": "【$1】 렌더링 완료! 소요 시간: $2s | 파일 크기: $3 MB",
+      "vi": "[$1] render thành công! Thời gian: $2s | Dung lượng: $3 MB",
+      "th": "[$1] เรนเดอร์เสร็จสมบูรณ์! ใช้เวลา: $2 วินาที | ขนาดไฟล์: $3 MB",
+      "id": "[$1] render selesai! Waktu: $2s | Ukuran berkas: $3 MB",
+      "es": "¡Renderizado de [$1] completado! Tiempo: $2s | Tamaño: $3 MB",
+      "fr": "Rendu de [$1] terminé ! Temps : $2s | Taille : $3 MB",
+      "pt": "Renderização de [$1] concluída! Tempo: $2s | Tamanho: $3 MB",
+      "de": "Rendering von [$1] abgeschlossen! Dauer: $2s | Dateigröße: $3 MB",
+      "it": "Rendering di [$1] completato! Tempo: $2s | Dimensione file: $3 MB",
+      "ru": "Рендеринг [$1] завершен! Время: $2с | Размер файла: $3 МБ",
+      "tr": "[$1] işlemesi tamamlandı! Süre: $2s | Dosya boyutu: $3 MB",
+    }
+  },
+  {
+    regex: /正在对音频轨做微小变调 \((.*?) 音分\)，人耳无感知但指纹辛辣差异化\.\.\./g,
+    translations: {
+      "zh": "Applying subtle pitch shift ($1 cents) to audio track to differentiate fingerprint...",
+      "en": "Applying subtle pitch shift ($1 cents) to audio track to differentiate fingerprint...",
+      "ja": "Applying subtle pitch shift ($1 cents) to audio track to differentiate fingerprint...",
+      "ko": "오디오 트랙에 미세 피치 시프트 ($1 센트) 적용 중...",
+      "vi": "Đang áp dụng điều chỉnh cao độ ($1 cents) cho dải âm thanh...",
+      "th": "กำลังปรับระดับเสียงในแทร็กเสียง ($1 เซนต์)...",
+      "id": "Menerapkan pitch shift halus ($1 sen) pada trek audio...",
+      "es": "Aplicando cambio sutil de tono ($1 cents) a la pista de audio...",
+      "fr": "Application d'un léger changement de hauteur ($1 cents) à la piste audio...",
+      "pt": "Aplicando alteração sutil de tom ($1 cents) na faixa de áudio...",
+      "de": "Subtile Tonhöhenänderung ($1 Cents) auf die Tonspur anwenden...",
+      "it": "Applicazione di un leggero cambio di tonalità ($1 cents) alla traccia audio...",
+      "ru": "Применение питч-шифта ($1 центов) к аудиодорожке...",
+      "tr": "Ses parçasına ince ton kaydırma ($1 cent) uygulanıyor...",
+    }
+  },
+  {
+    regex: /【(.*?)】代理上传成功! 耗时[:：]\s*(.*?)s \| 地址[:：]\s*(.*)/g,
+    translations: {
+      "zh": "[$1] proxy upload successful! Time: $2s | URL: $3",
+      "en": "[$1] proxy upload successful! Time: $2s | URL: $3",
+      "ja": "[$1] proxy upload successful! Time: $2s | URL: $3",
+      "ko": "【$1】 프록시 업로드 성공! 소요 시간: $2s | URL: $3",
+      "vi": "[$1] tải lên qua proxy thành công! Thời gian: $2s | URL: $3",
+      "th": "[$1] อัปโหลดผ่านพร็อกซีสำเร็จ! ใช้เวลา: $2 วินาที | URL: $3",
+      "id": "[$1] unggah proksi berhasil! Waktu: $2s | URL: $3",
+      "es": "¡[$1] carga proxy exitosa! Tiempo: $2s | URL: $3",
+      "fr": "Téléversement proxy [$1] réussi ! Temps : $2s | URL : $3",
+      "pt": "Upload por proxy de [$1] bem-sucedido! Tempo: $2s | URL: $3",
+      "de": "Proxy-Upload für [$1] erfolgreich! Dauer: $2s | URL: $3",
+      "it": "Caricamento proxy di [$1] riuscito! Tempo: $2s | URL: $3",
+      "ru": "Загрузка через прокси [$1] успешна! Время: $2с | URL: $3",
+      "tr": "[$1] vekil yüklemesi başarılı! Süre: $2s | URL: $3",
+    }
+  },
+  {
+    regex: /【(.*?)】本地直传成功[:：]\s*(.*)/g,
+    translations: {
+      "zh": "[$1] local direct upload successful: $2",
+      "en": "[$1] local direct upload successful: $2",
+      "ja": "[$1] local direct upload successful: $2",
+      "ko": "【$1】 로컬 직송 성공: $2",
+      "vi": "[$1] tải trực tiếp cục bộ thành công: $2",
+      "th": "[$1] อัปโหลดตรงในเครื่องสำเร็จ: $2",
+      "id": "[$1] unggah langsung lokal berhasil: $2",
+      "es": "[$1] Carga directa local exitosa: $2",
+      "fr": "Téléversement direct local [$1] réussi : $2",
+      "pt": "Upload direto local de [$1] bem-sucedido: $2",
+      "de": "Direkter lokaler Upload für [$1] erfolgreich: $2",
+      "it": "Caricamento diretto locale di [$1] riuscito: $2",
+      "ru": "Прямая локальная загрузка [$1] успешна: $2",
+      "tr": "[$1] yerel doğrudan yükleme başarılı: $2",
+    }
+  },
+  {
+    regex: /任务 \[(.*?)\] (\d+) 个多语言视频全部处理并发布完成!/g,
+    translations: {
+      "zh": "Task [$1] all $2 multilingual videos processed and published!",
+      "en": "Task [$1] all $2 multilingual videos processed and published!",
+      "ja": "Task [$1] all $2 multilingual videos processed and published!",
+      "ko": "작업 [$1] 총 $2개 다국어 동영상 처리 및 게시 완료!",
+      "vi": "Nhiệm vụ [$1] tất cả $2 video đa ngôn ngữ đã xử lý và xuất bản xong!",
+      "th": "งาน [$1] ทั้งหมด $2 วิดีโอหลายภาษาประมวลผลและเผยแพร่เสร็จสมบูรณ์!",
+      "id": "Tugas [$1] semua $2 video multibahasa telah diproses dan dipublikasikan!",
+      "es": "¡Tarea [$1] procesada y publicada para los $2 videos multilingües!",
+      "fr": "Tâche [$1] : les $2 vidéos multilingues ont été traitées et publiées !",
+      "pt": "Tarefa [$1]: todos os $2 vídeos multilíngues processados e publicados!",
+      "de": "Aufgabe [$1]: Alle $2 mehrsprachigen Videos verarbeitet und veröffentlicht!",
+      "it": "Attività [$1]: tutti i $2 video multilingue elaborati e pubblicati!",
+      "ru": "Задача [$1]: все $2 мультиязычных видео успешно обработаны и опубликованы!",
+      "tr": "Görev [$1] tüm $2 çok dilli video işlendi ve yayınlandı!",
+    }
+  },
+  {
+    regex: /正在向服务端同步状态为「渲染完成 \(video_finished\)」\.\.\./g,
+    translations: {
+      "zh": "Syncing status [video_finished] to server...",
+      "en": "Syncing status [video_finished] to server...",
+      "ja": "Syncing status [video_finished] to server...",
+      "ko": "서버로 상태 [video_finished] 동기화 중...",
+      "vi": "Đang đồng bộ trạng thái [video_finished] với máy chủ...",
+      "th": "กำลังซิงค์สถานะ [video_finished] ไปยังเซิร์ฟเวอร์...",
+      "id": "Menyinkronkan status [video_finished] ke server...",
+      "es": "Sincronizando estado [video_finished] con el servidor...",
+      "fr": "Synchronisation du statut [video_finished] avec le serveur...",
+      "pt": "Sincronizando status [video_finished] com o servidor...",
+      "de": "Status [video_finished] wird mit dem Server synchronisiert...",
+      "it": "Sincronizzazione dello stato [video_finished] con il server...",
+      "ru": "Синхронизация статуса [video_finished] с сервером...",
+      "tr": "[video_finished] durumu sunucuya senkronize ediliyor...",
+    }
+  },
+  {
+    regex: /🧹\ 检测到强制重新构建，清理历史缓存目录:\ \$\{BUNDLE_CACHE_DIR\}/g,
+    translations: {
+      "zh": "🧹 检测到强制重新构建，清理历史缓存目录: ${BUNDLE_CACHE_DIR}",
+      "en": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
+      "ja": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
+      "ko": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
+      "vi": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
+      "th": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
+      "id": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
+      "es": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
+      "fr": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
+      "pt": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
+      "de": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
+      "it": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
+      "ru": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
+      "tr": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
+    }
+  },
+  {
+    regex: /R2\s*上传接口返回失败/g,
+    translations: {
+      "zh": "R2 上传接口返回失败",
+      "en": "R2 upload API returned failure",
+      "ja": "R2 アップロード API が失敗を返しました",
+      "ko": "R2 업로드 API 실패 반환",
+      "vi": "API tải lên R2 trả về lỗi",
+      "th": "API อัปโหลด R2 ส่งคืนข้อผิดพลาด",
+      "id": "API unggah R2 mengembalikan kegagalan",
+      "es": "La API de carga de R2 devolvió un error",
+      "fr": "L'API de téléversement R2 a renvoyé un échec",
+      "pt": "A API de upload do R2 retornou falha",
+      "de": "R2-Upload-API hat einen Fehler gemeldet",
+      "it": "L'API di caricamento R2 ha restituito un errore",
+      "ru": "API загрузки R2 вернул ошибку",
+      "tr": "R2 yükleme API'si hata döndürdü",
+    }
+  },
+  {
+    regex: /R2\s*视频上传\s*\((.*?)\)/g,
+    translations: {
+      "zh": "R2 视频上传 ($1)",
+      "en": "R2 video upload ($1)",
+      "ja": "R2 動画アップロード ($1)",
+      "ko": "R2 비디오 업로드 ($1)",
+      "vi": "Tải video lên R2 ($1)",
+      "th": "อัปโหลดวิดีโอ R2 ($1)",
+      "id": "Unggah video R2 ($1)",
+      "es": "Subida de video a R2 ($1)",
+      "fr": "Téléversement vidéo R2 ($1)",
+      "pt": "Upload de vídeo no R2 ($1)",
+      "de": "R2-Video-Upload ($1)",
+      "it": "Caricamento video R2 ($1)",
+      "ru": "Загрузка видео в R2 ($1)",
+      "tr": "R2 video yükleme ($1)",
+    }
+  },
+  {
+    regex: /Remotion\s*打包失败[，,]\s*退出码[:：]\s*(.*?)/g,
+    translations: {
+      "zh": "Remotion 打包失败，退出码: $1",
+      "en": "Remotion bundle failed, exit code: $1",
+      "ja": "Remotion バンドル失敗、終了コード: $1",
+      "ko": "Remotion 번들 실패, 종료 코드: $1",
+      "vi": "Đóng gói Remotion thất bại, mã thoát: $1",
+      "th": "การบันเดิล Remotion ล้มเหลว รหัสออก: $1",
+      "id": "Bundling Remotion gagal, kode keluar: $1",
+      "es": "Fallo al empaquetar Remotion, código de salida: $1",
+      "fr": "Échec du paquet Remotion, code de sortie : $1",
+      "pt": "Falha no empacotamento do Remotion, código de saída: $1",
+      "de": "Remotion-Bundle fehlgeschlagen, Exit-Code: $1",
+      "it": "Creazione bundle Remotion non riuscita, codice di uscita: $1",
+      "ru": "Сборка Remotion не удалась, код выхода: $1",
+      "tr": "Remotion paketleme başarısız, çıkış kodu: $1",
+    }
+  },
+  {
+    regex: /Remotion\s*渲染进程异常退出[，,]\s*状态码[:：]\s*(.*?)/g,
+    translations: {
+      "zh": "Remotion 渲染进程异常退出，状态码: $1",
+      "en": "Remotion render process exited unexpectedly, status code: $1",
+      "ja": "Remotion レンダリングプロセスが異常終了しました。ステータスコード: $1",
+      "ko": "Remotion 렌더링 프로세스 비정상 종료, 상태 코드: $1",
+      "vi": "Tiến trình kết xuất Remotion thoát bất thường, mã trạng thái: $1",
+      "th": "กระบวนการเรนเดอร์ Remotion สิ้นสุดอย่างผิดปกติ รหัสสถานะ: $1",
+      "id": "Proses render Remotion keluar tidak normal, kode status: $1",
+      "es": "El proceso de renderizado Remotion finalizó de forma anormal, código de estado: $1",
+      "fr": "Le processus de rendu Remotion s'est arrêté anormalement, code d'état : $1",
+      "pt": "O processo de renderização Remotion saiu anormalmente, código de status: $1",
+      "de": "Remotion-Render-Prozess abnormal beendet, Statuscode: $1",
+      "it": "Il processo di rendering Remotion è terminato in modo anomalo, codice di stato: $1",
+      "ru": "Процесс рендеринга Remotion завершился аварийно, код состояния: $1",
+      "tr": "Remotion işleme süreci anormal şekilde sonlandı, durum kodu: $1",
+    }
+  },
+  {
+    regex: /SSE\s*监听主线程异常[:：]\s*(.*?)/g,
+    translations: {
+      "zh": "SSE 监听主线程异常: $1",
+      "en": "SSE listener main thread error: $1",
+      "ja": "SSE リスナーのメインスレッドエラー: $1",
+      "ko": "SSE 수신 메인 스레드 오류: $1",
+      "vi": "Lỗi luồng chính của trình nghe SSE: $1",
+      "th": "ข้อผิดพลาดเธรดหลักตัวฟัง SSE: $1",
+      "id": "Kesalahan utas utama pendengar SSE: $1",
+      "es": "Error en el subproceso principal del escucha SSE: $1",
+      "fr": "Erreur du thread principal de l'écouteur SSE : $1",
+      "pt": "Erro no thread principal do listener SSE: $1",
+      "de": "Fehler im Haupt-Thread des SSE-Listeners: $1",
+      "it": "Errore del thread principale del listener SSE: $1",
+      "ru": "Ошибка основного потока слушателя SSE: $1",
+      "tr": "SSE dinleyici ana iş parçacığı hatası: $1",
+    }
+  },
+  {
+    regex: /SSE\s*长连接中断[:：]\s*(.*?)[，,]\s*5\s*秒后自动重连\.\.\./g,
+    translations: {
+      "zh": "SSE 长连接中断: $1，5秒后自动重连...",
+      "en": "SSE connection interrupted: $1, reconnecting in 5s...",
+      "ja": "SSE 接続が中断されました: $1、5秒後に自動再接続...",
+      "ko": "SSE 연결 중단됨: $1, 5초 후 자동 재연결...",
+      "vi": "Kết nối SSE bị gián đoạn: $1, tự động kết nối lại sau 5 giây...",
+      "th": "การเชื่อมต่อ SSE ขัดข้อง: $1 กำลังเชื่อมต่อใหม่ใน 5 วินาที...",
+      "id": "Koneksi SSE terputus: $1, menyambung ulang otomatis dalam 5 detik...",
+      "es": "Conexión SSE interrumpida: $1, reconectando automáticamente en 5 s...",
+      "fr": "Connexion SSE interrompue : $1, reconnexion automatique dans 5 s...",
+      "pt": "Conexão SSE interrompida: $1, reconectando automaticamente em 5 s...",
+      "de": "SSE-Verbindung unterbrochen: $1, automatische Wiederverbindung in 5 s...",
+      "it": "Connessione SSE interrotta: $1, riconnessione automatica tra 5 s...",
+      "ru": "Соединение SSE прервано: $1, автоповтор через 5 сек...",
+      "tr": "SSE bağlantısı kesildi: $1, 5 saniye içinde otomatik yeniden bağlanılıyor...",
+    }
+  },
+  {
+    regex: /\[重试\s*(\d+\/\d+)\]\s*(.*?)\s*发生异常[:：]\s*(.*?)[，,]\s*([\d.]+)\s*秒后重试\.\.\./g,
+    translations: {
+      "zh": "[重试 $1] $2 发生异常: $3，$4秒后重试...",
+      "en": "[Retry $1] $2 exception: $3, retrying in $4s...",
+      "ja": "[再試行 $1] $2 例外が発生しました: $3、$4秒後に再試行...",
+      "ko": "[재시도 $1] $2 예외 발생: $3, $4초 후 재시도...",
+      "vi": "[Thử lại $1] $2 xảy ra ngoại lệ: $3, thử lại sau $4 giây...",
+      "th": "[ลองใหม่ $1] $2 เกิดข้อผิดพลาด: $3 ลองใหม่ใน $4 วินาที...",
+      "id": "[Coba lagi $1] $2 pengecualian: $3, mencoba lagi dalam $4 dtk...",
+      "es": "[Reintento $1] Excepción en $2: $3, reintentando en $4 s...",
+      "fr": "[Nouvel essai $1] Exception pour $2 : $3, nouvel essai dans $4 s...",
+      "pt": "[Nova tentativa $1] Exceção em $2: $3, tentando novamente em $4 s...",
+      "de": "[Wiederholung $1] Ausnahme bei $2: $3, erneuter Versuch in $4 s...",
+      "it": "[Nuovo tentativo $1] Eccezione in $2: $3, nuovo tentativo tra $4 s...",
+      "ru": "[Повтор $1] Исключение в $2: $3, повтор через $4 с...",
+      "tr": "[Yeniden Dene $1] $2 istisnası: $3, $4 sn içinde yeniden deneniyor...",
+    }
+  },
+  {
+    regex: /☁️\s*检测到本地开发\s*R2\s*密钥配置[，,]?\s*正在通过【本地直传通道】上传\s*(\d+)\s*个多语言视频至\s*Cloudflare\s*R2\.\.\./g,
+    translations: {
+      "zh": "☁️ 检测到本地开发 R2 密钥配置，正在通过【本地直传通道】上传 $1 个多语言视频至 Cloudflare R2...",
+      "en": "☁️ Local R2 config detected, uploading $1 multilingual videos to Cloudflare R2 via local direct channel...",
+      "ja": "☁️ ローカル R2 設定を検出、直接アップロード経由で $1 本の動画を Cloudflare R2 にアップロード中...",
+      "ko": "☁️ 로컬 R2 설정 감지됨, 로컬 직송 채널을 통해 $1개 다국어 비디오를 Cloudflare R2로 업로드 중...",
+      "vi": "☁️ Đã phát hiện cấu hình R2 cục bộ, đang tải $1 video đa ngôn ngữ lên Cloudflare R2 qua kênh trực tiếp...",
+      "th": "☁️ ตรวจพบการกำหนดค่า R2 ในเครื่อง กำลังอัปโหลดวิดีโอหลายภาษา $1 รายการไปยัง Cloudflare R2...",
+      "id": "☁️ Konfigurasi R2 lokal terdeteksi, mengunggah $1 video multibahasa ke Cloudflare R2 via saluran langsung...",
+      "es": "☁️ Configuración local de R2 detectada, subiendo $1 videos a Cloudflare R2 vía canal directo...",
+      "fr": "☁️ Configuration R2 locale détectée, téléversement de $1 vidéos multilingues vers Cloudflare R2...",
+      "pt": "☁️ Configuração R2 local detectada, enviando $1 vídeos para Cloudflare R2 via canal direto...",
+      "de": "☁️ Lokale R2-Konfiguration erkannt, lade $1 mehrsprachige Videos über direkten Kanal zu Cloudflare R2 hoch...",
+      "it": "☁️ Rilevata configurazione R2 locale, caricamento di $1 video multilingue su Cloudflare R2...",
+      "ru": "☁️ Обнаружена локальная конфигурация R2, загрузка $1 мультиязычных видео в Cloudflare R2...",
+      "tr": "☁️ Yerel R2 yapılandırması algılandı, $1 çok dilli video doğrudan Cloudflare R2'ye yükleniyor...",
+    }
+  },
+  {
+    regex: /单次运行模式完成，退出。/g,
+    translations: {
+      "zh": "单次运行模式完成，退出。",
+      "en": "Single run mode finished, exiting.",
+      "ja": "Single run mode finished, exiting.",
+      "ko": "Single run mode finished, exiting.",
+      "vi": "Single run mode finished, exiting.",
+      "th": "Single run mode finished, exiting.",
+      "id": "Single run mode finished, exiting.",
+      "es": "Single run mode finished, exiting.",
+      "fr": "Single run mode finished, exiting.",
+      "pt": "Single run mode finished, exiting.",
+      "de": "Single run mode finished, exiting.",
+      "it": "Single run mode finished, exiting.",
+      "ru": "Single run mode finished, exiting.",
+      "tr": "Single run mode finished, exiting.",
+    }
+  },
+  {
+    regex: /🌐\s*正在通过【服务端安全代理上传通道】同步\s*(\d+)\s*个多语言视频\.\.\./g,
+    translations: {
+      "zh": "🌐 正在通过【服务端安全代理上传通道】同步 $1 个多语言视频...",
+      "en": "🌐 Synchronizing $1 multilingual videos via server secure proxy channel...",
+      "ja": "🌐 サーバーセキュアプロキシ経由で $1 個のマルチ言語動画を同期中...",
+      "ko": "🌐 서버 보안 프록시 채널을 통해 $1개 다국어 비디오 동기화 중...",
+      "vi": "🌐 Đang đồng bộ $1 video đa ngôn ngữ qua kênh proxy bảo mật của máy chủ...",
+      "th": "🌐 กำลังซิงค์วิดีโอหลายภาษา $1 รายการผ่านช่องทางพร็อกซีความปลอดภัยของเซิร์ฟเวอร์...",
+      "id": "🌐 Menyinkronkan $1 video multibahasa melalui saluran proksi aman server...",
+      "es": "🌐 Sincronizando $1 videos multilingües mediante canal proxy seguro del servidor...",
+      "fr": "🌐 Synchronisation de $1 vidéos multilingues via le canal proxy sécurisé du serveur...",
+      "pt": "🌐 Sincronizando $1 vídeos multilíngues via canal proxy seguro do servidor...",
+      "de": "🌐 Synchronisiere $1 mehrsprachige Videos über den sicheren Server-Proxy-Kanal...",
+      "it": "🌐 Sincronizzazione di $1 video multilingue tramite canale proxy sicuro del server...",
+      "ru": "🌐 Синхронизация $1 мультиязычных видео через защищенный прокси сервера...",
+      "tr": "🌐 Güvenli sunucu proxy kanalı aracılığıyla $1 çok dilli video senkronize ediliyor...",
+    }
+  },
+  {
+    regex: /🎉\s*全部\s*(\d+)\s*个语言版本视频渲染完成!\s*总渲染耗时[:：]\s*([\d.]+)s/g,
+    translations: {
+      "zh": "🎉 全部 $1 个语言版本视频渲染完成! 总渲染耗时: $2s",
+      "en": "🎉 All $1 language versions render finished! Total duration: $2s",
+      "ja": "🎉 全 $1 言語バージョンのレンダリングが完了しました! 合計所要時間: $2s",
+      "ko": "🎉 전체 $1개 언어 버전 렌더링 완료! 총 소요 시간: $2s",
+      "vi": "🎉 Hoàn tất kết xuất toàn bộ $1 phiên bản ngôn ngữ! Tổng thời gian: $2s",
+      "th": "🎉 เรนเดอร์วิดีโอครบทั้ง $1 ภาษาแล้ว! เวลาทั้งหมด: $2 วินาที",
+      "id": "🎉 Semua $1 versi bahasa selesai dirender! Total durasi: $2s",
+      "es": "🎉 ¡Renderizado completado para las $1 versiones de idioma! Duración total: $2s",
+      "fr": "🎉 Rendu terminé pour les $1 versions linguistiques ! Durée totale : $2s",
+      "pt": "🎉 Renderização concluída para todas as $1 versões de idioma! Duração total: $2s",
+      "de": "🎉 Alle $1 Sprachversionen erfolgreich gerendert! Gesamtdauer: $2s",
+      "it": "🎉 Rendering completato per tutte le $1 versioni linguistiche! Durata totale: $2s",
+      "ru": "🎉 Рендеринг всех $1 языковых версий завершен! Общее время: $2s",
+      "tr": "🎉 Tüm $1 dil sürümünün işlemesi tamamlandı! Toplam süre: $2s",
+    }
+  },
+  {
+    regex: /🎬\s*根据任务语言设定检测到\s*(\d+)\s*种渲染版本[，,]?\s*即将开始渲染[:：]?/g,
+    translations: {
+      "zh": "🎬 根据任务语言设定检测到 $1 种渲染版本，即将开始渲染:",
+      "en": "🎬 Detected $1 render versions based on task settings, starting render:",
+      "ja": "🎬 タスク設定に基づき $1 種類のレンダリングバージョンを検出、レンダリングを開始:",
+      "ko": "🎬 작업 언어 설정에 따라 $1개 렌더링 버전 감지됨, 렌더링 시작:",
+      "vi": "🎬 Đã phát hiện $1 phiên bản kết xuất theo cài đặt tác vụ, bắt đầu kết xuất:",
+      "th": "🎬 ตรวจพบเวอร์ชันการเรนเดอร์ $1 เวอร์ชันตามการตั้งค่างาน กำลังเริ่มเรนเดอร์:",
+      "id": "🎬 Terdeteksi $1 versi render berdasarkan pengaturan tugas, memulai rendering:",
+      "es": "🎬 Detectadas $1 versiones de renderizado según configuración, iniciando:",
+      "fr": "🎬 Détection de $1 versions de rendu basées sur les paramètres, démarrage du rendu :",
+      "pt": "🎬 Detectadas $1 versões de renderização com base nas configurações, iniciando:",
+      "de": "🎬 $1 Rendering-Versionen basierend auf den Aufgabeneinstellungen erkannt, Rendering wird gestartet:",
+      "it": "🎬 Rilevate $1 versioni di rendering in base alle impostazioni, avvio del rendering:",
+      "ru": "🎬 Обнаружено $1 версий рендеринга на основе настроек задачи, запуск рендеринга:",
+      "tr": "🎬 Görev ayarlarına göre $1 işleme sürümü algılandı, işleme başlatılıyor:",
+    }
+  },
+  {
+    regex: /🔔\s*\[SSE\s*实时下发\]\s*收到新视频渲染任务[:：]?\s*\[(.*?)\]\s*(.*?)\s*vs\s*(.*?)/g,
+    translations: {
+      "zh": "🔔 [SSE 实时下发] 收到新视频渲染任务: [$1] $2 vs $3",
+      "en": "🔔 [SSE Realtime] Received new video render task: [$1] $2 vs $3",
+      "ja": "🔔 [SSE 配信] 新規動画レンダリングタスクを受信: [$1] $2 vs $3",
+      "ko": "🔔 [SSE 실시간 수신] 새 비디오 렌더링 작업 수신됨: [$1] $2 vs $3",
+      "vi": "🔔 [SSE Thời gian thực] Nhận tác vụ kết xuất video mới: [$1] $2 vs $3",
+      "th": "🔔 [SSE เรียลไทม์] ได้รับงานเรนเดอร์วิดีโอใหม่: [$1] $2 vs $3",
+      "id": "🔔 [SSE Realtime] Menerima tugas render video baru: [$1] $2 vs $3",
+      "es": "🔔 [SSE Tiempo Real] Nueva tarea de renderizado recibida: [$1] $2 vs $3",
+      "fr": "🔔 [SSE Temps Réel] Nouvelle tâche de rendu reçue : [$1] $2 vs $3",
+      "pt": "🔔 [SSE Tempo Real] Nova tarefa de renderização recebida: [$1] $2 vs $3",
+      "de": "🔔 [SSE Echtzeit] Neue Video-Rendering-Aufgabe empfangen: [$1] $2 vs $3",
+      "it": "🔔 [SSE Tempo Reale] Nuova attività di rendering ricevuta: [$1] $2 vs $3",
+      "ru": "🔔 [SSE Реальное время] Получена новая задача рендеринга: [$1] $2 vs $3",
+      "tr": "🔔 [SSE Gerçek Zamanlı] Yeni video işleme görevi alındı: [$1] $2 vs $3",
+    }
+  },
+  {
+    regex: /ℹ️\s*已启用\s*--skip-upload\s*选项[，,]?\s*全部视频仅保存在本地。/g,
+    translations: {
+      "zh": "ℹ️ 已启用 --skip-upload 选项，全部视频仅保存在本地。",
+      "en": "ℹ️ Option --skip-upload enabled, all videos saved locally.",
+      "ja": "ℹ️ --skip-upload オプションが有効です。すべての動画はローカルにのみ保存されます。",
+      "ko": "ℹ️ --skip-upload 옵션이 활성화되었습니다. 모든 비디오는 로컬에만 저장됩니다.",
+      "vi": "ℹ️ Tùy chọn --skip-upload đã bật, tất cả video chỉ lưu cục bộ.",
+      "th": "ℹ️ เปิดใช้งานตัวเลือก --skip-upload แล้ว วิดีโอทั้งหมดจะถูกบันทึกไว้ในเครื่องเท่านั้น",
+      "id": "ℹ️ Opsi --skip-upload diaktifkan, semua video hanya disimpan secara lokal.",
+      "es": "ℹ️ Opción --skip-upload habilitada, todos los videos se guardan solo localmente.",
+      "fr": "ℹ️ Option --skip-upload activée, toutes les vidéos sont enregistrées uniquement localement.",
+      "pt": "ℹ️ Opção --skip-upload ativada, todos os vídeos salvos apenas localmente.",
+      "de": "ℹ️ Option --skip-upload aktiviert, alle Videos werden nur lokal gespeichert.",
+      "it": "ℹ️ Opzione --skip-upload abilitata, tutti i video salvati solo localmente.",
+      "ru": "ℹ️ Включена опция --skip-upload, все видео сохраняются только локально.",
+      "tr": "ℹ️ --skip-upload seçeneği etkinleştirildi, tüm videolar yalnızca yerel olarak kaydedildi.",
+    }
+  },
+  {
+    regex: /⏳\s*正在向调度端同步状态为[「"“]正在渲染\s*\(rendering\)[」"”]\.\.\./g,
+    translations: {
+      "zh": "⏳ 正在向调度端同步状态为「正在渲染 (rendering)」...",
+      "en": "⏳ Syncing status to scheduler: \"rendering\"...",
+      "ja": "⏳ スケジューラーに「レンダリング中 (rendering)」ステータスを同期中...",
+      "ko": "⏳ 스케줄러에 '렌더링 중 (rendering)' 상태 동기화 중...",
+      "vi": "⏳ Đang đồng bộ trạng thái sang bộ lập lịch: \"đang kết xuất (rendering)\"...",
+      "th": "⏳ กำลังซิงค์สถานะไปยังตัวจัดกำหนดการ: \"กำลังเรนเดอร์ (rendering)\"...",
+      "id": "⏳ Menyinkronkan status ke penjadwal: \"sedang merender (rendering)\"...",
+      "es": "⏳ Sincronizando estado con el programador: \"renderizando (rendering)\"...",
+      "fr": "⏳ Synchronisation du statut avec le planificateur : \"rendu en cours (rendering)\"...",
+      "pt": "⏳ Sincronizando status com o agendador: \"renderizando (rendering)\"...",
+      "de": "⏳ Synchronisiere Status mit Planer: \"Rendering läuft (rendering)\"...",
+      "it": "⏳ Sincronizzazione stato con lo scheduler: \"rendering (rendering)\"...",
+      "ru": "⏳ Синхронизация статуса с диспетчером: «рендеринг (rendering)»...",
+      "tr": "⏳ Zamanlayıcıya durum senkronize ediliyor: \"işleniyor (rendering)\"...",
+    }
+  },
+  {
+    regex: /▶️\s*\[(\d+)\/(\d+)\]\s*正在执行【(.*?)】渲染\s*\((.*?)\)\.\.\./g,
+    translations: {
+      "zh": "▶️ [$1/$2] 正在执行【$3】渲染 ($4)...",
+      "en": "▶️ [$1/$2] Executing [$3] rendering ($4)...",
+      "ja": "▶️ [$1/$2] 【$3】のレンダリングを実行中 ($4)...",
+      "ko": "▶️ [$1/$2] 【$3】 렌더링 실행 중 ($4)...",
+      "vi": "▶️ [$1/$2] Đang thực hiện kết xuất [$3] ($4)...",
+      "th": "▶️ [$1/$2] กำลังเรนเดอร์ [$3] ($4)...",
+      "id": "▶️ [$1/$2] Mengeksekusi rendering [$3] ($4)...",
+      "es": "▶️ [$1/$2] Ejecutando renderizado de [$3] ($4)...",
+      "fr": "▶️ [$1/$2] Exécution du rendu [$3] ($4)...",
+      "pt": "▶️ [$1/$2] Executando renderização de [$3] ($4)...",
+      "de": "▶️ [$1/$2] Rendering von [$3] wird ausgeführt ($4)...",
+      "it": "▶️ [$1/$2] Esecuzione rendering di [$3] ($4)...",
+      "ru": "▶️ [$1/$2] Выполнение рендеринга [$3] ($4)...",
+      "tr": "▶️ [$1/$2] [$3] işlemesi yürütülüyor ($4)...",
+    }
+  },
+  {
+    regex: /🎯 任务调度范围/g,
+    translations: {
+      "zh": "🎯 任务调度范围",
+      "en": "🎯 Task scheduling scope",
+      "ja": "🎯 タスクスケジューリング範囲",
+      "ko": "🎯 작업 스케줄링 범위",
+      "vi": "🎯 Phạm vi lập lịch tác vụ",
+      "th": "🎯 ขอบเขตการจัดตารางงาน",
+      "id": "🎯 Cakupan penjadwalan tugas",
+      "es": "🎯 Alcance de programación de tareas",
+      "fr": "🎯 Portée de planification des tâches",
+      "pt": "🎯 Escopo de agendamento de tarefas",
+      "de": "🎯 Bereich der Aufgabenplanung",
+      "it": "🎯 Ambito di pianificazione delle attività",
+      "ru": "🎯 Область планирования задач",
+      "tr": "🎯 Görev zamanlama kapsamı",
+    }
+  },
+  {
+    regex: /仅限当前登录用户 \(Electron 客户端模式\)/g,
+    translations: {
+      "zh": "仅限当前登录用户 (Electron 客户端模式)",
+      "en": "Current logged-in user only (Electron client mode)",
+      "ja": "現在のログインユーザーのみ (Electronクライアントモード)",
+      "ko": "현재 로그인한 사용자 전용 (Electron 클라이언트 모드)",
+      "vi": "Chỉ người dùng hiện tại đã đăng nhập (Chế độ máy khách Electron)",
+      "th": "เฉพาะผู้ใช้ที่เข้าสู่ระบบปัจจุบันเท่านั้น (โหมดไคลเอ็นต์ Electron)",
+      "id": "Hanya pengguna yang sedang masuk (Mode klien Electron)",
+      "es": "Solo usuario actual conectado (Modo cliente Electron)",
+      "fr": "Utilisateur connecté actuel uniquement (Mode client Electron)",
+      "pt": "Apenas usuário conectado atual (Modo cliente Electron)",
+      "de": "Nur aktuell angemeldeter Benutzer (Electron-Client-Modus)",
+      "it": "Solo utente attualmente connesso (Modalità client Electron)",
+      "ru": "Только текущий вошедший пользователь (Режим клиента Electron)",
+      "tr": "Yalnızca oturum açmış geçerli kullanıcı (Electron istemci modu)",
+    }
+  },
+  {
+    regex: /全局任务队列 \(支持渲染所有用户的待处理视频 - CLI 模式\)/g,
+    translations: {
+      "zh": "全局任务队列 (支持渲染所有用户的待处理视频 - CLI 模式)",
+      "en": "Global task queue (Renders pending videos for all users - CLI mode)",
+      "ja": "グローバルタスクキュー (全ユーザーの保留中動画のレンダリング対応 - CLIモード)",
+      "ko": "전역 작업 큐 (모든 사용자의 대기 중 비디오 렌더링 지원 - CLI 모드)",
+      "vi": "Hàng đợi tác vụ toàn cầu (Hiển thị video đang chờ cho tất cả người dùng - Chế độ CLI)",
+      "th": "คิวงานส่วนกลาง (เรนเดอร์วิดีโอที่รอดำเนินการของผู้ใช้ทั้งหมด - โหมด CLI)",
+      "id": "Antrean tugas global (Merender video tertunda untuk semua pengguna - Mode CLI)",
+      "es": "Cola de tareas global (Renderiza videos pendientes para todos los usuarios - Modo CLI)",
+      "fr": "File d'attente globale des tâches (Rendu des vidéos en attente pour tous les utilisateurs - Mode CLI)",
+      "pt": "Fila global de tarefas (Renderiza vídeos pendentes para todos os usuários - Modo CLI)",
+      "de": "Globale Aufgabenwarteschlange (Rendert ausstehende Videos für alle Benutzer - CLI-Modus)",
+      "it": "Coda globale delle attività (Esegue il rendering dei video in sospeso per tutti gli utenti - Modalità CLI)",
+      "ru": "Глобальная очередь задач (Рендеринг ожидающих видео для всех пользователей - Режим CLI)",
+      "tr": "Genel görev kuyruğu (Tüm kullanıcılar için bekleyen videoları işler - CLI modu)",
+    }
+  },
+  {
+    regex: /流水线接续抢单/g,
+    translations: {
+      "zh": "流水线接续抢单",
+      "en": "Pipeline Continuous Claiming",
+      "ja": "パイプライン継続タスク取得",
+      "ko": "파이프라인 연속 작업 잠금",
+      "vi": "Nhận tác vụ liên tục dạng đường ống",
+      "th": "การรับงานต่อเนื่องแบบไปป์ไลน์",
+      "id": "Pengambilan tugas berkelanjutan pipeline",
+      "es": "Reclamación continua de tareas en canalización",
+      "fr": "Réclamation continue des tâches en pipeline",
+      "pt": "Reivindicação contínua de tarefas em pipeline",
+      "de": "Kontinuierliche Pipeline-Aufgabenübernahme",
+      "it": "Acquisizione continua di attività in pipeline",
+      "ru": "Непрерывный захват задач конвейера",
+      "tr": "Ardışık düzen sürekli görev alma",
+    }
+  },
+  {
+    regex: /检测到当前目录缺少图片素材，正在检查是否为共享视频并自动溯源查找原专辑图片\.\.\./g,
+    translations: {
+      "zh": "检测到当前目录缺少图片素材，正在检查是否为共享视频并自动溯源查找原专辑图片...",
+      "en": "Missing image assets in current directory, checking if shared video to trace source album images...",
+      "ja": "現在のディレクトリに画像素材が見つかりません。共有アルバムの元画像を追跡確認中...",
+      "ko": "현재 디렉터리에 이미지 에셋이 없습니다. 공유 비디오인지 확인하고 원본 앨범 이미지를 추적 중...",
+      "vi": "Thiếu tài nguyên hình ảnh trong thư mục hiện tại, đang kiểm tra video chia sẻ để tìm hình ảnh gốc...",
+      "th": "ไม่พบรูปภาพในไดเรกทอรีปัจจุบัน กำลังตรวจสอบว่าเป็นวิดีโอที่แชร์และค้นหารูปภาพต้นฉบับ...",
+      "id": "Aset gambar tidak ditemukan di direktori saat ini, memeriksa apakah video bersama untuk melacak gambar asli...",
+      "es": "Faltan recursos de imagen en el directorio actual, verificando si es compartido para rastrear imágenes originales...",
+      "fr": "Images manquantes dans le répertoire actuel, vérification du partage pour récupérer les images sources...",
+      "pt": "Imagens ausentes no diretório atual, verificando compartilhamento para obter imagens originais...",
+      "de": "Bildmaterial im aktuellen Verzeichnis fehlt, prüfe Freigabequelle zum Auffinden der Originalbilder...",
+      "it": "Immagini mancanti nella directory corrente, verifica condivisione per tracciare le immagini sorgente...",
+      "ru": "Изображения отсутствуют в текущем каталоге, проверка общего доступа для поиска исходных изображений...",
+      "tr": "Mevcut dizinde resim materyali eksik, paylaşılan video olup olmadığı kontrol ediliyor ve kaynak albüm resimleri aranıyor...",
+    }
+  },
+  {
+    regex: /成功定位到共享来源专辑: 用户 \[(.*?)\], 路径 \[(.*?)\]/g,
+    translations: {
+      "zh": "成功定位到共享来源专辑: 用户 [$1], 路径 [$2]",
+      "en": "Successfully located source shared album: User [$1], Path [$2]",
+      "ja": "共有元アルバムを特定しました: ユーザー [$1], パス [$2]",
+      "ko": "공유 원본 앨범 확인 완료: 사용자 [$1], 경로 [$2]",
+      "vi": "Đã định vị album nguồn được chia sẻ: Người dùng [$1], Đường dẫn [$2]",
+      "th": "ระบุอัลบั้มต้นทางที่แชร์สำเร็จ: ผู้ใช้ [$1], เส้นทาง [$2]",
+      "id": "Berhasil menemukan album sumber bersama: Pengguna [$1], Jalur [$2]",
+      "es": "Álbum compartido de origen localizado: Usuario [$1], Ruta [$2]",
+      "fr": "Album source partagé localisé avec succès : Utilisateur [$1], Chemin [$2]",
+      "pt": "Álbum de origem compartilhado localizado: Usuário [$1], Caminho [$2]",
+      "de": "Geteiltes Quellalbum erfolgreich ermittelt: Benutzer [$1], Pfad [$2]",
+      "it": "Album sorgente condiviso individuato: Utente [$1], Percorso [$2]",
+      "ru": "Успешно найден исходный общий альбом: Пользователь [$1], Путь [$2]",
+      "tr": "Paylaşılan kaynak albüm başarıyla belirlendi: Kullanıcı [$1], Yol [$2]",
+    }
+  },
+  {
+    regex: /正在从原共享专辑路径下载 01\.png 与 02\.png\.\.\./g,
+    translations: {
+      "zh": "正在从原共享专辑路径下载 01.png 与 02.png...",
+      "en": "Downloading 01.png and 02.png from source shared album path...",
+      "ja": "共有元のアルバムパスから 01.png と 02.png をダウンロード中...",
+      "ko": "원본 공유 앨범 경로에서 01.png 및 02.png 다운로드 중...",
+      "vi": "Đang tải xuống 01.png và 02.png từ đường dẫn album chia sẻ gốc...",
+      "th": "กำลังดาวน์โหลด 01.png และ 02.png จากพาธของอัลบั้มที่แชร์...",
+      "id": "Mengunduh 01.png dan 02.png dari jalur album sumber bersama...",
+      "es": "Descargando 01.png y 02.png desde la ruta del álbum compartido original...",
+      "fr": "Téléchargement de 01.png et 02.png depuis le chemin de l'album source...",
+      "pt": "Baixando 01.png e 02.png do caminho do álbum compartilhado de origem...",
+      "de": "01.png und 02.png aus dem Pfad des geteilten Quellalbums herunterladen...",
+      "it": "Download di 01.png e 02.png dal percorso dell'album condiviso sorgente...",
+      "ru": "Загрузка 01.png и 02.png из исходного каталога общего альбома...",
+      "tr": "Kaynak paylaşılan albüm yolundan 01.png ve 02.png indiriliyor...",
+    }
+  },
+  {
+    regex: /溯源下载成功！已自动获取原共享专辑的 01\.png 与 02\.png 图片素材。/g,
+    translations: {
+      "zh": "溯源下载成功！已自动获取原共享专辑的 01.png 与 02.png 图片素材。",
+      "en": "Source fallback download successful! Acquired 01.png and 02.png from original shared album.",
+      "ja": "追跡ダウンロード成功！元の共有アルバムから 01.png と 02.png を取得しました。",
+      "ko": "추적 다운로드 성공! 원본 공유 앨범의 01.png 및 02.png 이미지 에셋을 가져왔습니다.",
+      "vi": "Tải xuống nguồn thành công! Đã tự động lấy ảnh 01.png và 02.png từ album gốc.",
+      "th": "ดาวน์โหลดจากต้นฉบับสำเร็จ! รับรูปภาพ 01.png และ 02.png จากอัลบั้มแชร์เรียบร้อยแล้ว",
+      "id": "Unduh sumber berhasil! Mengambil gambar 01.png dan 02.png dari album asli.",
+      "es": "¡Descarga de origen exitosa! Se obtuvieron 01.png y 02.png del álbum compartido original.",
+      "fr": "Téléchargement source réussi ! 01.png et 02.png récupérés depuis l'album partagé d'origine.",
+      "pt": "Download de origem bem-sucedido! Imagens 01.png e 02.png obtidas do álbum original.",
+      "de": "Quell-Download erfolgreich! 01.png und 02.png aus Original-Freigabealbum bezogen.",
+      "it": "Download sorgente riuscito! 01.png e 02.png recuperati dall'album originale condiviso.",
+      "ru": "Успешная загрузка из источника! Автоматически получены изображения 01.png и 02.png из общего альбома.",
+      "tr": "Kaynak indirme başarılı! Orijinal paylaşılan albümden 01.png ve 02.png resimleri alındı.",
+    }
+  },
+  {
+    regex: /⚠️?\s*\[(?:内存|资源)告警\]\s*2x\s*并发下系统(?:内存|资源)受限\s*\(.*?\)/g,
+    translations: {
+      "zh": "⚠️ [内存告警] 2x 并发下系统资源受限 (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "en": "⚠️ [Resource Warning] System resources constrained at 2x concurrency (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "ja": "⚠️ [リソース警告] 2x 並列でシステムリソースが制限されました (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "ko": "⚠️ [리소스 경고] 2x 동시성에서 시스템 리소스가 제한되었습니다 (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "vi": "⚠️ [Cảnh báo tài nguyên] Tài nguyên hệ thống bị hạn chế ở mức 2x (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "th": "⚠️ [คำเตือนทรัพยากร] ทรัพยากรระบบจำกัดที่การทำงานพร้อมกัน 2x (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "id": "⚠️ [Peringatan Sumber Daya] Sumber daya sistem terbatas pada konkurensi 2x (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "es": "⚠️ [Advertencia de recursos] Recursos del sistema limitados en concurrencia 2x (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "fr": "⚠️ [Avertissement ressources] Ressources système limitées à 2x (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "pt": "⚠️ [Aviso de recursos] Recursos do sistema limitados em concorrência 2x (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "de": "⚠️ [Ressourcenwarnung] Systemressourcen begrenzt bei 2x Parallelität (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "it": "⚠️ [Avviso risorse] Risorse di sistema limitate a concorrenza 2x (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "ru": "⚠️ [Предупреждение о ресурсах] Ограничение системных ресурсов при параллелизме 2x (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+      "tr": "⚠️ [Kaynak Uyarısı] 2x eşzamanlılıkta sistem kaynakları yetersiz (ERR_INSUFFICIENT_RESOURCES / malloc failed)",
+    }
+  },
+  {
+    regex: /检测到 Chromium 内存不足 \(Out of memory\)，正在自动降级并发度为 1x 并重新尝试渲染\.\.\./g,
+    translations: {
+      "zh": "检测到 Chromium 内存不足 (Out of memory)，正在自动降级并发度为 1x 并重新尝试渲染...",
+      "en": "Detected Chromium out of memory, automatically reducing concurrency to 1x and retrying...",
+      "ja": "Chromium のメモリ不足を検出しました。並列度を 1x に自動縮小して再試行中...",
+      "ko": "Chromium 메모리 부족 감지, 동시성을 1x로 자동 축소하고 재시도 중...",
+      "vi": "Phát hiện Chromium thiếu bộ nhớ, tự động giảm số luồng xuống 1x và thử lại...",
+      "th": "ตรวจพบหน่วยความจำ Chromium ไม่เพียงพอ กำลังลดการทำงานพร้อมกันเป็น 1x และลองใหม่...",
+      "id": "Terdeteksi Chromium kehabisan memori, otomatis menurunkan konkurensi ke 1x dan mencoba lagi...",
+      "es": "Memoria insuficiente de Chromium detectada, reduciendo automáticamente la concurrencia a 1x y reintentando...",
+      "fr": "Mémoire Chromium insuffisante détectée, réduction de la concurrence à 1x et nouvel essai...",
+      "pt": "Memória insuficiente do Chromium detectada, reduzindo a concorrência para 1x e tentando novamente...",
+      "de": "Chromium-Speichermangel erkannt, Parallelität automatisch auf 1x reduziert und erneuter Versuch...",
+      "it": "Memoria insufficiente di Chromium rilevata, riduzione automatica della concorrenza a 1x e nuovo tentativo...",
+      "ru": "Обнаружена нехватка памяти Chromium, автоматическое снижение параллелизма до 1x и повторная попытка...",
+      "tr": "Chromium bellek yetersizliği algılandı, eşzamanlılık otomatik olarak 1x'e düşürülüyor ve yeniden deneniyor...",
+    }
+  },
+  {
+    regex: /降级并发重试渲染仍然失败[:：]\s*(.*)/g,
+    translations: {
+      "zh": "降级并发重试渲染仍然失败: $1",
+      "en": "Retry render after reducing concurrency still failed: $1",
+      "ja": "並列度を下げて再试行しましたがレンダリングに失敗しました: $1",
+      "ko": "동시성 축소 후 재시도 렌더링이 여전히 실패했습니다: $1",
+      "vi": "Thử lại kết xuất sau khi giảm đồng thời vẫn thất bại: $1",
+      "th": "ลองเรนเดอร์ใหม่หลังลดการทำงานพร้อมกันยังคงล้มเหลว: $1",
+      "id": "Mencoba kembali merender setelah menurunkan konkurensi masih gagal: $1",
+      "es": "El reintento de renderizado tras reducir la concurrencia aún falló: $1",
+      "fr": "Nouvel essai de rendu après réduction de la concurrence toujours échoué : $1",
+      "pt": "A nova tentativa de renderização após reduzir a concorrência ainda falhou: $1",
+      "de": "Wiederholter Rendering-Versuch nach Reduzierung der Parallelität fehlgeschlagen: $1",
+      "it": "Nuovo tentativo di rendering dopo la riduzione della concorrenza non riuscito: $1",
+      "ru": "Повторная попытка рендеринга после снижения параллелизма не удалась: $1",
+      "tr": "Eşzamanlılığı azalttıktan sonra işlemeyi yeniden deneme başarısız oldu: $1",
+    }
+  },
+  {
+    regex: /降级并发度 1x 重新渲染成功!/g,
+    translations: {
+      "zh": "降级并发度 1x 重新渲染成功!",
+      "en": "Successfully re-rendered after reducing concurrency to 1x!",
+      "ja": "並列度を 1x に縮小して再レンダリングに成功しました!",
+      "ko": "동시성을 1x로 축소한 후 재렌더링에 성공했습니다!",
+      "vi": "Kết xuất lại thành công sau khi giảm đồng thời xuống 1x!",
+      "th": "เรนเดอร์ใหม่สำเร็จหลังจากลดการทำงานพร้อมกันเป็น 1x!",
+      "id": "Berhasil merender ulang setelah menurunkan konkurensi ke 1x!",
+      "es": "¡Renderizado nuevamente con éxito tras reducir la concurrencia a 1x!",
+      "fr": "Rendu réussi après réduction de la concurrence à 1x !",
+      "pt": "Renderização bem-sucedida após reduzir a concorrência para 1x!",
+      "de": "Erfolgreich erneut gerendert nach Reduzierung der Parallelität auf 1x!",
+      "it": "Rendering completato con successo dopo aver ridotto la concorrenza a 1x!",
+      "ru": "Повторный рендеринг успешно завершен после снижения параллелизма до 1x!",
+      "tr": "Eşzamanlılık 1x'e düşürüldükten sonra yeniden işleme başarılı!",
+    }
+  }
+];
+
+function localizeScriptLog(rawText: string, lang?: string | null): string {
+  if (!rawText || typeof rawText !== 'string') return '';
+  const activeLang = normalizeScriptLang(lang || process.env.SHORTVIDEO_LANG || process.env.LANG || 'zh');
+  if (activeLang === 'zh') return rawText;
+
+  let text = rawText;
+  for (const rule of SCRIPT_I18N_RULES) {
+    const targetTpl = rule.translations[activeLang] || rule.translations.en;
+    if (targetTpl && rule.regex.test(text)) {
+      text = text.replace(rule.regex, targetTpl);
+    }
+  }
+  return text;
+}
+
+// ──   (  14  ) ───────────────────────────
+function log(msg: string, color: 'green' | 'blue' | 'yellow' | 'red' | 'gray' = 'gray', lang?: string) {
+  const colors = {
+    green: '\x1b[32m',
+    blue: '\x1b[34m',
+    yellow: '\x1b[33m',
+    red: '\x1b[31m',
+    gray: '\x1b[90m',
+  };
+  const reset = '\x1b[0m';
+  const activeLang = normalizeScriptLang(lang || process.env.SHORTVIDEO_LANG || process.env.LANG || 'zh');
+  const localizedMsg = localizeScriptLog(msg, activeLang);
+  const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  console.log(`${colors.gray}[${time}]${reset} ${colors[color]}${localizedMsg}${reset}`);
+}
+
+// ──   ──────────────────────────────────────────────────────
+async function retryOperation<T>(
+  operation: () => Promise<T>,
+  maxRetries = 3,
+  delayMs = 2000,
+  operationName = localizeScriptLog('网络操作')
+): Promise<T> {
+  let lastError: any;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (err: any) {
+      lastError = err;
+      if (attempt < maxRetries) {
+        log(localizeScriptLog(`[重试 ${attempt}/${maxRetries}] ${operationName} 发生异常: ${err.message}，${delayMs / 1000}秒后重试...`), 'yellow');
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+  throw lastError;
+}
+
+// ── 1. 任务拉取与原子抢单 ──────────────────────────────────
+function detectIsElectronClient(): boolean {
+  const args = process.argv.slice(2);
+  if (args.includes('--client=electron') || args.some((a) => a.startsWith('--client=electron'))) return true;
+  if (args.includes('--scope=current_user') || args.some((a) => a.startsWith('--scope=current_user'))) return true;
+  if (process.env.SHORTVIDEO_CLIENT_MODE === 'electron' || process.env.SHORTVIDEO_CLIENT_SCOPE === 'current_user') return true;
+  return false;
+}
+
+const IS_ELECTRON_CLIENT = detectIsElectronClient();
+
+async function fetchWaitingTasks(
+  baseUrl: string,
+  token: string = CURRENT_AUTH_TOKEN,
+  scope: 'current_user' | 'all_users' = (IS_ELECTRON_CLIENT ? 'current_user' : 'all_users')
+): Promise<any[]> {
+  const targetUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/compare-english-word/tasks/`;
+  try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const res = await fetch(targetUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        action: 'get_pending_render_tasks',
+        client: scope === 'current_user' ? 'electron' : 'cli',
+        scope,
+      }),
+    });
+
+    if (!res.ok) {
+      log(localizeScriptLog(`拉取待渲染任务失败 (HTTP ${res.status}): ${res.statusText}`), 'red');
+      return [];
+    }
+
+    const data = await res.json();
+    if (data && data.success && Array.isArray(data.tasks)) {
+      return data.tasks;
+    }
+    log(localizeScriptLog(`拉取待渲染任务失败: 服务端响应格式不符合预期`), 'red');
+    return [];
+  } catch (err: any) {
+    log(localizeScriptLog(`连接渲染调度服务端失败 (${baseUrl}): ${err.message}`), 'red');
+    return [];
+  }
+}
+
+export type VideoModule = 'compare-english-word' | 'ap-calculus-mcq';
+
+async function claimNextTask(
+  baseUrl: string,
+  token: string = CURRENT_AUTH_TOKEN,
+  scope: 'current_user' | 'all_users' = (IS_ELECTRON_CLIENT ? 'current_user' : 'all_users'),
+  module: VideoModule = 'compare-english-word'
+): Promise<any | null> {
+  const endpoint = module === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
+  const targetUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/${endpoint}/tasks/`;
+  try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(targetUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        action: 'claim_next_task',
+        client: scope === 'current_user' ? 'electron' : 'cli',
+        scope,
+      }),
+    });
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data && data.success && data.task) {
+      data.task.__module = module;
+      return data.task;
+    }
+    return null;
+  } catch (err) {
+    return null;
+  }
+}
+
+async function claimNextTaskAnyModule(
+  baseUrl: string,
+  token: string = CURRENT_AUTH_TOKEN,
+  scope: 'current_user' | 'all_users' = (IS_ELECTRON_CLIENT ? 'current_user' : 'all_users')
+): Promise<any | null> {
+  const cewTask = await claimNextTask(baseUrl, token, scope, 'compare-english-word');
+  if (cewTask) return cewTask;
+  const mcqTask = await claimNextTask(baseUrl, token, scope, 'ap-calculus-mcq');
+  if (mcqTask) return mcqTask;
+  return null;
+}
+
+// ── 2. 更新任务状态 ─────────────────────────────────────────────
+async function updateTaskStatus(
+  baseUrl: string,
+  taskId: string | number,
+  status: 'rendering' | 'video_finished' | 'waiting_render',
+  videoPath?: string,
+  folderPath?: string,
+  videoSize?: number,
+  videos?: Record<string, string>,
+  token: string = CURRENT_AUTH_TOKEN,
+  module: VideoModule = 'compare-english-word'
+): Promise<boolean> {
+  const endpoint = module === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
+  const targetUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/${endpoint}/tasks/`;
+  try {
+    return await retryOperation(
+      async () => {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const res = await fetch(targetUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            action: 'update_render_status',
+            taskId,
+            folderPath,
+            status,
+            videoPath,
+            videoSize,
+            videos,
+          }),
+        });
+        const data = await res.json();
+        return Boolean(res.ok && data.success);
+      },
+      2,
+      1500,
+      localizeScriptLog(`更新状态为 ${status}`)
+    );
+  } catch (err: any) {
+    log(localizeScriptLog(`更新任务状态(${status})失败: ${err.message}`), 'red');
+    return false;
+  }
+}
+
+// ── 2.1 服务端代理上传 MP4 产物至 Cloudflare R2 ─────────────────────────
+async function uploadVideoViaServerProxy(
+  baseUrl: string,
+  taskId: string | number,
+  lang: string,
+  filePath: string,
+  filename: string,
+  folderPath?: string,
+  token: string = CURRENT_AUTH_TOKEN,
+  isFinished: boolean = false,
+  module: VideoModule = 'compare-english-word'
+): Promise<{ success: boolean; cdnUrl?: string; error?: string }> {
+  const endpoint = module === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
+  const targetUrl = new URL(`${baseUrl.replace(/\/+$/, '')}/api/video/${endpoint}/upload-video`);
+  targetUrl.searchParams.set('taskId', String(taskId));
+  targetUrl.searchParams.set('lang', lang);
+  targetUrl.searchParams.set('filename', filename);
+  if (folderPath) {
+    targetUrl.searchParams.set('folderPath', folderPath);
+  }
+  if (isFinished) {
+    targetUrl.searchParams.set('isFinished', 'true');
+  }
+
+  const fileBytes = fs.readFileSync(filePath);
+  const headers: Record<string, string> = {
+    'Content-Type': 'video/mp4',
+    'x-task-id': String(taskId),
+    'x-lang': lang,
+    'x-filename': filename,
+  };
+  if (isFinished) {
+    headers['x-is-finished'] = 'true';
+  }
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  } else {
+    log(localizeScriptLog(`⚠️ [鉴权警告] 当前未传入登录 Token (CURRENT_AUTH_TOKEN 为空)，代理上传将被服务端拒绝 (401)`), 'red');
+  }
+
+  return await retryOperation(
+    async () => {
+      const res = await fetch(targetUrl.toString(), {
+        method: 'POST',
+        headers,
+        body: new Uint8Array(fileBytes),
+        signal: AbortSignal.timeout(180000), // 3分钟超时
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || `HTTP ${res.status} ${res.statusText}`);
+      }
+      return { success: true, cdnUrl: data.cdnUrl };
+    },
+    3,
+    2500,
+    localizeScriptLog(`服务端代理上传视频 (${lang})`)
+  );
+}
+
+
+// ── 3.   Remotion   ────────────────────────────────────────────
+// Electron   REMOTION_BUNDLE_CACHE_DIR（ ），
+// BundledCodeCache（ ）
+const BUNDLE_CACHE_DIR = process.env.REMOTION_BUNDLE_CACHE_DIR
+  || path.resolve(ROOT_DIR, 'BundledCodeCache/CompareEnglishWord');
+
+/**
+ * 动态定位 Remotion 执行器：
+ * 独立客户端环境下优先使用安装包自带的 @remotion/cli/remotion-cli.js，免外部环境依赖
+ */
+function getRemotionExecutor(): { command: string; baseArgs: string[]; isNode: boolean } {
+  const exeDir = process.execPath ? path.dirname(process.execPath) : '';
+  const procResourcesPath =
+    process.env.ELECTRON_RESOURCES_PATH ||
+    (process as any).resourcesPath ||
+    (exeDir ? path.join(exeDir, 'resources') : '');
+
+  const candidates = [
+    path.join(procResourcesPath, 'app.asar.unpacked', 'node_modules', '@remotion', 'cli', 'remotion-cli.js'),
+    path.join(procResourcesPath, 'app.asar', 'node_modules', '@remotion', 'cli', 'remotion-cli.js'),
+    path.join(__dirname, '..', 'node_modules', '@remotion', 'cli', 'remotion-cli.js'),
+    path.join(__dirname, '..', '..', 'node_modules', '@remotion', 'cli', 'remotion-cli.js'),
+    path.join(process.cwd(), 'node_modules', '@remotion', 'cli', 'remotion-cli.js'),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) {
+      return { command: process.execPath, baseArgs: [c], isNode: true };
+    }
+  }
+  return { command: 'npx', baseArgs: ['remotion'], isNode: false };
+}
+
+function buildEnhancedNodePath(): string {
+  const procResources = (process as any).resourcesPath || '';
+  const candidates = [
+    path.join(procResources, 'app.asar', 'node_modules'),
+    path.join(procResources, 'app.asar.unpacked', 'node_modules'),
+    path.resolve(ROOT_DIR, 'node_modules'),
+    path.resolve(ROOT_DIR, '..', 'node_modules'),
+    path.resolve(ROOT_DIR, '..', 'ShortVideo', 'node_modules'),
+    path.resolve(__dirname, '..', 'node_modules'),
+    path.resolve(__dirname, '..', '..', 'node_modules'),
+    path.resolve(__dirname, '..', '..', 'ShortVideo', 'node_modules'),
+    path.resolve(process.cwd(), 'node_modules'),
+    process.env.NODE_PATH || '',
+  ];
+
+  const validPaths: string[] = [];
+  const seen = new Set<string>();
+
+  for (const p of candidates) {
+    if (!p) continue;
+    try {
+      if (p.includes('.asar') || fs.existsSync(p)) {
+        if (!seen.has(p)) {
+          seen.add(p);
+          validPaths.push(p);
+        }
+      }
+    } catch (_) {}
+  }
+
+  return validPaths.join(path.delimiter);
+}
+
+/**
+ * 校验 Remotion Bundle 是否属于当前匹配的 4.0.534 版本
+ * 严格防止复用 4.0.520 的旧缓存导致版本不匹配警告
+ */
+function isRemotionBundleValid(bundleDir: string): boolean {
+  const indexHtml = path.join(bundleDir, 'index.html');
+  const bundleJs = path.join(bundleDir, 'bundle.js');
+  if (!fs.existsSync(indexHtml) || !fs.existsSync(bundleJs)) {
+    return false;
+  }
+
+  // 基础完整性校验：bundle.js 必须具备合理大小（正常约为 2.4MB，防止文件截断或损坏）
+  try {
+    const stat = fs.statSync(bundleJs);
+    if (stat.size < 500000) {
+      return false;
+    }
+  } catch (_) {
+    return false;
+  }
+
+  const versionFile = path.join(bundleDir, 'remotion-version.json');
+  if (fs.existsSync(versionFile)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(versionFile, 'utf8'));
+      if (data && data.version !== '4.0.534') {
+        return false;
+      }
+    } catch (_) {
+      return false;
+    }
+  }
+
+  try {
+    const stat = fs.statSync(bundleJs);
+    const readLen = Math.min(stat.size, 100000);
+    const fd = fs.openSync(bundleJs, 'r');
+    const buf = Buffer.alloc(readLen);
+    fs.readSync(fd, buf as any, 0, readLen, 0);
+    fs.closeSync(fd);
+    const head = buf.toString('utf8');
+    if (head.includes('4.0.520') && !head.includes('4.0.534')) {
+      return false;
+    }
+  } catch (_) {}
+
+  return true;
+}
+
+/**
+ * 递归复制目录，深度兼容 Electron app.asar 虚拟归档与普通物理路径
+ * 规避 Node 原生 fs.cpSync 在面对 asar 路径时调用 native opendir 抛出 ENOENT 的问题
+ */
+function copyDirSafe(srcDir: string, destDir: string): void {
+  if (!fs.existsSync(destDir)) {
+    fs.mkdirSync(destDir, { recursive: true });
+  }
+  const entries = fs.readdirSync(srcDir);
+  for (const entry of entries) {
+    const srcPath = path.join(srcDir, entry);
+    const destPath = path.join(destDir, entry);
+    const stat = fs.statSync(srcPath);
+    if (stat.isDirectory()) {
+      copyDirSafe(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
+/**
+ * 动态检索可用的内置预编译渲染包路径
+ */
+function getBuiltinBundleDir(): string | null {
+  const exeDir = process.execPath ? path.dirname(process.execPath) : '';
+  const procResourcesPath =
+    process.env.ELECTRON_RESOURCES_PATH ||
+    (process as any).resourcesPath ||
+    (exeDir ? path.join(exeDir, 'resources') : '');
+
+  const builtInBundleDirs = [
+    process.env.REMOTION_BUILTIN_BUNDLE_DIR,
+    path.join(procResourcesPath, 'app.asar.unpacked', 'build', 'remotion-bundle'),
+    path.join(procResourcesPath, 'app.asar', 'build', 'remotion-bundle'),
+    path.join(procResourcesPath, 'build', 'remotion-bundle'),
+    exeDir ? path.join(exeDir, 'resources', 'app.asar.unpacked', 'build', 'remotion-bundle') : '',
+    exeDir ? path.join(exeDir, 'resources', 'build', 'remotion-bundle') : '',
+    path.join(__dirname, '..', '..', 'build', 'remotion-bundle'),
+    path.join(__dirname, '..', 'build', 'remotion-bundle'),
+    path.resolve(ROOT_DIR, 'build/remotion-bundle'),
+  ].filter(Boolean) as string[];
+
+  for (const bDir of builtInBundleDirs) {
+    if (isRemotionBundleValid(bDir)) {
+      return bDir;
+    }
+  }
+  return null;
+}
+
+/**
+ * 确保 Remotion 渲染核心目录 ./BundledCodeCache/CompareEnglishWord 就绪
+ * 桌面控制台完全独立运行，100% 免源码依赖：直接加载本地缓存或安装包自带的预编译渲染核心
+ */
+let bundlePromise: Promise<string> | null = null;
+
+function ensureRemotionBundle(forceRebuild = false): Promise<string> {
+  const indexHtml = path.join(BUNDLE_CACHE_DIR, 'index.html');
+  const cacheBundleJs = path.join(BUNDLE_CACHE_DIR, 'bundle.js');
+  const builtinDir = getBuiltinBundleDir();
+
+  // 若存在内置预编译包，且当前缓存的 bundle.js 大小与内置包不一致，说明内置包已更新或本地缓存已损坏，自动清理重建
+  let cacheStale = false;
+  if (builtinDir && fs.existsSync(cacheBundleJs)) {
+    try {
+      const builtinSize = fs.statSync(path.join(builtinDir, 'bundle.js')).size;
+      const cacheSize = fs.statSync(cacheBundleJs).size;
+      if (builtinSize > 0 && Math.abs(builtinSize - cacheSize) > 0) {
+        cacheStale = true;
+      }
+    } catch (_) {}
+  }
+
+  if (!forceRebuild && !cacheStale && isRemotionBundleValid(BUNDLE_CACHE_DIR)) {
+    log(localizeScriptLog(`⚡ 检测到已有 Remotion 渲染核心缓存 (4.0.534): ${BUNDLE_CACHE_DIR}，直接复用免打包`), 'green');
+    return Promise.resolve(BUNDLE_CACHE_DIR);
+  } else if (!forceRebuild && (fs.existsSync(indexHtml) || cacheStale)) {
+    log(localizeScriptLog(`🧹 检测到 Remotion 缓存版本过期或不完整，自动清理并刷新: ${BUNDLE_CACHE_DIR}`), 'yellow');
+    try { fs.rmSync(BUNDLE_CACHE_DIR, { recursive: true, force: true }); } catch (_) {}
+  }
+
+  // 优先从安装包内置资源或自身工程 build/remotion-bundle 加载（完全无外部源码依赖）
+  if (builtinDir) {
+    log(localizeScriptLog(`📦 检测到客户端内置预编译 Remotion 渲染核心 (${builtinDir})，正在注入运行缓存...`), 'green');
+    try {
+      if (!fs.existsSync(BUNDLE_CACHE_DIR)) {
+        fs.mkdirSync(BUNDLE_CACHE_DIR, { recursive: true });
+      }
+      // 使用支持 asar 虚拟流的安全复制，秒级固化至运行缓存
+      copyDirSafe(builtinDir, BUNDLE_CACHE_DIR);
+      if (fs.existsSync(indexHtml) && isRemotionBundleValid(BUNDLE_CACHE_DIR)) {
+        log(localizeScriptLog(`✅ 内置 Remotion 渲染核心固化就绪: ${BUNDLE_CACHE_DIR}，免源码秒级执行！`), 'green');
+        return Promise.resolve(BUNDLE_CACHE_DIR);
+      }
+    } catch (cpErr: any) {
+      log(localizeScriptLog(`⚠️ 复制内置资源警告: ${cpErr.message}，直接挂载内置核心路径使用`), 'yellow');
+      return Promise.resolve(builtinDir);
+    }
+  }
+
+  // 若运行缓存与内置包均未检测到，报告核心组件状态
+  const errMsg = localizeScriptLog(`❌ 客户端视频渲染核心组件缺失，未检测到内置预编译包。请重新安装客户端以恢复渲染功能。`);
+  log(errMsg, 'red');
+  return Promise.reject(new Error(errMsg));
+}
+
+/**
+ *   Remotion   Web   (bundleTarget)   ( 、 、 )
+ *   .env.desktop   NEXT_PUBLIC_DOWNLOAD_BASE_URL (  https://download.shortvideo.ca)
+ *   bundleTarget/CompareEnglishWord/...，  (http:// localhost:3000)  404
+ */
+async function ensureBundleStaticAssets(bundleTarget: string, cleanFolder?: string): Promise<void> {
+  const downloadBaseUrl = getCdnDomain().replace(/\/+$/, '');
+
+  // Remotion CLI 本地静态服务根目录为 bundleTarget/public (若存在) 或 bundleTarget
+  const targetDirs = [path.join(bundleTarget, 'CompareEnglishWord')];
+  const publicDir = path.join(bundleTarget, 'public');
+  if (fs.existsSync(publicDir)) {
+    targetDirs.push(path.join(publicDir, 'CompareEnglishWord'));
+  }
+
+  for (const cewDir of targetDirs) {
+    if (!fs.existsSync(cewDir)) {
+      fs.mkdirSync(cewDir, { recursive: true });
+    }
+  }
+
+  // 针对主目录执行下载
+  const primaryDir = targetDirs[0];
+  const downloads: Promise<boolean>[] = [];
+
+  // 1. 公共音频: https://download.shortvideo.ca/CompareEnglishWord/background.mp3
+  const bgmDest = path.join(primaryDir, 'background.mp3');
+  const bgmUrl = `${downloadBaseUrl}/CompareEnglishWord/background.mp3`;
+  downloads.push(downloadFile(bgmUrl, bgmDest, 1000));
+
+  // 2. 底图素材: https://download.shortvideo.ca/CompareEnglishWord/style01/01.png ~ 06.png (以及 style02)
+  for (const style of ['style01', 'style02']) {
+    const styleDir = path.join(primaryDir, style);
+    if (!fs.existsSync(styleDir)) {
+      fs.mkdirSync(styleDir, { recursive: true });
+    }
+    for (let i = 1; i <= 6; i++) {
+      const filename = `0${i}.png`;
+      const imgDest = path.join(styleDir, filename);
+      const imgUrl = `${downloadBaseUrl}/CompareEnglishWord/${style}/${filename}`;
+      downloads.push(downloadFile(imgUrl, imgDest, 500));
+    }
+  }
+
+  // 3. 任务素材: 01.png, 02.png, audio_en.mp3
+  if (cleanFolder) {
+    const taskDir = path.join(primaryDir, cleanFolder);
+    if (!fs.existsSync(taskDir)) {
+      fs.mkdirSync(taskDir, { recursive: true });
+    }
+    const cdnFolderUrl = `${downloadBaseUrl}/CompareEnglishWord/${cleanFolder}`;
+    downloads.push(downloadFile(`${cdnFolderUrl}/01.png`, path.join(taskDir, '01.png'), 1000));
+    downloads.push(downloadFile(`${cdnFolderUrl}/02.png`, path.join(taskDir, '02.png'), 1000));
+    downloads.push(downloadFile(`${cdnFolderUrl}/audio_en.mp3`, path.join(taskDir, 'audio_en.mp3'), 2000));
+  }
+
+  await Promise.all(downloads);
+
+  // 若存在 public 目录，同步至 public/CompareEnglishWord，确保 Remotion 本地 Web 服务器 (http://localhost:3000) 100% 命中静态资源
+  if (targetDirs.length > 1) {
+    const publicCewDir = targetDirs[1];
+    try {
+      copyDirSafe(primaryDir, publicCewDir);
+    } catch (_) {}
+  }
+}
+
+let globalAdaptiveConcurrency: number | null = null;
+const OOM_ERROR_REGEX = /out of memory|ran out of memory|decrease the concurrency|memory or disk space|malloc.*failed|failed to allocate|quit with code 3752568763|generic error in an external library|ERR_INSUFFICIENT_RESOURCES|Target closed|Page\.bringToFront/i;
+
+async function executeRemotionRender(
+  outputFile: string,
+  props: Record<string, any>,
+  concurrency?: number | string,
+  compositionId: string = 'CompareEnglishWord'
+): Promise<void> {
+  // 确保 Remotion 渲染包已就绪
+  const bundleTarget = await ensureRemotionBundle();
+
+  // 仅在 CompareEnglishWord 渲染时同步专用本地静态素材
+  if (compositionId === 'CompareEnglishWord') {
+    log(localizeScriptLog(`📥 正在同步 Remotion 本地静态素材 (${getCdnDomain()}/CompareEnglishWord)...`), 'gray');
+    await ensureBundleStaticAssets(bundleTarget, props.folder);
+  }
+
+  return new Promise((resolve, reject) => {
+    const outputDir = path.dirname(outputFile);
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+    const propsFilePath = path.join(outputDir, `render_props_${props.lang || 'default'}.json`);
+    fs.writeFileSync(propsFilePath, JSON.stringify(props, null, 2), 'utf-8');
+
+    const executor = getRemotionExecutor();
+    const args = [
+      ...executor.baseArgs,
+      'render',
+      bundleTarget,
+      compositionId,
+      outputFile,
+      `--props=${propsFilePath}`,
+      '--disable-web-security',
+      '--log=info',
+    ];
+
+    // Windows 优化 ANGLE 与共享内存；Linux / macOS 设置沙箱及共享内存
+    if (process.platform === 'win32') {
+      args.push('--gl=angle');
+      args.push('--chromium-options=--disable-dev-shm-usage');
+    } else if (process.platform === 'linux') {
+      args.push('--chromium-options=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage');
+    } else {
+      args.push('--chromium-options=--disable-dev-shm-usage');
+    }
+
+    const defaultConcurrency = '2';
+    const finalConcurrency = concurrency || defaultConcurrency;
+    args.push(`--concurrency=${finalConcurrency}`);
+
+    log(localizeScriptLog(`🚀 执行渲染命令 (并发: ${finalConcurrency}x): ${executor.command} ${args.join(' ')}`), 'gray');
+
+    const extraPaths: string[] = [];
+    const procResources = (process as any).resourcesPath || '';
+    const remotionBaseDirs = [
+      path.join(procResources, 'app.asar.unpacked', 'node_modules', '@remotion'),
+      path.join(__dirname, '..', 'node_modules', '@remotion'),
+      path.join(process.cwd(), 'node_modules', '@remotion'),
+    ];
+
+    for (const baseDir of remotionBaseDirs) {
+      if (fs.existsSync(baseDir)) {
+        try {
+          const entries = fs.readdirSync(baseDir);
+          for (const entry of entries) {
+            if (entry.startsWith('compositor-')) {
+              extraPaths.push(path.join(baseDir, entry));
+            }
+          }
+        } catch {}
+      }
+    }
+
+    const currentPath = process.env.PATH || process.env.Path || '';
+    const newPath = [...extraPaths, currentPath].filter(Boolean).join(path.delimiter);
+
+    const sharedAppDir = process.env.APPDATA
+      ? path.join(process.env.APPDATA, 'shortvideo')
+      : (process.platform === 'darwin'
+        ? path.join(os.homedir(), 'Library', 'Application Support', 'shortvideo')
+        : path.join(os.homedir(), '.shortvideo'));
+
+    if (!fs.existsSync(sharedAppDir)) {
+      try { fs.mkdirSync(sharedAppDir, { recursive: true }); } catch (_) {}
+    }
+
+    const globalRemotionDir = path.join(sharedAppDir, '.remotion');
+    const localRemotionDir = path.join(outputDir, '.remotion');
+    if (!fs.existsSync(globalRemotionDir) && fs.existsSync(localRemotionDir)) {
+      try {
+        log(localizeScriptLog(`⚡ 检测到本地历史 Chromium 缓存，正在提升至全局共享目录: ${globalRemotionDir}`), 'green');
+        fs.cpSync(localRemotionDir, globalRemotionDir, { recursive: true });
+      } catch (_) {}
+    }
+
+    const proc = spawn(executor.command, args, {
+      cwd: sharedAppDir,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: !executor.isNode,
+      windowsHide: true,
+      env: {
+        ...process.env,
+        ...(executor.isNode ? { ELECTRON_RUN_AS_NODE: '1' } : {}),
+        NODE_PATH: buildEnhancedNodePath(),
+        PATH: newPath,
+        Path: newPath,
+        PUPPETEER_DISABLE_DEV_SHM_USAGE: 'true',
+        // 确保 Remotion 渲染内 Chromium 使用绝对 CDN 地址加载图片，而非退化为 localhost:3000
+        NEXT_PUBLIC_DOWNLOAD_BASE_URL: process.env.NEXT_PUBLIC_DOWNLOAD_BASE_URL || getCdnDomain() || 'https://download.shortvideo.ca',
+        DOWNLOAD_BASE_URL: process.env.DOWNLOAD_BASE_URL || getCdnDomain() || 'https://download.shortvideo.ca',
+      },
+    });
+
+    let lastIsProgress = false;
+    let stdoutBuffer = '';
+    let isOomError = false;
+    let hasLoggedOomWarning = false;
+
+    // 过滤掉内部 FFmpeg 与浏览器崩溃时倾泻的大量底层编译配置、模块版本、以及堆栈调试杂音
+    const NOISY_FFMPEG_LOG_REGEX = /^(?:ffmpeg version|built with|configuration:\s*--prefix|libavutil|libavcodec|libavformat|libavdevice|libavfilter|libswscale|libswresample|libpostproc|\[swscaler\s*@|\[libx264\s*@|\[vost#|\[vf#|\[out#|Conversion failed!|Nothing was written into output file|Terminating thread with return code|Task finished with error code|at renderFramesProc|at async renderFrameWithOptionToReject|Error:\s*FFmpeg quit with code|x264\s*\[error\]:\s*malloc.*failed|.*net::ERR_INSUFFICIENT_RESOURCES|.*ProtocolError:\s*Protocol error|.*Target closed|.*remotion\.dev\/docs\/target-closed)/i;
+
+    const processLogChunk = (chunk: Buffer | string) => {
+      stdoutBuffer += chunk.toString('utf-8');
+      const lines = stdoutBuffer.split(/[\r\n]+/);
+      stdoutBuffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (!trimmedLine) continue;
+
+        if (OOM_ERROR_REGEX.test(trimmedLine)) {
+          isOomError = true;
+          if (!hasLoggedOomWarning) {
+            hasLoggedOomWarning = true;
+            if (lastIsProgress) {
+              process.stdout.write('\n');
+              lastIsProgress = false;
+            }
+            log(localizeScriptLog('⚠️ [内存告警] 2x 并发下系统资源受限 (ERR_INSUFFICIENT_RESOURCES / malloc failed)'), 'yellow');
+          }
+        }
+
+        // 屏蔽 FFmpeg 崩溃时底层的冗长日志输出
+        if (NOISY_FFMPEG_LOG_REGEX.test(trimmedLine)) {
+          continue;
+        }
+
+        const progressMatch = trimmedLine.match(/Rendered\s+(\d+)\/(\d+)(?:,\s*time remaining:\s*([0-9a-zA-Z\s]+))?/i);
+        if (progressMatch) {
+          const cur = parseInt(progressMatch[1], 10);
+          const tot = parseInt(progressMatch[2], 10);
+          const eta = progressMatch[3] ? ` | 剩余预计: ${progressMatch[3].trim()}` : '';
+          const pct = ((cur / tot) * 100).toFixed(1);
+
+          if (process.stdout.isTTY) {
+            process.stdout.write(`\r\x1b[K⏳ 渲染进度: ${pct}% (${cur}/${tot} 帧)${eta}`);
+          } else {
+            if (cur === 1 || cur === tot || cur % 50 === 0) {
+              process.stdout.write(`⏳ 渲染进度: ${pct}% (${cur}/${tot} 帧)${eta}\n`);
+            }
+          }
+          lastIsProgress = true;
+        } else {
+          if (lastIsProgress) {
+            process.stdout.write('\n');
+            lastIsProgress = false;
+          }
+          process.stdout.write(trimmedLine + '\n');
+        }
+      }
+    };
+
+    proc.stdout?.on('data', processLogChunk);
+    proc.stderr?.on('data', processLogChunk);
+
+    proc.on('close', (code) => {
+      if (stdoutBuffer.trim()) {
+        if (OOM_ERROR_REGEX.test(stdoutBuffer)) {
+          isOomError = true;
+          if (!hasLoggedOomWarning) {
+            hasLoggedOomWarning = true;
+            if (lastIsProgress) {
+              process.stdout.write('\n');
+              lastIsProgress = false;
+            }
+            log(localizeScriptLog('⚠️ [内存告警] 2x 并发下系统资源受限 (ERR_INSUFFICIENT_RESOURCES / malloc failed)'), 'yellow');
+          }
+        }
+        if (!NOISY_FFMPEG_LOG_REGEX.test(stdoutBuffer.trim())) {
+          if (lastIsProgress) process.stdout.write('\n');
+          process.stdout.write(stdoutBuffer.trim() + '\n');
+          lastIsProgress = false;
+        }
+      } else if (lastIsProgress) {
+        process.stdout.write('\n');
+      }
+      if (code === 0) {
+        resolve();
+      } else {
+        const errorMsg = isOomError
+          ? localizeScriptLog('检测到渲染内存不足 (Out of memory / malloc failed)')
+          : localizeScriptLog(`Remotion 渲染进程异常退出，状态码: ${code}`);
+        const err: any = new Error(errorMsg);
+        err.isOom = isOomError;
+        err.exitCode = code;
+        reject(err);
+      }
+    });
+
+    proc.on('error', (err) => {
+      reject(err);
+    });
+  });
+}
+
+async function renderVideoWithRemotion(
+  outputFile: string,
+  props: Record<string, any>,
+  concurrency?: number | string,
+  compositionId: string = 'CompareEnglishWord'
+): Promise<void> {
+  const defaultConcurrency = '2';
+  const initialConcurrency = globalAdaptiveConcurrency ?? (concurrency || defaultConcurrency);
+  try {
+    await executeRemotionRender(outputFile, props, initialConcurrency, compositionId);
+  } catch (err: any) {
+    const isOom = Boolean(err?.isOom) || OOM_ERROR_REGEX.test(err?.message || '');
+    const currentNum = Number(initialConcurrency);
+    if (isOom && currentNum > 1) {
+      globalAdaptiveConcurrency = 1;
+      log(localizeScriptLog(`⚠️ 检测到渲染内存不足 (Out of memory / malloc failed)，正在自动降级并发度为 1x 并重新尝试渲染...`), 'yellow');
+      if (fs.existsSync(outputFile)) {
+        try { fs.unlinkSync(outputFile); } catch {}
+      }
+      try {
+        await executeRemotionRender(outputFile, props, 1, compositionId);
+        log(localizeScriptLog(`✅ 降级并发度 1x 重新渲染成功!`), 'green');
+        return;
+      } catch (retryErr: any) {
+        const msg = retryErr?.message || String(retryErr);
+        throw new Error(localizeScriptLog(`降级并发重试渲染仍然失败: ${msg}`));
+      }
+    }
+    throw err;
+  }
+}
+
+export interface RenderWorkerOptions {
+  skipUpload?: boolean;
+  concurrency?: number | string;
+  lang?: string;
+  scope?: 'current_user' | 'all_users';
+}
+
+/**
+ * 专门处理微积分 AP Calculus MCQ 视频渲染流水线
+ * 包含：中文视频渲染 (ApCalculusMCQ-Demo-ZH) 与 英文视频渲染 (ApCalculusMCQ-Demo-EN) 双版本自动生产与上云
+ */
+async function processApCalculusTask(
+  task: any,
+  baseUrl: string,
+  options: RenderWorkerOptions = {}
+) {
+  const taskId = task.videoId || task.id;
+  const rawFolder = (task.folderPath || '').trim();
+  const cleanFolder = rawFolder
+    .replace(/^\/+|\/+$/g, '')
+    .replace(/^ApCalculusMCQ\//, '') || `task_${taskId}`;
+
+  const rawEmail = (task.userEmail || '').trim();
+  const safeUserEmail = rawEmail
+    ? rawEmail.replace(/[\\/:*?"<>|]/g, '_')
+    : 'default_user';
+
+  let rawVideoName = cleanFolder;
+  if (!rawVideoName) {
+    rawVideoName = (task.title || '').trim() || `mcq_${taskId}`;
+  }
+  const safeVideoName = path.basename(rawVideoName)
+    .replace(/[\\/:*?"<>|]/g, '_')
+    .replace(/\s+/g, '_');
+
+  const baseOutputDir = resolveBaseOutputDir();
+  const outputDir = path.join(baseOutputDir, 'ApCalculusMCQ', safeUserEmail, safeVideoName);
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+
+  log(`\n============================================================`, 'blue');
+  log(localizeScriptLog(`🎬 [微积分 MCQ] 开始渲染任务: [${taskId}] ${safeVideoName}`), 'blue');
+  log(localizeScriptLog(`📂 本地输出目录: ${outputDir}`), 'gray');
+  log(`============================================================`, 'blue');
+
+  // 解析 summaryData
+  let questionData: any = task.summaryData;
+  if (typeof questionData === 'string') {
+    try {
+      questionData = JSON.parse(questionData);
+    } catch (_) {
+      questionData = {};
+    }
+  } else {
+    questionData = { ...(questionData || {}) };
+  }
+
+  // 确保获取云端最新最完整的微积分题目结构与声学逐词对齐结果
+  try {
+    const summaryCdnUrl = `${getCdnDomain()}/ApCalculusMCQ/${cleanFolder}/summary.json?_t=${Date.now()}`;
+    const sRes = await fetch(summaryCdnUrl);
+    if (sRes.ok) {
+      const remoteData = await sRes.json();
+      if (remoteData && typeof remoteData === 'object') {
+        questionData = { ...remoteData, ...questionData };
+        log(localizeScriptLog(`📥 已从云端同步最新微积分剧本与时间戳数据 (summary.json)`), 'gray');
+      }
+    }
+  } catch (_) { }
+
+  // 1. 渲染中文版本
+  const zhOutputFile = path.join(outputDir, `${safeVideoName}_zh.mp4`);
+  log(localizeScriptLog(`\n[1/2] 正在渲染中文视频 (ApCalculusMCQ-Demo-ZH)...`), 'blue');
+  const zhProps = {
+    question: questionData,
+    lang: 'zh',
+    showAudio: true,
+  };
+  await renderVideoWithRemotion(zhOutputFile, zhProps, options.concurrency, 'ApCalculusMCQ-Demo-ZH');
+  log(localizeScriptLog(`✅ 中文视频渲染完成: ${zhOutputFile}`), 'green');
+
+  // 2. 渲染英文版本
+  const enOutputFile = path.join(outputDir, `${safeVideoName}_en.mp4`);
+  log(localizeScriptLog(`\n[2/2] 正在渲染英文视频 (ApCalculusMCQ-Demo-EN)...`), 'blue');
+  const enProps = {
+    question: questionData,
+    lang: 'en',
+    showAudio: true,
+  };
+  await renderVideoWithRemotion(enOutputFile, enProps, options.concurrency, 'ApCalculusMCQ-Demo-EN');
+  log(localizeScriptLog(`✅ 英文视频渲染完成: ${enOutputFile}`), 'green');
+
+  // 3. 上传视频
+  const uploadedVideos: Record<string, string> = {};
+  let primaryCdnUrl = '';
+  let primarySize = 0;
+
+  if (fs.existsSync(zhOutputFile)) {
+    primarySize = fs.statSync(zhOutputFile).size;
+  }
+
+  if (options.skipUpload) {
+    log(localizeScriptLog(`⏩ 跳过云端上传 (--skip-upload)`), 'gray');
+    primaryCdnUrl = zhOutputFile;
+    uploadedVideos['zh'] = zhOutputFile;
+    uploadedVideos['en'] = enOutputFile;
+  } else {
+    // 上传中文视频
+    log(localizeScriptLog(`\n☁️ 正在上传中文视频...`), 'blue');
+    let zhCdn = '';
+    if (HAS_R2_CONFIG) {
+      const r2Key = `ApCalculusMCQ/${cleanFolder}/${safeVideoName}_zh.mp4`;
+      const uploaded = await uploadToR2(r2Key, fs.readFileSync(zhOutputFile), 'video/mp4');
+      if (uploaded) zhCdn = `${getCdnDomain()}/${r2Key}`;
+    } else {
+      const res = await uploadVideoViaServerProxy(
+        baseUrl,
+        taskId,
+        'zh',
+        zhOutputFile,
+        `${safeVideoName}_zh.mp4`,
+        task.folderPath,
+        CURRENT_AUTH_TOKEN,
+        false,
+        'ap-calculus-mcq'
+      );
+      if (res.success && res.cdnUrl) zhCdn = res.cdnUrl;
+    }
+    if (zhCdn) {
+      uploadedVideos['zh'] = zhCdn;
+      primaryCdnUrl = zhCdn;
+      log(localizeScriptLog(`✅ 中文视频上传成功: ${zhCdn}`), 'green');
+    }
+
+    // 上传英文视频
+    log(localizeScriptLog(`\n☁️ 正在上传英文视频...`), 'blue');
+    let enCdn = '';
+    if (HAS_R2_CONFIG) {
+      const r2Key = `ApCalculusMCQ/${cleanFolder}/${safeVideoName}_en.mp4`;
+      const uploaded = await uploadToR2(r2Key, fs.readFileSync(enOutputFile), 'video/mp4');
+      if (uploaded) enCdn = `${getCdnDomain()}/${r2Key}`;
+    } else {
+      const res = await uploadVideoViaServerProxy(
+        baseUrl,
+        taskId,
+        'en',
+        enOutputFile,
+        `${safeVideoName}_en.mp4`,
+        task.folderPath,
+        CURRENT_AUTH_TOKEN,
+        true,
+        'ap-calculus-mcq'
+      );
+      if (res.success && res.cdnUrl) enCdn = res.cdnUrl;
+    }
+    if (enCdn) {
+      uploadedVideos['en'] = enCdn;
+      if (!primaryCdnUrl) primaryCdnUrl = enCdn;
+      log(localizeScriptLog(`✅ 英文视频上传成功: ${enCdn}`), 'green');
+    }
+  }
+
+  // 4. 更新任务状态为已完成
+  log(localizeScriptLog(`\n📝 正在更新微积分视频任务状态为已完成 (video_finished)...`), 'blue');
+  const updateSuccess = await updateTaskStatus(
+    baseUrl,
+    taskId,
+    'video_finished',
+    primaryCdnUrl,
+    task.folderPath,
+    primarySize,
+    uploadedVideos,
+    CURRENT_AUTH_TOKEN,
+    'ap-calculus-mcq'
+  );
+
+  if (updateSuccess) {
+    log(localizeScriptLog(`🎉 [微积分 MCQ] 任务 [${taskId}] 全部渲染与上传完成!`), 'green');
+  } else {
+    log(localizeScriptLog(`⚠️ [微积分 MCQ] 任务 [${taskId}] 视频已生成，但更新服务端状态失败`), 'yellow');
+  }
+}
+
+// ── 4. 单任务渲染调度 ────────────────────────────────────────────
+async function processSingleTask(
+  task: any,
+  baseUrl: string,
+  options: RenderWorkerOptions = {}
+) {
+  // 识别微积分 AP Calculus MCQ 模块任务并执行双语渲染流程
+  if (
+    task.__module === 'ap-calculus-mcq' ||
+    task.course ||
+    (typeof task.folderPath === 'string' && task.folderPath.includes('ApCalculusMCQ')) ||
+    task.question
+  ) {
+    return await processApCalculusTask(task, baseUrl, options);
+  }
+  const taskId = task.videoId || task.id;
+  const rawFolder = (task.folderPath || '').trim();
+  const cleanFolder = rawFolder
+    .replace(/^\/+|\/+$/g, '')
+    .replace(/^CompareEnglishWord\//, '') || `${task.wordA}_${task.wordB}`;
+
+  const wordA = (task.wordA || 'wordA').trim().toLowerCase();
+  const wordB = (task.wordB || 'wordB').trim().toLowerCase();
+
+  // 1.   ./out/CompareEnglishWord/ /
+  // a)
+  const rawEmail = (task.userEmail || '').trim();
+  const safeUserEmail = rawEmail
+    ? rawEmail.replace(/[\\/:*?"<>|]/g, '_')
+    : 'default_user';
+
+  // b)   (  cleanFolder，  101_mountain_hill，  title  )
+  let rawVideoName = cleanFolder;
+  if (!rawVideoName) {
+    rawVideoName = (task.title || '').trim() || `${wordA}-${wordB}`;
+  }
+  // ，
+  const safeVideoName = path.basename(rawVideoName)
+    .replace(/[\\/:*?"<>|]/g, '_')
+    .replace(/\s+/g, '_');
+
+  // c)  （ ）
+  const baseOutputDir = resolveBaseOutputDir();
+  const outputDir = path.join(baseOutputDir, 'CompareEnglishWord', safeUserEmail, safeVideoName);
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+
+  // ：  task   mp4  ，  wordA-wordB.mp4
+  let filename = `${wordA}-${wordB}.mp4`;
+  if (task.videoPath && typeof task.videoPath === 'string') {
+    const base = path.basename(task.videoPath.split('?')[0]);
+    if (base.endsWith('.mp4')) {
+      filename = base;
+    }
+  }
+
+  const outputFile = path.join(outputDir, filename);
+
+  log(`\n------------------------------------------------------------`, 'blue');
+  log(localizeScriptLog(`🎯 拾取待渲染任务: [${taskId}] ${task.wordA} vs ${task.wordB}`), 'blue');
+  log(localizeScriptLog(`📂 存储目录路径: CompareEnglishWord/${cleanFolder}`), 'blue');
+  log(localizeScriptLog(`💾 本地存储位置: ${outputFile}`), 'green');
+  if (CURRENT_AUTH_TOKEN) {
+    const masked = CURRENT_AUTH_TOKEN.length > 12 ? `${CURRENT_AUTH_TOKEN.slice(0, 6)}...${CURRENT_AUTH_TOKEN.slice(-6)}` : '***';
+    log(localizeScriptLog(`🔑 携带用户鉴权凭据: ${masked}`), 'gray');
+  } else if (!HAS_R2_CONFIG) {
+    log(localizeScriptLog(`⚠️ 提示: 当前未检测到登录 Token，若需服务端代理上传，请先在桌面客户端登录账号`), 'yellow');
+  }
+
+  // d. 任务已通过 claimNextTask 在服务端原子锁定为 rendering，此处直接开始渲染流程
+  log(localizeScriptLog(`✅ 任务 [${taskId}] 已由服务端原子锁定为「正在渲染」，开始本地渲染...`), 'green');
+
+  // e.  ： 、 、 ，
+  log(localizeScriptLog(`📥 正在预下载并校验核心素材 (音频/图片/文字)...`), 'yellow');
+
+  // 1)
+  let summaryData = task.summaryData;
+  const cdnFolderUrl = `${getCdnDomain()}/CompareEnglishWord/${cleanFolder}`;
+  if (!summaryData || !Array.isArray(summaryData.segments) || summaryData.segments.length === 0) {
+    const summaryCdnUrl = `${cdnFolderUrl}/summary.json?_t=${Date.now()}`;
+    try {
+      const sRes = await fetch(summaryCdnUrl);
+      if (sRes.ok) summaryData = await sRes.json();
+    } catch (e) {}
+  }
+
+  if (!summaryData || !Array.isArray(summaryData.segments) || summaryData.segments.length === 0) {
+    log(localizeScriptLog(`❌ 素材缺失: 未能获取到有效的文字段落数据 (segments 为空)，拦截渲染以保护质量。`), 'red');
+    await updateTaskStatus(baseUrl, taskId, 'waiting_render', undefined, task.folderPath);
+    return;
+  }
+
+  // 2)
+  const assetsDir = path.join(outputDir, 'assets');
+  if (!fs.existsSync(assetsDir)) {
+    fs.mkdirSync(assetsDir, { recursive: true });
+  }
+
+  const localAudioPath = path.join(assetsDir, 'audio_en.mp3');
+  const rawAudioUrl = task.audioPath ? task.audioPath.split('?')[0] : `${cdnFolderUrl}/audio_en.mp3`;
+  const audioDownloaded = await downloadFile(rawAudioUrl, localAudioPath, 5000);
+
+  if (!audioDownloaded && !fs.existsSync(localAudioPath)) {
+    log(localizeScriptLog(`❌ 音频素材准备失败: 无法下载或音频文件无效 (${rawAudioUrl})`), 'red');
+    await updateTaskStatus(baseUrl, taskId, 'waiting_render', undefined, task.folderPath);
+    return;
+  }
+
+  // ( )
+  const physicalAudioDuration = getMediaExactDuration(localAudioPath);
+
+  // segments
+  let maxSpeechEndTime = 0;
+  for (const seg of summaryData.segments) {
+    const end = seg.end_en || seg.end || 0;
+    if (end > maxSpeechEndTime) maxSpeechEndTime = end;
+    if (Array.isArray(seg.words_en)) {
+      for (const w of seg.words_en) {
+        if (w.end > maxSpeechEndTime) maxSpeechEndTime = w.end;
+      }
+    }
+  }
+
+  // ：  meta.duration_en，  meta.duration
+  let durationSeconds = 18;
+  if (typeof summaryData?.meta?.duration_en === 'number' && summaryData.meta.duration_en > 0) {
+    durationSeconds = summaryData.meta.duration_en;
+  } else if (physicalAudioDuration && physicalAudioDuration > 0) {
+    durationSeconds = physicalAudioDuration;
+  } else if (maxSpeechEndTime > 0) {
+    durationSeconds = maxSpeechEndTime;
+  }
+
+  // 3) 准备 01 与 02 两张核心图片
+  const localImg01Path = path.join(assetsDir, '01.png');
+  const localImg02Path = path.join(assetsDir, '02.png');
+  const rawImg01Url = task.img01Path ? task.img01Path.split('?')[0] : `${cdnFolderUrl}/01.png`;
+  const rawImg02Url = task.img02Path ? task.img02Path.split('?')[0] : `${cdnFolderUrl}/02.png`;
+
+  let [img1Ok, img2Ok] = await Promise.all([
+    downloadFile(rawImg01Url, localImg01Path, 3000),
+    downloadFile(rawImg02Url, localImg02Path, 3000),
+  ]);
+
+  // 若当前目录未获取到完整的 01.png 或 02.png，自动溯源查找原共享者专辑目录获取图片
+  if (!img1Ok || !img2Ok) {
+    log(localizeScriptLog(`🔍 检测到当前目录缺少图片素材，正在检查是否为共享视频并自动溯源查找原专辑图片...`), 'yellow');
+
+    let sourceImg01Url = task.sourceImg01Path || summaryData?.sourceImg01Path || '';
+    let sourceImg02Url = task.sourceImg02Path || summaryData?.sourceImg02Path || '';
+    let sourceFolderPath = task.sourceFolderPath || summaryData?.sourceFolderPath || '';
+    let sourceUserEmail = task.sourceUserEmail || summaryData?.sourceUserEmail || '';
+
+    if (sourceFolderPath && (!sourceImg01Url || !sourceImg02Url)) {
+      const cleanSrcFolder = sourceFolderPath.replace(/^CompareEnglishWord\//, '').replace(/^\/+|\/+$/g, '');
+      if (!sourceImg01Url) sourceImg01Url = `${getCdnDomain()}/CompareEnglishWord/${cleanSrcFolder}/01.png`;
+      if (!sourceImg02Url) sourceImg02Url = `${getCdnDomain()}/CompareEnglishWord/${cleanSrcFolder}/02.png`;
+    }
+
+    if (!sourceImg01Url || !sourceImg02Url) {
+      try {
+        const traceRes = await fetch(`${baseUrl.replace(/\/+$/, '')}/api/video/compare-english-word/tasks/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(CURRENT_AUTH_TOKEN ? { Authorization: `Bearer ${CURRENT_AUTH_TOKEN}` } : {}),
+          },
+          body: JSON.stringify({
+            action: 'get_share_source_media',
+            taskId: taskId,
+            videoId: task.videoId,
+            folderId: task.folderId,
+            folderPath: task.folderPath,
+            wordA: task.wordA,
+            wordB: task.wordB,
+          }),
+        });
+        if (traceRes.ok) {
+          const traceData = await traceRes.json();
+          if (traceData && traceData.success) {
+            sourceImg01Url = traceData.sourceImg01Url || sourceImg01Url;
+            sourceImg02Url = traceData.sourceImg02Url || sourceImg02Url;
+            sourceFolderPath = traceData.sourceFolderPath || sourceFolderPath;
+            sourceUserEmail = traceData.sourceUserEmail || sourceUserEmail;
+          }
+        }
+      } catch (err: any) {
+        log(localizeScriptLog(`溯源共享来源专辑接口请求异常: ${err.message}`), 'yellow');
+      }
+    }
+
+    if (sourceImg01Url && sourceImg02Url) {
+      log(localizeScriptLog(`📂 成功定位到共享来源专辑: 用户 [${sourceUserEmail || '未知'}], 路径 [${sourceFolderPath || '源目录'}]`), 'blue');
+      log(localizeScriptLog(`📥 正在从原共享专辑路径下载 01.png 与 02.png...`), 'yellow');
+      const [srcImg1Ok, srcImg2Ok] = await Promise.all([
+        downloadFile(sourceImg01Url.split('?')[0], localImg01Path, 3000),
+        downloadFile(sourceImg02Url.split('?')[0], localImg02Path, 3000),
+      ]);
+      if (srcImg1Ok && srcImg2Ok) {
+        img1Ok = true;
+        img2Ok = true;
+        log(localizeScriptLog(`✅ 溯源下载成功！已自动获取原共享专辑的 01.png 与 02.png 图片素材。`), 'green');
+      }
+    }
+  }
+
+  if (!img1Ok || !img2Ok) {
+    log(localizeScriptLog(`❌ 图片素材准备失败: 01.png 或 02.png 无法下载或损坏，拦截渲染。`), 'red');
+    await updateTaskStatus(baseUrl, taskId, 'waiting_render', undefined, task.folderPath);
+    return;
+  }
+
+  const style = summaryData?.meta?.style || task.style || 'style01';
+
+  // Base64  ， 、  CDN   CORS
+  let img01Data = rawImg01Url;
+  let img02Data = rawImg02Url;
+  try {
+    if (fs.existsSync(localImg01Path)) {
+      img01Data = `data:image/png;base64,${fs.readFileSync(localImg01Path).toString('base64')}`;
+    }
+    if (fs.existsSync(localImg02Path)) {
+      img02Data = `data:image/png;base64,${fs.readFileSync(localImg02Path).toString('base64')}`;
+    }
+  } catch (err: any) {
+    log(localizeScriptLog(`⚠️ 本地图片转 Base64 失败，降级使用远程 URL: ${err.message}`), 'yellow');
+  }
+
+  // Helper function note
+  const baseRenderProps = {
+    folder: cleanFolder,
+    summaryData,
+    img01: img01Data,
+    img02: img02Data,
+    audioEn: rawAudioUrl,
+    style,
+    durationSeconds,
+  };
+
+  log(localizeScriptLog(`✅ 核心素材全部就绪: 采用 meta.duration_en 视频时长 ${durationSeconds.toFixed(2)}s (${Math.ceil(durationSeconds * 30)} 帧)`), 'green');
+
+  // summary.json  ，  14   +
+  // audioStartFrom:  （0~15 ， 0~500ms），
+  // MP4  ，
+  const SUPPORTED_LANG_DEFINITIONS = [
+    // 1.   (  +  )
+    { lang: 'zh', label: localizeScriptLog('中文字幕'), audioStartFrom: 0, audioVolumeTweak: 0.000, pitchCents: 0 },
+    { lang: 'en', label: localizeScriptLog('纯英文'),   audioStartFrom: 1, audioVolumeTweak: 0.002, pitchCents: 2 },
+    { lang: 'ja', label: localizeScriptLog('日文字幕'), audioStartFrom: 2, audioVolumeTweak: 0.004, pitchCents: -2 },
+    { lang: 'ko', label: localizeScriptLog('韩文字幕'), audioStartFrom: 3, audioVolumeTweak: -0.002, pitchCents: 4 },
+    { lang: 'vi', label: localizeScriptLog('越南文字幕'), audioStartFrom: 4, audioVolumeTweak: -0.004, pitchCents: -4 },
+    { lang: 'th', label: localizeScriptLog('泰文字幕'), audioStartFrom: 5, audioVolumeTweak: 0.006, pitchCents: 6 },
+    { lang: 'id', label: localizeScriptLog('印尼文字幕'), audioStartFrom: 6, audioVolumeTweak: 0.008, pitchCents: 8 },
+    // 2.   /   (  CPM +  )
+    { lang: 'es', label: localizeScriptLog('西班牙文字幕'), audioStartFrom: 7, audioVolumeTweak: -0.006, pitchCents: -6 },
+    { lang: 'fr', label: localizeScriptLog('法文字幕'), audioStartFrom: 8, audioVolumeTweak: 0.003, pitchCents: 3 },
+    { lang: 'pt', label: localizeScriptLog('葡萄牙文字幕'), audioStartFrom: 9, audioVolumeTweak: -0.003, pitchCents: -3 },
+    { lang: 'de', label: localizeScriptLog('德文字幕'), audioStartFrom: 10, audioVolumeTweak: -0.005, pitchCents: -5 },
+    { lang: 'it', label: localizeScriptLog('意大利文字幕'), audioStartFrom: 11, audioVolumeTweak: -0.007, pitchCents: -7 },
+    // 3.
+    { lang: 'ru', label: localizeScriptLog('俄文字幕'), audioStartFrom: 12, audioVolumeTweak: 0.005, pitchCents: 5 },
+    { lang: 'tr', label: localizeScriptLog('土耳其文字幕'), audioStartFrom: 13, audioVolumeTweak: 0.007, pitchCents: 7 },
+    // Helper function note
+    { lang: 'bn', label: localizeScriptLog('孟加拉文字幕'), audioStartFrom: 14, audioVolumeTweak: 0.009, pitchCents: 9 },
+    { lang: 'ur', label: localizeScriptLog('乌尔都文字幕'), audioStartFrom: 15, audioVolumeTweak: -0.009, pitchCents: -9 },
+  ];
+
+  // /
+  const chosenLang = (
+    options.lang ||
+    task.targetLang ||
+    task.subtitle_language ||
+    summaryData?.meta?.subtitle_language ||
+    summaryData?.meta?.target_languages?.[0] ||
+    summaryData?.subtitle_language ||
+    summaryData?.target_languages?.[0] ||
+    ''
+  ).trim().toLowerCase();
+  let renderLangs: typeof SUPPORTED_LANG_DEFINITIONS = [];
+
+  if (chosenLang) {
+    const matched = SUPPORTED_LANG_DEFINITIONS.find((item) => item.lang === chosenLang);
+    if (matched) {
+      renderLangs = [matched];
+    }
+  }
+
+  // ，  JSON
+  if (renderLangs.length === 0) {
+    for (const item of SUPPORTED_LANG_DEFINITIONS) {
+      if (item.lang === 'en') {
+        renderLangs.push(item);
+      } else {
+        const hasContent = summaryData.segments?.some(
+          (seg: any) => typeof seg[`text_${item.lang}`] === 'string' && seg[`text_${item.lang}`].trim().length > 0
+        );
+        if (hasContent) {
+          renderLangs.push(item);
+        }
+      }
+    }
+  }
+
+  // Helper function note
+  if (renderLangs.length === 0) {
+    renderLangs = SUPPORTED_LANG_DEFINITIONS;
+  }
+
+  log(localizeScriptLog(`\n🎬 根据任务语言设定检测到 ${renderLangs.length} 种渲染版本，即将开始渲染:`), 'blue');
+  renderLangs.forEach((l, idx) => {
+    log(`   ${idx + 1}. [${l.lang}] ${l.label} (${wordA}-${wordB}_${l.lang}.mp4)`, 'blue');
+  });
+
+  // f.
+  const totalStartTime = Date.now();
+  const renderedVideos: Array<{
+    lang: string;
+    label: string;
+    outputFile: string;
+    filename: string;
+    r2Key: string;
+    cdnUrl: string;
+    size: number;
+  }> = [];
+
+  for (let idx = 0; idx < renderLangs.length; idx++) {
+    const { lang, label } = renderLangs[idx];
+    const langFilename = `${wordA}-${wordB}_${lang}.mp4`;
+    const langOutputFile = path.join(outputDir, langFilename);
+
+    log(`\n------------------------------------------------------------`, 'blue');
+    log(localizeScriptLog(`▶️ [${idx + 1}/${renderLangs.length}] 正在执行【${label}】渲染 (${langFilename})...`), 'yellow');
+
+    const langRenderProps = {
+      ...baseRenderProps,
+      lang,
+      // ： ，
+      audioStartFrom: renderLangs[idx].audioStartFrom ?? idx,
+      // ： （ ），
+      audioVolumeTweak: renderLangs[idx].audioVolumeTweak ?? 0,
+    };
+
+    const langStartTime = Date.now();
+    try {
+      await renderVideoWithRemotion(langOutputFile, langRenderProps, options.concurrency);
+    } catch (renderErr: any) {
+      log(localizeScriptLog(`❌ 【${label}】渲染失败: ${renderErr.message}`), 'red');
+      // waiting_render
+      await updateTaskStatus(baseUrl, taskId, 'waiting_render', undefined, task.folderPath);
+      return;
+    }
+
+    if (!fs.existsSync(langOutputFile)) {
+      log(localizeScriptLog(`❌ 【${label}】渲染流程完成但未在本地找到目标 MP4 文件: ${langOutputFile}`), 'red');
+      await updateTaskStatus(baseUrl, taskId, 'waiting_render', undefined, task.folderPath);
+      return;
+    }
+
+    const stats = fs.statSync(langOutputFile);
+    const costSec = ((Date.now() - langStartTime) / 1000).toFixed(1);
+    const sizeMb = (stats.size / 1024 / 1024).toFixed(2);
+    log(localizeScriptLog(`✅ 【${label}】渲染完成! 耗时: ${costSec}s | 文件大小: ${sizeMb} MB`), 'green');
+
+    // ✨  ，  pitch shift，  YouTube
+    const pitchCents = renderLangs[idx].pitchCents ?? 0;
+    if (pitchCents !== 0) {
+      log(localizeScriptLog(`🎵 【${label}】正在对音频轨做微小变调 (${pitchCents > 0 ? '+' : ''}${pitchCents} 音分)，人耳无感知但指纹辛辣差异化...`), 'yellow');
+      const pitchOk = await applyAudioPitchShift(langOutputFile, pitchCents);
+      if (pitchOk) {
+        log(localizeScriptLog(`✅ 【${label}】音频变调处理完成 (${pitchCents > 0 ? '+' : ''}${pitchCents} 音分)`), 'green');
+      } else {
+        log(localizeScriptLog(`⚠️ 【${label}】音频变调处理失败，将使用未变调版本继续上传`), 'yellow');
+      }
+    }
+
+    const r2Key = `CompareEnglishWord/${cleanFolder}/${langFilename}`;
+    const cdnUrl = `${getCdnDomain()}/${r2Key}`;
+
+    renderedVideos.push({
+      lang,
+      label,
+      outputFile: langOutputFile,
+      filename: langFilename,
+      r2Key,
+      cdnUrl,
+      size: stats.size,
+    });
+  }
+
+  const totalCostSec = ((Date.now() - totalStartTime) / 1000).toFixed(1);
+  log(localizeScriptLog(`\n🎉 全部 ${renderedVideos.length} 个语言版本视频渲染完成! 总渲染耗时: ${totalCostSec}s`), 'green');
+
+  // 精准锁定全局主视频（优先级：指定语言 > 中文 > 英文 > 首个完成的视频）
+  const primaryVideo =
+    renderedVideos.find((v) => v.lang === chosenLang) ||
+    renderedVideos.find((v) => v.lang === 'zh') ||
+    renderedVideos.find((v) => v.lang === 'en') ||
+    renderedVideos[0];
+
+  // 兼容机制：将选定的全局主视频精准固化一份为默认无语言后缀的根主视频 (wordA-wordB.mp4)
+  if (primaryVideo?.outputFile && fs.existsSync(primaryVideo.outputFile)) {
+    const defaultCompatFile = path.join(outputDir, `${wordA}-${wordB}.mp4`);
+    try {
+      fs.copyFileSync(primaryVideo.outputFile, defaultCompatFile);
+    } catch (_) { }
+  }
+
+  // g.   MP4
+  // 1.   --skip-upload，
+  if (options.skipUpload) {
+    log(localizeScriptLog(`ℹ️ 已启用 --skip-upload 选项，全部视频仅保存在本地。`), 'yellow');
+    await updateTaskStatus(
+      baseUrl,
+      taskId,
+      'video_finished',
+      `local://${primaryVideo.outputFile}`,
+      task.folderPath,
+      primaryVideo.size,
+      undefined,
+      CURRENT_AUTH_TOKEN
+    );
+    return;
+  }
+
+  // 2.  ：
+  // -   R2   (  Electron  )， 【 】
+  // -   R2  ， 【 】
+  const useServerProxy = !HAS_R2_CONFIG;
+  if (useServerProxy) {
+    log(localizeScriptLog(`\n🌐 正在通过【服务端安全代理上传通道】同步 ${renderedVideos.length} 个多语言视频...`), 'yellow');
+  } else {
+    log(localizeScriptLog(`\n☁️ 检测到本地开发 R2 密钥配置，正在通过【本地直传通道】上传 ${renderedVideos.length} 个多语言视频至 Cloudflare R2...`), 'yellow');
+  }
+
+  try {
+    for (let i = 0; i < renderedVideos.length; i++) {
+      const item = renderedVideos[i];
+      const isLast = i === renderedVideos.length - 1;
+      const sizeMb = (item.size / 1024 / 1024).toFixed(2);
+
+      if (useServerProxy) {
+        log(localizeScriptLog(`📤 服务端代理上传【${item.label}】: ${item.filename} (${sizeMb} MB)...`), 'yellow');
+        const uploadStart = Date.now();
+        const proxyRes = await uploadVideoViaServerProxy(
+          baseUrl,
+          taskId,
+          item.lang,
+          item.outputFile,
+          item.filename,
+          task.folderPath,
+          CURRENT_AUTH_TOKEN,
+          isLast
+        );
+        if (proxyRes.cdnUrl) {
+          item.cdnUrl = proxyRes.cdnUrl;
+        }
+        const costSec = ((Date.now() - uploadStart) / 1000).toFixed(1);
+        log(localizeScriptLog(`✅ 【${item.label}】代理上传成功! 耗时: ${costSec}s | 地址: ${item.cdnUrl}`), 'green');
+      } else {
+        log(localizeScriptLog(`📤 本地直传上传【${item.label}】: ${item.r2Key}...`), 'yellow');
+        const fileBuffer = fs.readFileSync(item.outputFile);
+
+        await retryOperation(
+          async () => {
+            const res = await uploadToR2(item.r2Key, fileBuffer, 'video/mp4');
+            if (!res.success) {
+              throw new Error(res.error || localizeScriptLog('R2 上传接口返回失败'));
+            }
+            return res;
+          },
+          3,
+          2500,
+          localizeScriptLog(`R2 视频上传 (${item.lang})`)
+        );
+
+        log(localizeScriptLog(`✅ 【${item.label}】本地直传成功: ${item.cdnUrl}`), 'green');
+
+        // 兼容机制：向 R2 上传选定的主视频作为默认根文件，确保旧链接与根链接 100% 访问可用
+        if (item.lang === primaryVideo.lang) {
+          const defaultCompatKey = `CompareEnglishWord/${cleanFolder}/${wordA}-${wordB}.mp4`;
+          await uploadToR2(defaultCompatKey, fileBuffer, 'video/mp4').catch(() => null);
+        }
+      }
+    }
+
+    // Helper function note
+    log(localizeScriptLog(`📝 正在向服务端同步状态为「渲染完成 (video_finished)」...`), 'yellow');
+    const videosMap: Record<string, string> = {};
+    renderedVideos.forEach((v) => {
+      videosMap[v.lang] = v.cdnUrl;
+    });
+
+    const updateSuccess = await updateTaskStatus(
+      baseUrl,
+      taskId,
+      'video_finished',
+      primaryVideo.cdnUrl,
+      task.folderPath,
+      primaryVideo.size,
+      videosMap,
+      CURRENT_AUTH_TOKEN
+    );
+
+    if (updateSuccess) {
+      log(localizeScriptLog(`🏆 任务 [${taskId}] ${renderedVideos.length} 个多语言视频全部处理并发布完成!\n`), 'green');
+    } else {
+      log(localizeScriptLog(`⚠️ 任务 [${taskId}] 视频已上传成功，但状态回写遇到网络波动，请人工核查`), 'yellow');
+    }
+  } catch (uploadErr: any) {
+    log(localizeScriptLog(`❌ 视频上传或回写状态失败: ${uploadErr.message}`), 'red');
+  }
+}
+
+// ── 5.   ──────────────────────────────────────────────
+let isProcessingQueue = false;
+let currentRunningTaskId: string | number | null = null;
+const pendingQueue: any[] = [];
+
+async function enqueueRenderTask(
+  task: any,
+  baseUrl: string,
+  options: RenderWorkerOptions = {}
+) {
+  const taskId = task.videoId || task.id;
+  // ，
+  if (currentRunningTaskId != null && currentRunningTaskId === taskId) {
+    return;
+  }
+  // Helper function note
+  const exists = pendingQueue.some((t) => (t.videoId || t.id) === taskId);
+  if (exists) return;
+
+  pendingQueue.push(task);
+  triggerQueue(baseUrl, options);
+}
+
+async function triggerQueue(
+  baseUrl: string,
+  options: RenderWorkerOptions = {}
+) {
+  if (isProcessingQueue) return;
+  isProcessingQueue = true;
+
+  try {
+    while (true) {
+      let task = pendingQueue.shift();
+      if (!task) {
+        // 尝试即刻连贯抢占下一个任务，实现批量任务流水线无缝渲染，免除空档等待
+        const clientScope = options.scope || (IS_ELECTRON_CLIENT ? 'current_user' : 'all_users');
+        const nextTask = await claimNextTaskAnyModule(baseUrl, CURRENT_AUTH_TOKEN, clientScope);
+        if (nextTask) {
+          const modName = nextTask.__module === 'ap-calculus-mcq' ? '[微积分 MCQ]' : '[对比学单词]';
+          const taskDesc = nextTask.__module === 'ap-calculus-mcq'
+            ? `${nextTask.title || nextTask.folderPath || nextTask.id}`
+            : `${nextTask.wordA} vs ${nextTask.wordB}`;
+          log(localizeScriptLog(`\n⚡ [流水线接续抢单] 成功锁定待渲染任务: ${modName} [${nextTask.videoId || nextTask.id}] ${taskDesc}`), 'green');
+          task = nextTask;
+        } else {
+          break;
+        }
+      }
+
+      currentRunningTaskId = task.videoId || task.id;
+      try {
+        await processSingleTask(task, baseUrl, options);
+      } catch (err: any) {
+        log(localizeScriptLog(`❌ 任务 [${currentRunningTaskId}] 执行异常: ${err.message}，已自动恢复为待渲染状态`), 'red');
+        if (currentRunningTaskId) {
+          const mod: VideoModule = task.__module === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
+          await updateTaskStatus(baseUrl, currentRunningTaskId, 'waiting_render', undefined, task.folderPath, undefined, undefined, CURRENT_AUTH_TOKEN, mod).catch(() => null);
+        }
+      } finally {
+        currentRunningTaskId = null;
+      }
+    }
+  } finally {
+    isProcessingQueue = false;
+    currentRunningTaskId = null;
+  }
+}
+
+// ── 6. SSE 任务实时下发监听 (全模块多路长连接) ────────────────────────────────
+async function listenSSEForModule(
+  baseUrl: string,
+  module: VideoModule,
+  options: RenderWorkerOptions = {}
+) {
+  const eventsUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/${module}/events/`;
+  const modLabel = module === 'ap-calculus-mcq' ? '微积分 MCQ' : '对比学单词';
+
+  while (true) {
+    try {
+      log(localizeScriptLog(`📡 正在建立 [${modLabel}] SSE 实时任务下发长连接: ${eventsUrl}...`), 'blue');
+      const headers: Record<string, string> = {
+        'Accept': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+      };
+      if (CURRENT_AUTH_TOKEN) {
+        headers['Authorization'] = `Bearer ${CURRENT_AUTH_TOKEN}`;
+      }
+      const res = await fetch(eventsUrl, { headers });
+
+      if (!res.ok || !res.body) {
+        throw new Error(localizeScriptLog(`无法建立 SSE 连接 (HTTP ${res.status})`));
+      }
+
+      log(localizeScriptLog(`⚡ [${modLabel}] SSE 任务长连接已打通！已进入「即时事件下发」监听状态。`), 'green');
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() || '';
+
+        for (const block of parts) {
+          const trimmed = block.trim();
+          if (!trimmed || trimmed.startsWith(':')) continue;
+
+          let eventName = 'message';
+          let dataStr = '';
+
+          for (const line of trimmed.split('\n')) {
+            if (line.startsWith('event:')) {
+              eventName = line.replace('event:', '').trim();
+            } else if (line.startsWith('data:')) {
+              dataStr = line.replace('data:', '').trim();
+            }
+          }
+
+          if (eventName === 'new_task' && dataStr) {
+            try {
+              const clientScope = options.scope || (IS_ELECTRON_CLIENT ? 'current_user' : 'all_users');
+              const claimedTask = await claimNextTask(baseUrl, CURRENT_AUTH_TOKEN, clientScope, module);
+              if (claimedTask) {
+                const taskDesc = module === 'ap-calculus-mcq'
+                  ? `${claimedTask.title || claimedTask.folderPath || claimedTask.id}`
+                  : `${claimedTask.wordA} vs ${claimedTask.wordB}`;
+                log(localizeScriptLog(`\n🔔 [${modLabel} SSE 抢单成功] 成功锁定待渲染任务: [${claimedTask.videoId || claimedTask.id}] ${taskDesc}`), 'green');
+                enqueueRenderTask(claimedTask, baseUrl, options);
+              } else {
+                log(localizeScriptLog(`\n🔔 [${modLabel} SSE 消息触发] 任务已被其他 Worker 提前锁定或非当前用户任务，跳过`), 'gray');
+              }
+            } catch (err: any) {
+              log(localizeScriptLog(`解析或抢占 [${modLabel}] SSE 任务异常: ${err.message}`), 'red');
+            }
+          } else if (eventName === 'ready') {
+            log(localizeScriptLog(`📡 服务端确认 [${modLabel}] 长连接就绪 (SSE Ready)`), 'gray');
+          }
+        }
+      }
+    } catch (err: any) {
+      log(localizeScriptLog(`[${modLabel}] SSE 长连接中断: ${err.message}，5秒后自动重连...`), 'yellow');
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+  }
+}
+
+async function startSSEListener(
+  baseUrl: string,
+  options: RenderWorkerOptions = {}
+) {
+  // 同时监听 CompareEnglishWord 与 ApCalculusMCQ 两个频道的任务下发
+  listenSSEForModule(baseUrl, 'compare-english-word', options).catch((err) => {
+    log(localizeScriptLog(`[对比学单词] SSE 线程异常: ${err.message}`), 'red');
+  });
+  listenSSEForModule(baseUrl, 'ap-calculus-mcq', options).catch((err) => {
+    log(localizeScriptLog(`[微积分 MCQ] SSE 线程异常: ${err.message}`), 'red');
+  });
+}
+
+// ── 7. 主启动入口 / 调度循环 ───────────────────────────────────────────
+async function main() {
+  const args = process.argv.slice(2);
+  const isOnce = args.includes('--once');
+  const skipUpload = args.includes('--skip-upload');
+  const baseUrlArg = args.find((a) => a.startsWith('--url='));
+  const baseUrl = baseUrlArg ? baseUrlArg.replace('--url=', '') : DEFAULT_API_BASE;
+  const concurrencyArg = args.find((a) => a.startsWith('--concurrency='));
+  const envConcurrency = process.env.REMOTION_CONCURRENCY;
+  const isElectronClient = args.includes('--client=electron') || args.some((a) => a.startsWith('--client=electron')) || process.env.SHORTVIDEO_CLIENT_MODE === 'electron';
+  const defaultConcurrency = '2';
+  const concurrency = concurrencyArg ? concurrencyArg.replace('--concurrency=', '') : (envConcurrency || defaultConcurrency);
+  const langArg = args.find((a) => a.startsWith('--lang=') || a.startsWith('--target-lang='));
+  const targetLang = langArg ? langArg.split('=')[1]?.trim().toLowerCase() : undefined;
+  if (targetLang) {
+    process.env.SHORTVIDEO_LANG = targetLang;
+  }
+
+  const scopeArg = args.find((a) => a.startsWith('--scope='));
+  const clientScope: 'current_user' | 'all_users' = scopeArg
+    ? (scopeArg.split('=')[1]?.trim() as 'current_user' | 'all_users')
+    : (isElectronClient ? 'current_user' : 'all_users');
+
+  const options: RenderWorkerOptions = { skipUpload, concurrency, lang: targetLang, scope: clientScope };
+
+  // 启动即主动预热/固化 Remotion Bundle，确保独立客户端完全脱离源码也能秒级免打包就绪
+  const rebuildBundle = args.includes('--rebuild-bundle') || args.includes('--clean-bundle');
+  try {
+    await ensureRemotionBundle(rebuildBundle);
+  } catch (_) { }
+
+  console.clear();
+  log(`============================================================`, 'green');
+  log(localizeScriptLog(`🎬 短视频远程渲染工作进程 (ShortVideo Render Worker)`), 'green');
+  log(localizeScriptLog(`💻 本机硬件配置: ${os.cpus()[0]?.model || 'CPU'} (${os.cpus().length} 核心) | 内存: ${(os.totalmem() / 1024 / 1024 / 1024).toFixed(1)} GB`), 'blue');
+  log(localizeScriptLog(`⚡ 渲染并发配置: ${concurrency}x`), 'blue');
+  if (targetLang) {
+    log(localizeScriptLog(`🌍 指定渲染语言: ${targetLang}`), 'blue');
+  }
+  log(localizeScriptLog(`🎯 任务调度范围: ${clientScope === 'current_user' ? '🔒 仅限当前登录用户 (Electron 客户端模式)' : '🌍 全局任务队列 (支持渲染所有用户的待处理视频 - CLI 模式)'}`), 'blue');
+  log(localizeScriptLog(`🌐 目标服务端: ${baseUrl}`), 'blue');
+  log(localizeScriptLog(`☁️ 视频上传通道: ${HAS_R2_CONFIG ? '⚡ 本地直传模式 (Local R2)' : '🌐 服务端安全代理模式 (Server R2 Proxy)'}`), 'green');
+  log(localizeScriptLog(`🔑 用户会话鉴权: ${CURRENT_AUTH_TOKEN ? '✅ 已绑定当前用户 Token (安全会话)' : '⚠️ 未传入 Token (公共无鉴权模式)'}`), CURRENT_AUTH_TOKEN ? 'green' : 'yellow');
+  log(localizeScriptLog(`⚡ Remotion 缓存: ${fs.existsSync(path.join(BUNDLE_CACHE_DIR, 'index.html')) ? '✅ 已就绪 (秒级免打包)' : '⏳ 首次任务将自动构建并固化缓存'} (${BUNDLE_CACHE_DIR})`), 'blue');
+  log(localizeScriptLog(`🔁 运行模式: ${isOnce ? '单次执行 (--once)' : '后台守护监听'}`), 'blue');
+  log(`============================================================\n`, 'green');
+
+  // 严格安全鉴权校验：
+  if (!CURRENT_AUTH_TOKEN && !HAS_R2_CONFIG) {
+    log(localizeScriptLog(`❌ [登录拦截] 当前未检测到用户登录凭据 (Token 为空)，已终止执行渲染！`), 'red');
+    log(localizeScriptLog(`💡 提示: 请先在 ShortVideo 桌面客户端的主站窗口中登录账号后再开始渲染。\n`), 'yellow');
+    process.exit(1);
+  }
+
+  // 后台模式下，优先拉起 SSE 任务即时通知长连接
+  if (!isOnce) {
+    startSSEListener(baseUrl, options).catch((err) => {
+      log(localizeScriptLog(`SSE 监听主线程异常: ${err.message}`), 'red');
+    });
+  }
+
+  // 主轮询循环：补偿 SSE 丢包/重连空档，每隔 POLL_INTERVAL_MS 向服务端原子抢单
+  while (true) {
+    try {
+      // 如果当前已有任务正在执行或队列非空，跳过主动轮询，避免超额抢单
+      if (!isProcessingQueue && pendingQueue.length === 0 && currentRunningTaskId == null) {
+        const claimedTask = await claimNextTaskAnyModule(baseUrl, CURRENT_AUTH_TOKEN, clientScope);
+        if (claimedTask) {
+          const modName = claimedTask.__module === 'ap-calculus-mcq' ? '[微积分 MCQ]' : '[对比学单词]';
+          const taskDesc = claimedTask.__module === 'ap-calculus-mcq'
+            ? `${claimedTask.title || claimedTask.folderPath || claimedTask.id}`
+            : `${claimedTask.wordA} vs ${claimedTask.wordB}`;
+          log(localizeScriptLog(`\n⚡ [轮询抢单] 成功锁定待渲染任务: ${modName} [${claimedTask.videoId || claimedTask.id}] ${taskDesc}`), 'green');
+          enqueueRenderTask(claimedTask, baseUrl, options);
+        } else if (!isProcessingQueue && currentRunningTaskId == null) {
+          process.stdout.write(localizeScriptLog(`\r渲染调度服务端连接正常，当前队列中没有视频任务，等待中...\n`));
+        }
+      }
+
+      if (isOnce) {
+        while (isProcessingQueue || pendingQueue.length > 0) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+        log(localizeScriptLog(`\n单次运行模式完成，退出。`), 'gray');
+        break;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+    } catch (e) {
+      log(localizeScriptLog(`轮询异常: ${e.message}`), 'red');
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+    }
+  }
+}
+
+main().catch((err) => {
+  console.error('Fatal Worker Error:', err);
+  process.exit(1);
+});
