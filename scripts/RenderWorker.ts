@@ -2179,27 +2179,36 @@ async function processApCalculusTask(
     }
   } catch (_) { }
 
-  // 1. 渲染中文版本
+  const specifiedLang = (options.lang || '').trim().toLowerCase();
+  const shouldRenderZh = !specifiedLang || specifiedLang === 'all' || specifiedLang === 'zh';
+  const shouldRenderEn = !specifiedLang || specifiedLang === 'all' || specifiedLang === 'en';
+
   const zhOutputFile = path.join(outputDir, `${safeVideoName}_zh.mp4`);
-  log(localizeScriptLog(`\n[1/2] 正在渲染中文视频 (ApCalculusMCQ-Demo-ZH)...`), 'blue');
-  const zhProps = {
-    question: questionData,
-    lang: 'zh',
-    showAudio: true,
-  };
-  await renderVideoWithRemotion(zhOutputFile, zhProps, options.concurrency, 'ApCalculusMCQ-Demo-ZH');
-  log(localizeScriptLog(`✅ 中文视频渲染完成: ${zhOutputFile}`), 'green');
+  const enOutputFile = path.join(outputDir, `${safeVideoName}_en.mp4`);
+
+  // 1. 渲染中文版本
+  if (shouldRenderZh) {
+    log(localizeScriptLog(`\n[1/2] 正在渲染中文视频 (ApCalculusMCQ-Demo-ZH)...`), 'blue');
+    const zhProps = {
+      question: questionData,
+      lang: 'zh',
+      showAudio: true,
+    };
+    await renderVideoWithRemotion(zhOutputFile, zhProps, options.concurrency, 'ApCalculusMCQ-Demo-ZH');
+    log(localizeScriptLog(`✅ 中文视频渲染完成: ${zhOutputFile}`), 'green');
+  }
 
   // 2. 渲染英文版本
-  const enOutputFile = path.join(outputDir, `${safeVideoName}_en.mp4`);
-  log(localizeScriptLog(`\n[2/2] 正在渲染英文视频 (ApCalculusMCQ-Demo-EN)...`), 'blue');
-  const enProps = {
-    question: questionData,
-    lang: 'en',
-    showAudio: true,
-  };
-  await renderVideoWithRemotion(enOutputFile, enProps, options.concurrency, 'ApCalculusMCQ-Demo-EN');
-  log(localizeScriptLog(`✅ 英文视频渲染完成: ${enOutputFile}`), 'green');
+  if (shouldRenderEn) {
+    log(localizeScriptLog(`\n[2/2] 正在渲染英文视频 (ApCalculusMCQ-Demo-EN)...`), 'blue');
+    const enProps = {
+      question: questionData,
+      lang: 'en',
+      showAudio: true,
+    };
+    await renderVideoWithRemotion(enOutputFile, enProps, options.concurrency, 'ApCalculusMCQ-Demo-EN');
+    log(localizeScriptLog(`✅ 英文视频渲染完成: ${enOutputFile}`), 'green');
+  }
 
   // 3. 上传视频
   const uploadedVideos: Record<string, string> = {};
@@ -2208,67 +2217,105 @@ async function processApCalculusTask(
 
   if (fs.existsSync(zhOutputFile)) {
     primarySize = fs.statSync(zhOutputFile).size;
+  } else if (fs.existsSync(enOutputFile)) {
+    primarySize = fs.statSync(enOutputFile).size;
   }
 
   if (options.skipUpload) {
     log(localizeScriptLog(`⏩ 跳过云端上传 (--skip-upload)`), 'gray');
-    primaryCdnUrl = zhOutputFile;
-    uploadedVideos['zh'] = zhOutputFile;
-    uploadedVideos['en'] = enOutputFile;
+    if (shouldRenderZh && fs.existsSync(zhOutputFile)) {
+      primaryCdnUrl = zhOutputFile;
+      uploadedVideos['zh'] = zhOutputFile;
+    }
+    if (shouldRenderEn && fs.existsSync(enOutputFile)) {
+      if (!primaryCdnUrl) primaryCdnUrl = enOutputFile;
+      uploadedVideos['en'] = enOutputFile;
+    }
   } else {
     // 上传中文视频
-    log(localizeScriptLog(`\n☁️ 正在上传中文视频...`), 'blue');
-    let zhCdn = '';
-    if (HAS_R2_CONFIG) {
-      const r2Key = `ApCalculusMCQ/${cleanFolder}/${safeVideoName}_zh.mp4`;
-      const uploaded = await uploadToR2(r2Key, fs.readFileSync(zhOutputFile), 'video/mp4');
-      if (uploaded) zhCdn = `${getCdnDomain()}/${r2Key}`;
-    } else {
-      const res = await uploadVideoViaServerProxy(
-        baseUrl,
-        taskId,
-        'zh',
-        zhOutputFile,
-        `${safeVideoName}_zh.mp4`,
-        task.folderPath,
-        CURRENT_AUTH_TOKEN,
-        false,
-        'ap-calculus-mcq'
-      );
-      if (res.success && res.cdnUrl) zhCdn = res.cdnUrl;
-    }
-    if (zhCdn) {
-      uploadedVideos['zh'] = zhCdn;
-      primaryCdnUrl = zhCdn;
-      log(localizeScriptLog(`✅ 中文视频上传成功: ${zhCdn}`), 'green');
+    if (shouldRenderZh && fs.existsSync(zhOutputFile)) {
+      log(localizeScriptLog(`\n☁️ 正在上传中文视频...`), 'blue');
+      let zhCdn = '';
+      if (HAS_R2_CONFIG) {
+        const r2Key = `ApCalculusMCQ/${cleanFolder}/${safeVideoName}_zh.mp4`;
+        await retryOperation(
+          async () => {
+            const res = await uploadToR2(r2Key, fs.readFileSync(zhOutputFile), 'video/mp4');
+            if (!res.success) {
+              throw new Error(res.error || localizeScriptLog('R2 上传接口返回失败'));
+            }
+            zhCdn = res.url || `${getCdnDomain()}/${r2Key}`;
+            return res;
+          },
+          3,
+          2500,
+          localizeScriptLog(`R2 微积分中文视频上传`)
+        );
+      } else {
+        const res = await uploadVideoViaServerProxy(
+          baseUrl,
+          taskId,
+          'zh',
+          zhOutputFile,
+          `${safeVideoName}_zh.mp4`,
+          task.folderPath,
+          CURRENT_AUTH_TOKEN,
+          !shouldRenderEn, // 若不渲染英文，则中文为最终产物标记已完成
+          'ap-calculus-mcq'
+        );
+        if (res.success && res.cdnUrl) zhCdn = res.cdnUrl;
+      }
+      if (zhCdn) {
+        uploadedVideos['zh'] = zhCdn;
+        primaryCdnUrl = zhCdn;
+        log(localizeScriptLog(`✅ 中文视频上传成功: ${zhCdn}`), 'green');
+      }
     }
 
     // 上传英文视频
-    log(localizeScriptLog(`\n☁️ 正在上传英文视频...`), 'blue');
-    let enCdn = '';
-    if (HAS_R2_CONFIG) {
-      const r2Key = `ApCalculusMCQ/${cleanFolder}/${safeVideoName}_en.mp4`;
-      const uploaded = await uploadToR2(r2Key, fs.readFileSync(enOutputFile), 'video/mp4');
-      if (uploaded) enCdn = `${getCdnDomain()}/${r2Key}`;
-    } else {
-      const res = await uploadVideoViaServerProxy(
-        baseUrl,
-        taskId,
-        'en',
-        enOutputFile,
-        `${safeVideoName}_en.mp4`,
-        task.folderPath,
-        CURRENT_AUTH_TOKEN,
-        true,
-        'ap-calculus-mcq'
-      );
-      if (res.success && res.cdnUrl) enCdn = res.cdnUrl;
+    if (shouldRenderEn && fs.existsSync(enOutputFile)) {
+      log(localizeScriptLog(`\n☁️ 正在上传英文视频...`), 'blue');
+      let enCdn = '';
+      if (HAS_R2_CONFIG) {
+        const r2Key = `ApCalculusMCQ/${cleanFolder}/${safeVideoName}_en.mp4`;
+        await retryOperation(
+          async () => {
+            const res = await uploadToR2(r2Key, fs.readFileSync(enOutputFile), 'video/mp4');
+            if (!res.success) {
+              throw new Error(res.error || localizeScriptLog('R2 上传接口返回失败'));
+            }
+            enCdn = res.url || `${getCdnDomain()}/${r2Key}`;
+            return res;
+          },
+          3,
+          2500,
+          localizeScriptLog(`R2 微积分英文视频上传`)
+        );
+      } else {
+        const res = await uploadVideoViaServerProxy(
+          baseUrl,
+          taskId,
+          'en',
+          enOutputFile,
+          `${safeVideoName}_en.mp4`,
+          task.folderPath,
+          CURRENT_AUTH_TOKEN,
+          true,
+          'ap-calculus-mcq'
+        );
+        if (res.success && res.cdnUrl) enCdn = res.cdnUrl;
+      }
+      if (enCdn) {
+        uploadedVideos['en'] = enCdn;
+        if (!primaryCdnUrl) primaryCdnUrl = enCdn;
+        log(localizeScriptLog(`✅ 英文视频上传成功: ${enCdn}`), 'green');
+      }
     }
-    if (enCdn) {
-      uploadedVideos['en'] = enCdn;
-      if (!primaryCdnUrl) primaryCdnUrl = enCdn;
-      log(localizeScriptLog(`✅ 英文视频上传成功: ${enCdn}`), 'green');
-    }
+  }
+
+  // 严谨校验：如果未成功获取主视频 URL，禁止标记已完成
+  if (!primaryCdnUrl) {
+    throw new Error(localizeScriptLog('微积分视频渲染产物未能成功生成或上传'));
   }
 
   // 4. 更新任务状态为已完成
