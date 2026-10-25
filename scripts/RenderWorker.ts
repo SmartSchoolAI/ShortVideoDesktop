@@ -258,7 +258,7 @@ const DEFAULT_API_BASE =
   process.env.NEXT_PUBLIC_APP_SITE_URL ||
   process.env.NEXT_PUBLIC_SITE_ORIGIN ||
   'https://app.shortvideo.ca';
-const getCdnDomain = () => process.env.NEXT_PUBLIC_DOWNLOAD_BASE_URL || CDN_BASE_DOMAIN || '';
+const getCdnDomain = () => (process.env.NEXT_PUBLIC_DOWNLOAD_BASE_URL || CDN_BASE_DOMAIN || '').trim().replace(/\/+$/, '');
 const POLL_INTERVAL_MS = 30000; // 30
 function resolveSafeRootDir(): string {
   if (process.env.SHORTVIDEO_ROOT_DIR && !process.env.SHORTVIDEO_ROOT_DIR.includes('.asar')) {
@@ -1375,7 +1375,7 @@ async function fetchWaitingTasks(
   token: string = CURRENT_AUTH_TOKEN,
   scope: 'current_user' | 'all_users' = (IS_ELECTRON_CLIENT ? 'current_user' : 'all_users')
 ): Promise<any[]> {
-  const targetUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/compare-english-word/tasks/`;
+  const targetUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/compare-english-word/tasks`;
   try {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -1413,6 +1413,18 @@ async function fetchWaitingTasks(
 
 export type VideoModule = 'compare-english-word' | 'ap-calculus-mcq';
 
+export function detectTaskModule(task: any): VideoModule {
+  if (
+    task?.__module === 'ap-calculus-mcq' ||
+    task?.course ||
+    (typeof task?.folderPath === 'string' && task.folderPath.includes('ApCalculusMCQ')) ||
+    task?.question
+  ) {
+    return 'ap-calculus-mcq';
+  }
+  return 'compare-english-word';
+}
+
 async function claimNextTask(
   baseUrl: string,
   token: string = CURRENT_AUTH_TOKEN,
@@ -1420,7 +1432,7 @@ async function claimNextTask(
   module: VideoModule = 'compare-english-word'
 ): Promise<any | null> {
   const endpoint = module === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
-  const targetUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/${endpoint}/tasks/`;
+  const targetUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/${endpoint}/tasks`;
   try {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -1469,9 +1481,17 @@ async function updateTaskStatus(
   videoSize?: number,
   videos?: Record<string, string>,
   token: string = CURRENT_AUTH_TOKEN,
-  module: VideoModule = 'compare-english-word'
+  module?: VideoModule
 ): Promise<boolean> {
-  const endpoint = module === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
+  let effectiveModule: VideoModule = module || 'compare-english-word';
+  if (!module) {
+    const f = String(folderPath || '').toLowerCase();
+    const tid = String(taskId || '').toLowerCase();
+    if (f.includes('apcalculusmcq') || f.includes('ap-calculus-mcq') || tid.includes('ap-calculus-mcq')) {
+      effectiveModule = 'ap-calculus-mcq';
+    }
+  }
+  const endpoint = effectiveModule === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
   const targetUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/${endpoint}/tasks`;
   try {
     return await retryOperation(
@@ -1496,8 +1516,17 @@ async function updateTaskStatus(
             videos,
           }),
         });
-        const data = await res.json();
-        return Boolean(res.ok && data.success);
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 409 && status === 'waiting_render' && data?.isLocked) {
+          return true;
+        }
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${data?.error || res.statusText || 'Request failed'}`);
+        }
+        if (!data?.success) {
+          throw new Error(data?.error || 'Server returned unsuccessful response');
+        }
+        return true;
       },
       2,
       1500,
@@ -1519,9 +1548,17 @@ async function uploadVideoViaServerProxy(
   folderPath?: string,
   token: string = CURRENT_AUTH_TOKEN,
   isFinished: boolean = false,
-  module: VideoModule = 'compare-english-word'
+  module?: VideoModule
 ): Promise<{ success: boolean; cdnUrl?: string; error?: string }> {
-  const endpoint = module === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
+  let effectiveModule: VideoModule = module || 'compare-english-word';
+  if (!module) {
+    const f = String(folderPath || '').toLowerCase();
+    const tid = String(taskId || '').toLowerCase();
+    if (f.includes('apcalculusmcq') || f.includes('ap-calculus-mcq') || tid.includes('ap-calculus-mcq')) {
+      effectiveModule = 'ap-calculus-mcq';
+    }
+  }
+  const endpoint = effectiveModule === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
   const targetUrl = new URL(`${baseUrl.replace(/\/+$/, '')}/api/video/${endpoint}/upload-video`);
   targetUrl.searchParams.set('taskId', String(taskId));
   targetUrl.searchParams.set('lang', lang);
@@ -2441,12 +2478,7 @@ async function processSingleTask(
   options: RenderWorkerOptions = {}
 ) {
   // 识别微积分 AP Calculus MCQ 模块任务并执行双语渲染流程
-  if (
-    task.__module === 'ap-calculus-mcq' ||
-    task.course ||
-    (typeof task.folderPath === 'string' && task.folderPath.includes('ApCalculusMCQ')) ||
-    task.question
-  ) {
+  if (detectTaskModule(task) === 'ap-calculus-mcq') {
     return await processApCalculusTask(task, baseUrl, options);
   }
   const taskId = task.videoId || task.id;
@@ -2596,7 +2628,7 @@ async function processSingleTask(
 
     if (!sourceImg01Url || !sourceImg02Url) {
       try {
-        const traceRes = await fetch(`${baseUrl.replace(/\/+$/, '')}/api/video/compare-english-word/tasks/`, {
+        const traceRes = await fetch(`${baseUrl.replace(/\/+$/, '')}/api/video/compare-english-word/tasks`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -2854,7 +2886,8 @@ async function processSingleTask(
       task.folderPath,
       primaryVideo.size,
       undefined,
-      CURRENT_AUTH_TOKEN
+      CURRENT_AUTH_TOKEN,
+      'compare-english-word'
     );
     return;
   }
@@ -2886,7 +2919,8 @@ async function processSingleTask(
           item.filename,
           task.folderPath,
           CURRENT_AUTH_TOKEN,
-          isLast
+          isLast,
+          'compare-english-word'
         );
         if (proxyRes.cdnUrl) {
           item.cdnUrl = proxyRes.cdnUrl;
@@ -2935,7 +2969,8 @@ async function processSingleTask(
       task.folderPath,
       primaryVideo.size,
       videosMap,
-      CURRENT_AUTH_TOKEN
+      CURRENT_AUTH_TOKEN,
+      'compare-english-word'
     );
 
     if (updateSuccess) {
@@ -3003,7 +3038,7 @@ async function triggerQueue(
       } catch (err: any) {
         log(localizeScriptLog(`❌ 任务 [${currentRunningTaskId}] 执行异常: ${err.message}，已自动恢复为待渲染状态`), 'red');
         if (currentRunningTaskId) {
-          const mod: VideoModule = task.__module === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
+          const mod: VideoModule = detectTaskModule(task);
           await updateTaskStatus(baseUrl, currentRunningTaskId, 'waiting_render', undefined, task.folderPath, undefined, undefined, CURRENT_AUTH_TOKEN, mod).catch(() => null);
         }
       } finally {

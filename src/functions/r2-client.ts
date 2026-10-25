@@ -16,13 +16,14 @@ function getR2EnvConfig() {
 export function getCdnBaseDomain(): string {
   const g = globalThis as any;
   const env = g?.__workerEnv || {};
-  return (
+  const raw = (
     env.NEXT_PUBLIC_DOWNLOAD_BASE_URL ||
     env.DOWNLOAD_BASE_URL ||
     process.env.NEXT_PUBLIC_DOWNLOAD_BASE_URL ||
     process.env.DOWNLOAD_BASE_URL ||
     ''
   );
+  return String(raw).trim().replace(/\/+$/, '');
 }
 
 function getCdnBase(): string {
@@ -69,6 +70,16 @@ async function getSignatureKey(key: string, dateStamp: string, regionName: strin
 }
 
 /**
+ * 标准 AWS SigV4 RFC 3986 路径编码（保留路径分隔符 /）
+ */
+function encodeRfc3986Uri(str: string): string {
+  return str
+    .split('/')
+    .map((seg) => encodeURIComponent(seg).replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase()))
+    .join('/');
+}
+
+/**
  * 上传 Buffer、Uint8Array 或字符串到 Cloudflare R2 (完全兼容 Edge Runtime)
  */
 export async function uploadToR2(
@@ -83,7 +94,8 @@ export async function uploadToR2(
       throw new Error('Missing R2 credentials in environment variables.');
     }
 
-    const cleanKey = key.startsWith('/') ? key.substring(1) : key;
+    const cleanKey = key.replace(/^\/+/, '');
+    const canonicalKey = encodeRfc3986Uri(cleanKey);
     const buffer: Uint8Array =
       typeof content === 'string'
         ? new TextEncoder().encode(content)
@@ -92,7 +104,7 @@ export async function uploadToR2(
         : new Uint8Array(content);
 
     const host = `${accountId}.r2.cloudflarestorage.com`;
-    const endpoint = `https://${host}/${bucketName}/${cleanKey}`;
+    const endpoint = `https://${host}/${bucketName}/${canonicalKey}`;
     const region = 'auto';
     const service = 's3';
 
@@ -102,7 +114,7 @@ export async function uploadToR2(
 
     const payloadHash = await sha256Hex(buffer);
 
-    const canonicalUri = `/${bucketName}/${encodeURI(cleanKey)}`;
+    const canonicalUri = `/${bucketName}/${canonicalKey}`;
     const canonicalHeaders = `host:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
     const signedHeaders = 'host;x-amz-content-sha256;x-amz-date';
 
@@ -141,28 +153,30 @@ export async function uploadToR2(
       body: buffer as any,
     });
 
-    const cdnBase = getCdnBase();
+    const cdnBase = getCdnBase().replace(/\/+$/, '');
+    const cleanUrl = cdnBase ? `${cdnBase}/${cleanKey}` : `/${cleanKey}`;
 
     if (!response.ok) {
       const errText = await response.text();
       console.error('[R2 Upload Error]', response.status, errText);
       return {
         success: false,
-        url: `${cdnBase}/${cleanKey}`,
+        url: cleanUrl,
         error: `HTTP ${response.status}: ${errText.substring(0, 300)}`,
       };
     }
 
     return {
       success: true,
-      url: `${cdnBase}/${cleanKey}`,
+      url: cleanUrl,
     };
   } catch (err: any) {
     console.error('[R2 Upload Exception]', err);
-    const cdnBase = getCdnBase();
+    const cdnBase = getCdnBase().replace(/\/+$/, '');
+    const cleanK = String(key || '').replace(/^\/+/, '');
     return {
       success: false,
-      url: `${cdnBase}/${key}`,
+      url: cdnBase ? `${cdnBase}/${cleanK}` : `/${cleanK}`,
       error: err.message || 'Unknown R2 upload error',
     };
   }
