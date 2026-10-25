@@ -260,7 +260,7 @@ export async function ensureLocalVideoFile(
       const rawBase = baseName.replace(/_[a-z]{2,5}$/i, '');
 
       // 若原 URL 带有语言后缀（如 flat-studio_en.mp4），将去除后缀的无后缀根文件加入备选
-      if (/_ [a-z]{2,5}$/i.test(baseName) || /_[a-z]{2,5}$/i.test(baseName)) {
+      if (/_[a-z]{2,5}$/i.test(baseName)) {
         const rootPath = cleanPath.replace(new RegExp(`${baseName}\\${ext}$`), `${rawBase}${ext}`);
         const rootUrl = `${urlObj.origin}${rootPath}${urlObj.search}`;
         if (!candidateUrls.includes(rootUrl)) {
