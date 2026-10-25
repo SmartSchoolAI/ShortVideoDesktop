@@ -2514,10 +2514,17 @@ export class WechatChannelsPlatform extends BasePlatform {
       // 串行动作 [步骤 4/6]：填入短标题（平台严格限制不超过 16 字，超长自动截断）
       await tracer.updateStep(2, 'active');
       const rawTitle = (payload.title || '')
-        .replace(/#[\w\u4e00-\u9fa5]+/g, '')
+        .replace(/#[\w\u4e00-\u9fa5]+/g, ' ')
         .replace(/[\r\n\t]+/g, ' ')
         .trim();
-      const cleanShortTitle = rawTitle.slice(0, 16);
+
+      // 微信短标题专属字符白名单过滤：平台仅支持书名号、引号、逗号、加号、问号、百分号、摄氏度，非法字符（如·间隔号、-破折号、:冒号等）转为空格
+      const sanitizedTitle = rawTitle
+        .replace(/[·•\-_—–:/\\|~`!@#$^&*()_+={\}\[\]【】（）;；、]/g, ' ')
+        .replace(/[^\u4e00-\u9fa5a-zA-Z0-9\s《》""''“”‘’，,+＋?？%％℃]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const cleanShortTitle = sanitizedTitle.slice(0, 16).trim();
 
       if (cleanShortTitle) {
         await tracer.track('[步骤 4/6] 开始录入视频短标题 (限16字)...', {
