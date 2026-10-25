@@ -428,6 +428,13 @@ function registerIpcHandlers(): void {
     windowManager.openLogsTab();
     return { success: true };
   });
+
+  // 7. 打开外部独立视频/网页弹窗（如 YouTube 视频播放页）
+  ipcMain.handle('app:open-external-url', (_event, url: string) => {
+    if (!url) return { success: false };
+    windowManager.openExternalVideoWindow(url);
+    return { success: true };
+  });
 }
 
 import { oauthBridge } from './services/oauth-bridge';

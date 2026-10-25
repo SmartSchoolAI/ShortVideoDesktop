@@ -55,6 +55,7 @@ export class WindowManager {
   private currentLanguage: string = 'zh';
   private oauthWindow: BrowserWindow | null = null;
   private stealthInjectedContents: WeakSet<WebContents> = new WeakSet();
+  private videoPlayerWindow: BrowserWindow | null = null;
 
   private loadPersistedLanguage(): string {
     try {
@@ -967,6 +968,15 @@ export class WindowManager {
           this.openOAuthWindow(url);
           return { action: 'deny' }; // 阻止默认的不可控弹出
         }
+
+        // 外部视频平台（如 YouTube 视频播放页）：在独立视频窗口中打开，避免覆盖主站视图
+        const isYouTubeVideo = /youtube\.com|youtu\.be/i.test(url);
+        if (isYouTubeVideo) {
+          console.log('[WindowManager] 捕获到 YouTube 视频播放请求，开启独立视频播放窗口:', url);
+          this.openExternalVideoWindow(url);
+          return { action: 'deny' };
+        }
+
         // 其他 HTTP 链接在当前 View 内导航
         if (url.startsWith('http://') || url.startsWith('https://')) {
           mainView.webContents.loadURL(url).catch((e) => {
@@ -2038,6 +2048,62 @@ export class WindowManager {
   }
 
   /**
+   * 打开外部独立视频播放/浏览窗口（如 YouTube 视频播放页），既不覆盖主站，又能新弹出一个独立窗口
+   */
+  public openExternalVideoWindow(videoUrl: string): BrowserWindow | null {
+    if (!videoUrl) return null;
+
+    // 若视频播放窗口已存在且未销毁，直接切歌/播放并置顶激活
+    if (this.videoPlayerWindow && !this.videoPlayerWindow.isDestroyed()) {
+      this.videoPlayerWindow.loadURL(videoUrl).catch((err) => {
+        console.warn('[WindowManager] 加载视频播放页面失败:', err?.message || err);
+      });
+      if (this.videoPlayerWindow.isMinimized()) this.videoPlayerWindow.restore();
+      this.videoPlayerWindow.focus();
+      return this.videoPlayerWindow;
+    }
+
+    const parentWin = this.mainWindow && !this.mainWindow.isDestroyed() ? this.mainWindow : undefined;
+    const videoWin = new BrowserWindow({
+      width: 1080,
+      height: 720,
+      center: true,
+      parent: parentWin,
+      modal: false,
+      title: `${APP_CONFIG.appName} - Video Player`,
+      autoHideMenuBar: true,
+      backgroundColor: '#0F172A',
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: false,
+        webSecurity: true,
+      },
+    });
+
+    this.videoPlayerWindow = videoWin;
+    videoWin.setMenuBarVisibility(false);
+    videoWin.webContents.setUserAgent(APP_CONFIG.userAgent);
+
+    videoWin.webContents.setWindowOpenHandler(({ url }) => {
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        shell.openExternal(url).catch(() => { });
+      }
+      return { action: 'deny' };
+    });
+
+    videoWin.on('closed', () => {
+      this.videoPlayerWindow = null;
+    });
+
+    videoWin.loadURL(videoUrl).catch((err) => {
+      console.warn('[WindowManager] 加载视频播放页面失败:', err?.message || err);
+    });
+
+    return videoWin;
+  }
+
+  /**
    * 销毁所有视图
    */
   private destroyAll(): void {
@@ -2083,6 +2149,13 @@ export class WindowManager {
         this.aboutWindow.close();
       } catch { }
       this.aboutWindow = null;
+    }
+
+    if (this.videoPlayerWindow && !this.videoPlayerWindow.isDestroyed()) {
+      try {
+        this.videoPlayerWindow.close();
+      } catch { }
+      this.videoPlayerWindow = null;
     }
 
     this.mainWindow = null;

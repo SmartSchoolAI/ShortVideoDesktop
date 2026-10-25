@@ -83,6 +83,13 @@ const electronAPI = {
       ipcRenderer.removeListener('scheduler:tasks-updated', handler);
     };
   },
+
+  /**
+   * 在独立的外部视频/页面弹窗中打开链接
+   */
+  openExternalUrl: (url: string) => {
+    return ipcRenderer.invoke('app:open-external-url', url);
+  },
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
