@@ -1472,7 +1472,7 @@ async function updateTaskStatus(
   module: VideoModule = 'compare-english-word'
 ): Promise<boolean> {
   const endpoint = module === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
-  const targetUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/${endpoint}/tasks/`;
+  const targetUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/${endpoint}/tasks`;
   try {
     return await retryOperation(
       async () => {
@@ -1577,8 +1577,17 @@ async function uploadVideoViaServerProxy(
 // ── 3. Remotion 模板核心缓存与执行 ────────────────────────────────────────────
 // 根据不同视频模板隔离运行缓存目录（如 CompareEnglishWord 与 ApCalculusMCQ 互不污染）
 function getBundleCacheDir(moduleName: string = 'CompareEnglishWord'): string {
+  if (process.env.REMOTION_BUNDLE_CACHE_BASE_DIR) {
+    return path.join(process.env.REMOTION_BUNDLE_CACHE_BASE_DIR, moduleName);
+  }
   if (process.env.REMOTION_BUNDLE_CACHE_DIR) {
-    return process.env.REMOTION_BUNDLE_CACHE_DIR;
+    const customDir = process.env.REMOTION_BUNDLE_CACHE_DIR;
+    const lastPart = path.basename(customDir);
+    const parentDir = path.dirname(customDir);
+    if (lastPart === 'CompareEnglishWord' && moduleName !== 'CompareEnglishWord') {
+      return path.join(parentDir, moduleName);
+    }
+    return customDir;
   }
   return path.resolve(ROOT_DIR, 'BundledCodeCache', moduleName);
 }
