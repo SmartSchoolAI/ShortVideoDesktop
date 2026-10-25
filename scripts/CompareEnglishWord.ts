@@ -1536,12 +1536,15 @@ async function uploadVideoViaServerProxy(
   const fileBytes = fs.readFileSync(filePath);
   const headers: Record<string, string> = {
     'Content-Type': 'video/mp4',
-    'x-task-id': String(taskId),
-    'x-lang': lang,
-    'x-filename': filename,
+    'x-task-id': encodeURIComponent(String(taskId)),
+    'x-lang': encodeURIComponent(lang),
+    'x-filename': encodeURIComponent(filename),
   };
   if (isFinished) {
     headers['x-is-finished'] = 'true';
+  }
+  if (folderPath) {
+    headers['x-folder-path'] = encodeURIComponent(folderPath);
   }
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
