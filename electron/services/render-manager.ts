@@ -700,7 +700,8 @@ export class RenderManager {
           REMOTION_BUILTIN_BUNDLE_DIR: builtinBundleDir,
           // 明确告知渲染脚本将生成的视频文件存放在应用程序数据目录（userData/out）
           SHORTVIDEO_OUTPUT_DIR: defaultOutputDir,
-          // 告知渲染脚本把 BundledCodeCache 存到 userData 而非源码目录
+          // 告知渲染脚本把 BundledCodeCache 存到 userData 而非源码目录，支持各模块隔离存放
+          REMOTION_BUNDLE_CACHE_BASE_DIR: path.join(userDataDir, 'BundledCodeCache'),
           REMOTION_BUNDLE_CACHE_DIR: path.join(userDataDir, 'BundledCodeCache', 'CompareEnglishWord'),
           // CDN 下载域名：确保 Remotion 渲染时 Chromium 使用绝对 CDN 地址加载图片，而非退化为 localhost:3000
           NEXT_PUBLIC_DOWNLOAD_BASE_URL: process.env.NEXT_PUBLIC_DOWNLOAD_BASE_URL || 'https://download.shortvideo.ca',
