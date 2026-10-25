@@ -704,8 +704,8 @@ export class RenderManager {
           REMOTION_BUNDLE_CACHE_BASE_DIR: path.join(userDataDir, 'BundledCodeCache'),
           REMOTION_BUNDLE_CACHE_DIR: path.join(userDataDir, 'BundledCodeCache', 'CompareEnglishWord'),
           // CDN 下载域名：确保 Remotion 渲染时 Chromium 使用绝对 CDN 地址加载图片，而非退化为 localhost:3000
-          NEXT_PUBLIC_DOWNLOAD_BASE_URL: process.env.NEXT_PUBLIC_DOWNLOAD_BASE_URL || 'https://download.shortvideo.ca',
-          DOWNLOAD_BASE_URL: process.env.DOWNLOAD_BASE_URL || 'https://download.shortvideo.ca',
+          NEXT_PUBLIC_DOWNLOAD_BASE_URL: process.env.NEXT_PUBLIC_DOWNLOAD_BASE_URL || APP_CONFIG.downloadUrl,
+          DOWNLOAD_BASE_URL: process.env.DOWNLOAD_BASE_URL || APP_CONFIG.downloadUrl,
           ...(authToken ? { SHORTVIDEO_AUTH_TOKEN: authToken } : {}),
         },
       });
