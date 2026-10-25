@@ -977,11 +977,17 @@ export class WindowManager {
           return { action: 'deny' };
         }
 
-        // 其他 HTTP 链接在当前 View 内导航
+        // 主站自身域名的链接在当前 View 内导航，非主站的外部链接统一在独立窗口中打开，避免主站被覆盖
         if (url.startsWith('http://') || url.startsWith('https://')) {
-          mainView.webContents.loadURL(url).catch((e) => {
-            console.warn('[WindowManager] 主站 window.open 重定向失败:', e?.message || e);
-          });
+          const isMainDomain = url.includes('shortvideo.ca') || url.includes('localhost') || url.includes('127.0.0.1');
+          if (isMainDomain) {
+            mainView.webContents.loadURL(url).catch((e) => {
+              console.warn('[WindowManager] 主站 window.open 重定向失败:', e?.message || e);
+            });
+          } else {
+            console.log('[WindowManager] 捕获到主站外部链接 window.open，开启独立窗口:', url);
+            this.openExternalVideoWindow(url);
+          }
         }
       } catch (e: any) {
         console.warn('[WindowManager] mainView setWindowOpenHandler 异常:', e?.message || e);
