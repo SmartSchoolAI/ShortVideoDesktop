@@ -641,9 +641,13 @@ export class RenderManager {
         console.warn('[RenderManager] 获取用户会话凭据失败:', err?.message || err);
       }
 
-      // 直接用 node 执行编译后 JS，BundledCodeCache 存放在 userData 目录下持久化复用
       const userDataDir = app.getPath('userData');
       const defaultOutputDir = path.join(userDataDir, 'out');
+      const cacheBaseDir = path.join(userDataDir, 'BundledCodeCache');
+      try {
+        if (!fs.existsSync(defaultOutputDir)) fs.mkdirSync(defaultOutputDir, { recursive: true });
+        if (!fs.existsSync(cacheBaseDir)) fs.mkdirSync(cacheBaseDir, { recursive: true });
+      } catch (_) {}
       const workingDir = this.resolvePhysicalWorkingDir();
       const targetApiUrl = APP_CONFIG.siteUrl || APP_CONFIG.productionUrl || 'https://app.shortvideo.ca';
       
@@ -706,7 +710,7 @@ export class RenderManager {
           // CDN 下载域名：确保 Remotion 渲染时 Chromium 使用绝对 CDN 地址加载图片，而非退化为 localhost:3000
           NEXT_PUBLIC_DOWNLOAD_BASE_URL: process.env.NEXT_PUBLIC_DOWNLOAD_BASE_URL || APP_CONFIG.downloadUrl,
           DOWNLOAD_BASE_URL: process.env.DOWNLOAD_BASE_URL || APP_CONFIG.downloadUrl,
-          ...(authToken ? { SHORTVIDEO_AUTH_TOKEN: authToken } : {}),
+          ...(authToken ? { SHORTVIDEO_AUTH_TOKEN: authToken, AUTH_TOKEN: authToken } : {}),
         },
       });
 

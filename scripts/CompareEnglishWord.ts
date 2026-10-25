@@ -1417,8 +1417,10 @@ export function detectTaskModule(task: any): VideoModule {
   if (
     task?.__module === 'ap-calculus-mcq' ||
     task?.course ||
-    (typeof task?.folderPath === 'string' && task.folderPath.includes('ApCalculusMCQ')) ||
-    task?.question
+    task?.question ||
+    (typeof task?.folderPath === 'string' && /ap[\s_-]?calculus/i.test(task.folderPath)) ||
+    (typeof task?.videoId === 'string' && /ap[\s_-]?calculus/i.test(task.videoId)) ||
+    (typeof task?.id === 'string' && /ap[\s_-]?calculus/i.test(task.id))
   ) {
     return 'ap-calculus-mcq';
   }
@@ -3015,7 +3017,7 @@ async function main() {
   const isOnce = args.includes('--once');
   const skipUpload = args.includes('--skip-upload');
   const baseUrlArg = args.find((a) => a.startsWith('--url='));
-  const baseUrl = baseUrlArg ? baseUrlArg.replace('--url=', '') : DEFAULT_API_BASE;
+  const baseUrl = (baseUrlArg ? baseUrlArg.replace('--url=', '') : DEFAULT_API_BASE).trim().replace(/\/+$/, '');
   const concurrencyArg = args.find((a) => a.startsWith('--concurrency='));
   const envConcurrency = process.env.REMOTION_CONCURRENCY;
   const isElectronClient = args.includes('--client=electron') || args.some((a) => a.startsWith('--client=electron')) || process.env.SHORTVIDEO_CLIENT_MODE === 'electron';
