@@ -621,7 +621,8 @@ export class RenderManager {
 
     const appVersion = app.getVersion();
     const appTag = appVersion.startsWith('v') ? appVersion : `v${appVersion}`;
-    this.appendLog('system', `🚀 准备执行视频渲染任务: node CompareEnglishWord.js`);
+    const scriptBaseName = path.basename(renderScript);
+    this.appendLog('system', `🚀 准备执行视频渲染任务: node ${scriptBaseName}`);
     this.appendLog('system', `🏷️ 软件版本: ${appTag}`);
     this.appendLog('system', `📄 渲染脚本路径: ${renderScript}`);
 
