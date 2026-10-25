@@ -5,7 +5,7 @@
  * - Windows 分别打包出 A、B、C 三个版本，分别使用不同安装与数据目录、带独立颜色圆点图标与单实例锁，互不影响；
  * - Mac 与 Linux 统一使用 A 版本。
  */
-const { spawnSync } = require('child_process');
+const { spawnSync, execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { t } = require('./i18n');
@@ -156,12 +156,12 @@ function ensureIcons() {
 
 function cleanupProcessLocks() {
   if (process.platform === 'win32') {
-    try {
-      spawnSync('taskkill', ['/F', '/IM', 'ShortVideo*.exe', '/T'], { stdio: 'ignore' });
-    } catch {}
-    try {
-      spawnSync('taskkill', ['/F', '/IM', '*Setup*.exe', '/T'], { stdio: 'ignore' });
-    } catch {}
+    const procs = ['ShortVideo.exe', 'ShortVideo A.exe', 'ShortVideo B.exe', 'ShortVideo C.exe', 'ShortVideo*.exe', 'electron.exe', '*Setup*.exe'];
+    for (const p of procs) {
+      try {
+        execSync(`taskkill /F /IM "${p}" /T`, { stdio: 'ignore' });
+      } catch {}
+    }
   }
 }
 

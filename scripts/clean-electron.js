@@ -19,7 +19,7 @@ try {
 function killProcess(processName) {
   if (process.platform === 'win32') {
     try {
-      execSync(`taskkill /F /IM ${processName} /T`, { stdio: 'ignore' });
+      execSync(`taskkill /F /IM "${processName}" /T`, { stdio: 'ignore' });
     } catch {}
   }
 }
@@ -61,9 +61,17 @@ function getOutputDir() {
 
 console.log(t('CLEAN_ELECTRON_START'));
 
-// 1. 终止残留的客户端主进程与 Electron 调试进程
+// 1. 终止残留的客户端各渠道进程与 Electron 调试进程
 killProcess('ShortVideo.exe');
+killProcess('ShortVideo A.exe');
+killProcess('ShortVideo B.exe');
+killProcess('ShortVideo C.exe');
+killProcess('ShortVideo*.exe');
 killProcess('electron.exe');
+
+// 等待文件锁完全释放
+const sleepStart = Date.now();
+while (Date.now() - sleepStart < 500) {}
 
 // 2. 动态读取配置并清理输出产物目录与编译目录
 const outputDir = getOutputDir();
