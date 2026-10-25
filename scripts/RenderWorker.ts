@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
-import { spawn, execSync } from 'child_process';
+import { spawn, execSync, spawnSync } from 'child_process';
 import { uploadToR2, CDN_BASE_DOMAIN } from '../src/functions/r2-client';
 
 // Material download helper function
@@ -1571,11 +1571,16 @@ async function uploadVideoViaServerProxy(
 }
 
 
-// ── 3.   Remotion   ────────────────────────────────────────────
-// Electron   REMOTION_BUNDLE_CACHE_DIR（ ），
-// BundledCodeCache（ ）
-const BUNDLE_CACHE_DIR = process.env.REMOTION_BUNDLE_CACHE_DIR
-  || path.resolve(ROOT_DIR, 'BundledCodeCache/CompareEnglishWord');
+// ── 3. Remotion 模板核心缓存与执行 ────────────────────────────────────────────
+// 根据不同视频模板隔离运行缓存目录（如 CompareEnglishWord 与 ApCalculusMCQ 互不污染）
+function getBundleCacheDir(moduleName: string = 'CompareEnglishWord'): string {
+  if (process.env.REMOTION_BUNDLE_CACHE_DIR) {
+    return process.env.REMOTION_BUNDLE_CACHE_DIR;
+  }
+  return path.resolve(ROOT_DIR, 'BundledCodeCache', moduleName);
+}
+
+const BUNDLE_CACHE_DIR = getBundleCacheDir('CompareEnglishWord');
 
 /**
  * 动态定位 Remotion 执行器：
@@ -1707,9 +1712,9 @@ function copyDirSafe(srcDir: string, destDir: string): void {
 }
 
 /**
- * 动态检索可用的内置预编译渲染包路径
+ * 动态检索可用的内置预编译渲染包路径 (优先按模块专属查找)
  */
-function getBuiltinBundleDir(): string | null {
+function getBuiltinBundleDir(moduleName: string = 'CompareEnglishWord'): string | null {
   const exeDir = process.execPath ? path.dirname(process.execPath) : '';
   const procResourcesPath =
     process.env.ELECTRON_RESOURCES_PATH ||
@@ -1718,13 +1723,19 @@ function getBuiltinBundleDir(): string | null {
 
   const builtInBundleDirs = [
     process.env.REMOTION_BUILTIN_BUNDLE_DIR,
+    path.join(procResourcesPath, 'app.asar.unpacked', 'build', 'remotion-bundle', moduleName),
     path.join(procResourcesPath, 'app.asar.unpacked', 'build', 'remotion-bundle'),
+    path.join(procResourcesPath, 'app.asar', 'build', 'remotion-bundle', moduleName),
     path.join(procResourcesPath, 'app.asar', 'build', 'remotion-bundle'),
+    path.join(procResourcesPath, 'build', 'remotion-bundle', moduleName),
     path.join(procResourcesPath, 'build', 'remotion-bundle'),
-    exeDir ? path.join(exeDir, 'resources', 'app.asar.unpacked', 'build', 'remotion-bundle') : '',
-    exeDir ? path.join(exeDir, 'resources', 'build', 'remotion-bundle') : '',
+    exeDir ? path.join(exeDir, 'resources', 'app.asar.unpacked', 'build', 'remotion-bundle', moduleName) : '',
+    exeDir ? path.join(exeDir, 'resources', 'build', 'remotion-bundle', moduleName) : '',
+    path.join(__dirname, '..', '..', 'build', 'remotion-bundle', moduleName),
     path.join(__dirname, '..', '..', 'build', 'remotion-bundle'),
+    path.join(__dirname, '..', 'build', 'remotion-bundle', moduleName),
     path.join(__dirname, '..', 'build', 'remotion-bundle'),
+    path.resolve(ROOT_DIR, 'build/remotion-bundle', moduleName),
     path.resolve(ROOT_DIR, 'build/remotion-bundle'),
   ].filter(Boolean) as string[];
 
@@ -1737,15 +1748,15 @@ function getBuiltinBundleDir(): string | null {
 }
 
 /**
- * 确保 Remotion 渲染核心目录 ./BundledCodeCache/CompareEnglishWord 就绪
- * 桌面控制台完全独立运行，100% 免源码依赖：直接加载本地缓存或安装包自带的预编译渲染核心
+ * 确保对应视频模块的 Remotion 渲染核心目录就绪
+ * 比如 CompareEnglishWord -> ./BundledCodeCache/CompareEnglishWord
+ *      ApCalculusMCQ      -> ./BundledCodeCache/ApCalculusMCQ
  */
-let bundlePromise: Promise<string> | null = null;
-
-function ensureRemotionBundle(forceRebuild = false): Promise<string> {
-  const indexHtml = path.join(BUNDLE_CACHE_DIR, 'index.html');
-  const cacheBundleJs = path.join(BUNDLE_CACHE_DIR, 'bundle.js');
-  const builtinDir = getBuiltinBundleDir();
+function ensureRemotionBundle(forceRebuild = false, moduleName: string = 'CompareEnglishWord'): Promise<string> {
+  const targetCacheDir = getBundleCacheDir(moduleName);
+  const indexHtml = path.join(targetCacheDir, 'index.html');
+  const cacheBundleJs = path.join(targetCacheDir, 'bundle.js');
+  const builtinDir = getBuiltinBundleDir(moduleName);
 
   // 若存在内置预编译包，且当前缓存的 bundle.js 大小与内置包不一致，说明内置包已更新或本地缓存已损坏，自动清理重建
   let cacheStale = false;
@@ -1759,26 +1770,25 @@ function ensureRemotionBundle(forceRebuild = false): Promise<string> {
     } catch (_) {}
   }
 
-  if (!forceRebuild && !cacheStale && isRemotionBundleValid(BUNDLE_CACHE_DIR)) {
-    log(localizeScriptLog(`⚡ 检测到已有 Remotion 渲染核心缓存 (4.0.534): ${BUNDLE_CACHE_DIR}，直接复用免打包`), 'green');
-    return Promise.resolve(BUNDLE_CACHE_DIR);
+  if (!forceRebuild && !cacheStale && isRemotionBundleValid(targetCacheDir)) {
+    log(localizeScriptLog(`⚡ 检测到已有 [${moduleName}] Remotion 渲染核心缓存 (4.0.534): ${targetCacheDir}，直接复用免打包`), 'green');
+    return Promise.resolve(targetCacheDir);
   } else if (!forceRebuild && (fs.existsSync(indexHtml) || cacheStale)) {
-    log(localizeScriptLog(`🧹 检测到 Remotion 缓存版本过期或不完整，自动清理并刷新: ${BUNDLE_CACHE_DIR}`), 'yellow');
-    try { fs.rmSync(BUNDLE_CACHE_DIR, { recursive: true, force: true }); } catch (_) {}
+    log(localizeScriptLog(`🧹 检测到 [${moduleName}] Remotion 缓存版本过期或不完整，自动清理并刷新: ${targetCacheDir}`), 'yellow');
+    try { fs.rmSync(targetCacheDir, { recursive: true, force: true }); } catch (_) {}
   }
 
-  // 优先从安装包内置资源或自身工程 build/remotion-bundle 加载（完全无外部源码依赖）
+  // 1. 优先从安装包内置资源或自身工程 build/remotion-bundle 加载（完全无外部源码依赖）
   if (builtinDir) {
-    log(localizeScriptLog(`📦 检测到客户端内置预编译 Remotion 渲染核心 (${builtinDir})，正在注入运行缓存...`), 'green');
+    log(localizeScriptLog(`📦 检测到客户端内置预编译 Remotion 渲染核心 (${builtinDir})，正在注入 [${moduleName}] 运行缓存...`), 'green');
     try {
-      if (!fs.existsSync(BUNDLE_CACHE_DIR)) {
-        fs.mkdirSync(BUNDLE_CACHE_DIR, { recursive: true });
+      if (!fs.existsSync(targetCacheDir)) {
+        fs.mkdirSync(targetCacheDir, { recursive: true });
       }
-      // 使用支持 asar 虚拟流的安全复制，秒级固化至运行缓存
-      copyDirSafe(builtinDir, BUNDLE_CACHE_DIR);
-      if (fs.existsSync(indexHtml) && isRemotionBundleValid(BUNDLE_CACHE_DIR)) {
-        log(localizeScriptLog(`✅ 内置 Remotion 渲染核心固化就绪: ${BUNDLE_CACHE_DIR}，免源码秒级执行！`), 'green');
-        return Promise.resolve(BUNDLE_CACHE_DIR);
+      copyDirSafe(builtinDir, targetCacheDir);
+      if (fs.existsSync(indexHtml) && isRemotionBundleValid(targetCacheDir)) {
+        log(localizeScriptLog(`✅ [${moduleName}] 内置 Remotion 渲染核心固化就绪: ${targetCacheDir}，免源码秒级执行！`), 'green');
+        return Promise.resolve(targetCacheDir);
       }
     } catch (cpErr: any) {
       log(localizeScriptLog(`⚠️ 复制内置资源警告: ${cpErr.message}，直接挂载内置核心路径使用`), 'yellow');
@@ -1786,8 +1796,59 @@ function ensureRemotionBundle(forceRebuild = false): Promise<string> {
     }
   }
 
+  // 2. 独立模板快速派生机制：若已有基础 bundle 缓存且包含多模板代码，快速派生至专属模块目录
+  const fallbackBaseDir = path.resolve(ROOT_DIR, 'BundledCodeCache', 'CompareEnglishWord');
+  if (moduleName !== 'CompareEnglishWord' && isRemotionBundleValid(fallbackBaseDir)) {
+    log(localizeScriptLog(`📦 正在从已有核心包派生 [${moduleName}] 专属缓存目录: ${targetCacheDir}...`), 'blue');
+    try {
+      if (!fs.existsSync(targetCacheDir)) {
+        fs.mkdirSync(targetCacheDir, { recursive: true });
+      }
+      copyDirSafe(fallbackBaseDir, targetCacheDir);
+      // 清除专属缓存中的旧模块静态媒体资源目录，确保微积分缓存干净独立
+      const dirtySub = path.join(targetCacheDir, 'CompareEnglishWord');
+      if (fs.existsSync(dirtySub)) {
+        try { fs.rmSync(dirtySub, { recursive: true, force: true }); } catch (_) {}
+      }
+      if (isRemotionBundleValid(targetCacheDir)) {
+        log(localizeScriptLog(`✅ 成功就绪 [${moduleName}] 专属渲染核心缓存: ${targetCacheDir}`), 'green');
+        return Promise.resolve(targetCacheDir);
+      }
+    } catch (deriveErr: any) {
+      log(localizeScriptLog(`⚠️ 派生专属缓存跳过: ${deriveErr.message}`), 'yellow');
+    }
+  }
+
+  // 3. 源码环境动态编译：若存在 src/index.ts，通过 Remotion CLI 打包生成
+  const srcEntryPoint = path.resolve(ROOT_DIR, 'src/index.ts');
+  if (fs.existsSync(srcEntryPoint)) {
+    log(localizeScriptLog(`⚙️ 正在通过 Remotion CLI 编译 [${moduleName}] 专属渲染核心: ${targetCacheDir}...`), 'blue');
+    try {
+      if (!fs.existsSync(targetCacheDir)) {
+        fs.mkdirSync(targetCacheDir, { recursive: true });
+      }
+      const executor = getRemotionExecutor();
+      const bundleArgs = [...executor.baseArgs, 'bundle', srcEntryPoint, targetCacheDir, '--disable-web-security'];
+      const buildRes = spawnSync(executor.command, bundleArgs, {
+        cwd: ROOT_DIR,
+        shell: !executor.isNode,
+        stdio: 'inherit',
+        env: {
+          ...process.env,
+          NODE_PATH: buildEnhancedNodePath(),
+        },
+      });
+      if (buildRes.status === 0 && isRemotionBundleValid(targetCacheDir)) {
+        log(localizeScriptLog(`✅ [${moduleName}] Remotion 渲染核心编译成功: ${targetCacheDir}`), 'green');
+        return Promise.resolve(targetCacheDir);
+      }
+    } catch (bundleErr: any) {
+      log(localizeScriptLog(`⚠️ 动态编译 Remotion 核心失败: ${bundleErr.message}`), 'yellow');
+    }
+  }
+
   // 若运行缓存与内置包均未检测到，报告核心组件状态
-  const errMsg = localizeScriptLog(`❌ 客户端视频渲染核心组件缺失，未检测到内置预编译包。请重新安装客户端以恢复渲染功能。`);
+  const errMsg = localizeScriptLog(`❌ 客户端视频渲染核心组件缺失，未检测到 [${moduleName}] 预编译包。请重新安装客户端以恢复渲染功能。`);
   log(errMsg, 'red');
   return Promise.reject(new Error(errMsg));
 }
@@ -1866,13 +1927,14 @@ async function executeRemotionRender(
   outputFile: string,
   props: Record<string, any>,
   concurrency?: number | string,
-  compositionId: string = 'CompareEnglishWord'
+  compositionId: string = 'CompareEnglishWord',
+  moduleName: string = 'CompareEnglishWord'
 ): Promise<void> {
-  // 确保 Remotion 渲染包已就绪
-  const bundleTarget = await ensureRemotionBundle();
+  // 确保对应视频模块的 Remotion 渲染包已就绪
+  const bundleTarget = await ensureRemotionBundle(false, moduleName);
 
   // 仅在 CompareEnglishWord 渲染时同步专用本地静态素材
-  if (compositionId === 'CompareEnglishWord') {
+  if (moduleName === 'CompareEnglishWord' || compositionId === 'CompareEnglishWord') {
     log(localizeScriptLog(`📥 正在同步 Remotion 本地静态素材 (${getCdnDomain()}/CompareEnglishWord)...`), 'gray');
     await ensureBundleStaticAssets(bundleTarget, props.folder);
   }
@@ -2080,12 +2142,13 @@ async function renderVideoWithRemotion(
   outputFile: string,
   props: Record<string, any>,
   concurrency?: number | string,
-  compositionId: string = 'CompareEnglishWord'
+  compositionId: string = 'CompareEnglishWord',
+  moduleName: string = 'CompareEnglishWord'
 ): Promise<void> {
   const defaultConcurrency = '2';
   const initialConcurrency = globalAdaptiveConcurrency ?? (concurrency || defaultConcurrency);
   try {
-    await executeRemotionRender(outputFile, props, initialConcurrency, compositionId);
+    await executeRemotionRender(outputFile, props, initialConcurrency, compositionId, moduleName);
   } catch (err: any) {
     const isOom = Boolean(err?.isOom) || OOM_ERROR_REGEX.test(err?.message || '');
     const currentNum = Number(initialConcurrency);
@@ -2096,7 +2159,7 @@ async function renderVideoWithRemotion(
         try { fs.unlinkSync(outputFile); } catch {}
       }
       try {
-        await executeRemotionRender(outputFile, props, 1, compositionId);
+        await executeRemotionRender(outputFile, props, 1, compositionId, moduleName);
         log(localizeScriptLog(`✅ 降级并发度 1x 重新渲染成功!`), 'green');
         return;
       } catch (retryErr: any) {
@@ -2128,7 +2191,7 @@ async function processApCalculusTask(
   const rawFolder = (task.folderPath || '').trim();
   const cleanFolder = rawFolder
     .replace(/^\/+|\/+$/g, '')
-    .replace(/^ApCalculusMCQ\//, '') || `task_${taskId}`;
+    .replace(/^ApCalculusMCQ\//i, '') || `task_${taskId}`;
 
   const rawEmail = (task.userEmail || '').trim();
   const safeUserEmail = rawEmail
@@ -2173,7 +2236,15 @@ async function processApCalculusTask(
     if (sRes.ok) {
       const remoteData = await sRes.json();
       if (remoteData && typeof remoteData === 'object') {
-        questionData = { ...remoteData, ...questionData };
+        questionData = {
+          ...questionData,
+          ...remoteData,
+          audio_src_zh: remoteData.audio_src_zh || questionData.audio_src_zh || '',
+          audio_src_en: remoteData.audio_src_en || questionData.audio_src_en || '',
+          audio_src: remoteData.audio_src || questionData.audio_src || '',
+          total_duration_frames: remoteData.total_duration_frames || questionData.total_duration_frames,
+          totalDurationFrames: remoteData.totalDurationFrames || questionData.totalDurationFrames,
+        };
         log(localizeScriptLog(`📥 已从云端同步最新微积分剧本与时间戳数据 (summary.json)`), 'gray');
       }
     }
@@ -2186,27 +2257,39 @@ async function processApCalculusTask(
   const zhOutputFile = path.join(outputDir, `${safeVideoName}_zh.mp4`);
   const enOutputFile = path.join(outputDir, `${safeVideoName}_en.mp4`);
 
-  // 1. 渲染中文版本
+  // 1. 渲染中文版本 (使用微积分专属核心缓存 BundledCodeCache/ApCalculusMCQ)
   if (shouldRenderZh) {
     log(localizeScriptLog(`\n[1/2] 正在渲染中文视频 (ApCalculusMCQ-Demo-ZH)...`), 'blue');
+    const zhAudio =
+      questionData.audio_src_zh ||
+      questionData.meta?.audio_src_zh ||
+      (questionData.audio_src && !questionData.audio_src.includes('_en_') && !questionData.audio_src.includes('_en.') ? questionData.audio_src : undefined) ||
+      (task.audioPath && !task.audioPath.includes('_en_') && !task.audioPath.includes('_en.') ? task.audioPath : undefined);
     const zhProps = {
       question: questionData,
       lang: 'zh',
       showAudio: true,
+      audioSrc: zhAudio,
     };
-    await renderVideoWithRemotion(zhOutputFile, zhProps, options.concurrency, 'ApCalculusMCQ-Demo-ZH');
+    await renderVideoWithRemotion(zhOutputFile, zhProps, options.concurrency, 'ApCalculusMCQ-Demo-ZH', 'ApCalculusMCQ');
     log(localizeScriptLog(`✅ 中文视频渲染完成: ${zhOutputFile}`), 'green');
   }
 
-  // 2. 渲染英文版本
+  // 2. 渲染英文版本 (使用微积分专属核心缓存 BundledCodeCache/ApCalculusMCQ)
   if (shouldRenderEn) {
     log(localizeScriptLog(`\n[2/2] 正在渲染英文视频 (ApCalculusMCQ-Demo-EN)...`), 'blue');
+    const enAudio =
+      questionData.audio_src_en ||
+      questionData.meta?.audio_src_en ||
+      (questionData.audio_src && !questionData.audio_src.includes('_zh_') && !questionData.audio_src.includes('_zh.') ? questionData.audio_src : undefined) ||
+      (task.audioPath && !task.audioPath.includes('_zh_') && !task.audioPath.includes('_zh.') ? task.audioPath : undefined);
     const enProps = {
       question: questionData,
       lang: 'en',
       showAudio: true,
+      audioSrc: enAudio,
     };
-    await renderVideoWithRemotion(enOutputFile, enProps, options.concurrency, 'ApCalculusMCQ-Demo-EN');
+    await renderVideoWithRemotion(enOutputFile, enProps, options.concurrency, 'ApCalculusMCQ-Demo-EN', 'ApCalculusMCQ');
     log(localizeScriptLog(`✅ 英文视频渲染完成: ${enOutputFile}`), 'green');
   }
 
@@ -3042,11 +3125,15 @@ async function main() {
 
   const options: RenderWorkerOptions = { skipUpload, concurrency, lang: targetLang, scope: clientScope };
 
-  // 启动即主动预热/固化 Remotion Bundle，确保独立客户端完全脱离源码也能秒级免打包就绪
+  // 启动即主动预热/固化各个模板模块的 Remotion Bundle，确保独立客户端完全脱离源码也能秒级免打包就绪
   const rebuildBundle = args.includes('--rebuild-bundle') || args.includes('--clean-bundle');
   try {
-    await ensureRemotionBundle(rebuildBundle);
+    await ensureRemotionBundle(rebuildBundle, 'CompareEnglishWord');
+    await ensureRemotionBundle(rebuildBundle, 'ApCalculusMCQ');
   } catch (_) { }
+
+  const cewCache = getBundleCacheDir('CompareEnglishWord');
+  const mcqCache = getBundleCacheDir('ApCalculusMCQ');
 
   console.clear();
   log(`============================================================`, 'green');
@@ -3060,7 +3147,8 @@ async function main() {
   log(localizeScriptLog(`🌐 目标服务端: ${baseUrl}`), 'blue');
   log(localizeScriptLog(`☁️ 视频上传通道: ${HAS_R2_CONFIG ? '⚡ 本地直传模式 (Local R2)' : '🌐 服务端安全代理模式 (Server R2 Proxy)'}`), 'green');
   log(localizeScriptLog(`🔑 用户会话鉴权: ${CURRENT_AUTH_TOKEN ? '✅ 已绑定当前用户 Token (安全会话)' : '⚠️ 未传入 Token (公共无鉴权模式)'}`), CURRENT_AUTH_TOKEN ? 'green' : 'yellow');
-  log(localizeScriptLog(`⚡ Remotion 缓存: ${fs.existsSync(path.join(BUNDLE_CACHE_DIR, 'index.html')) ? '✅ 已就绪 (秒级免打包)' : '⏳ 首次任务将自动构建并固化缓存'} (${BUNDLE_CACHE_DIR})`), 'blue');
+  log(localizeScriptLog(`⚡ Remotion 缓存 (单词对比): ${fs.existsSync(path.join(cewCache, 'index.html')) ? '✅ 已就绪 (秒级免打包)' : '⏳ 首次任务自动固化'} (${cewCache})`), 'blue');
+  log(localizeScriptLog(`⚡ Remotion 缓存 (微积分 MCQ): ${fs.existsSync(path.join(mcqCache, 'index.html')) ? '✅ 已就绪 (秒级免打包)' : '⏳ 首次任务自动固化'} (${mcqCache})`), 'blue');
   log(localizeScriptLog(`🔁 运行模式: ${isOnce ? '单次执行 (--once)' : '后台守护监听'}`), 'blue');
   log(`============================================================\n`, 'green');
 
