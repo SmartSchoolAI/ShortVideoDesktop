@@ -259,12 +259,24 @@ export async function ensureLocalVideoFile(
       const baseName = path.basename(cleanPath, ext);
       const rawBase = baseName.replace(/_[a-z]{2,5}$/i, '');
 
-      // 若原 URL 带有语言后缀（如 flat-studio_en.mp4），将去除后缀的无后缀根文件加入唯一下一步备选（兼容历史旧版本渲染的 flat-studio.mp4）
+      // 若原 URL 带有语言后缀（如 flat-studio_en.mp4），将去除后缀的无后缀根文件加入备选
       if (/_ [a-z]{2,5}$/i.test(baseName) || /_[a-z]{2,5}$/i.test(baseName)) {
         const rootPath = cleanPath.replace(new RegExp(`${baseName}\\${ext}$`), `${rawBase}${ext}`);
         const rootUrl = `${urlObj.origin}${rootPath}${urlObj.search}`;
         if (!candidateUrls.includes(rootUrl)) {
           candidateUrls.push(rootUrl);
+        }
+      } else {
+        // 若原 URL 不带语言后缀，优先追加 _zh 与 _en 备选项（针对多语言双版本视频架构）
+        const zhPath = cleanPath.replace(new RegExp(`${baseName}\\${ext}$`), `${baseName}_zh${ext}`);
+        const zhUrl = `${urlObj.origin}${zhPath}${urlObj.search}`;
+        if (!candidateUrls.includes(zhUrl)) {
+          candidateUrls.push(zhUrl);
+        }
+        const enPath = cleanPath.replace(new RegExp(`${baseName}\\${ext}$`), `${baseName}_en${ext}`);
+        const enUrl = `${urlObj.origin}${enPath}${urlObj.search}`;
+        if (!candidateUrls.includes(enUrl)) {
+          candidateUrls.push(enUrl);
         }
       }
     } catch (_) { }
