@@ -1614,8 +1614,9 @@ async function uploadVideoViaServerProxy(
 // ── 3.   Remotion   ────────────────────────────────────────────
 // Electron   REMOTION_BUNDLE_CACHE_DIR（ ），
 // BundledCodeCache（ ）
-const BUNDLE_CACHE_DIR = process.env.REMOTION_BUNDLE_CACHE_DIR
-  || path.resolve(ROOT_DIR, 'BundledCodeCache/CompareEnglishWord');
+const BUNDLE_CACHE_DIR = process.env.REMOTION_BUNDLE_CACHE_BASE_DIR
+  ? path.join(process.env.REMOTION_BUNDLE_CACHE_BASE_DIR, 'CompareEnglishWord')
+  : (process.env.REMOTION_BUNDLE_CACHE_DIR || path.resolve(ROOT_DIR, 'BundledCodeCache', 'CompareEnglishWord'));
 
 /**
  * 动态定位 Remotion 执行器：
