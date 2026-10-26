@@ -449,7 +449,7 @@
       font-weight: 600;
     }
 
-    /* ANSI 颜色模拟类 */
+    /* ANSI 颜色与修饰模拟类 */
     .ansi-black { color: #475569; }
     .ansi-red { color: #f87171; }
     .ansi-green { color: #34d399; }
@@ -459,6 +459,61 @@
     .ansi-cyan { color: #38bdf8; }
     .ansi-white { color: #f8fafc; }
     .ansi-bold { font-weight: 700; }
+    .ansi-dim { opacity: 0.65; }
+    .ansi-italic { font-style: italic; }
+    .ansi-underline { text-decoration: underline; }
+    .highlight {
+      background: rgba(234, 179, 8, 0.35);
+      color: #fef08a;
+      padding: 0 2px;
+      border-radius: 2px;
+    }
+
+    /* 媒体链接与路径高亮可点击交互样式 */
+    .media-link {
+      color: #38bdf8;
+      text-decoration: underline;
+      text-decoration-style: dashed;
+      text-underline-offset: 3px;
+      cursor: pointer;
+      padding: 1px 5px;
+      margin: 0 1px;
+      border-radius: 4px;
+      transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+      display: inline-block;
+      vertical-align: baseline;
+      font-weight: 500;
+      word-break: break-all;
+      white-space: normal;
+    }
+    .media-link:hover {
+      text-decoration-style: solid;
+    }
+    .media-link:active {
+      opacity: 0.85;
+    }
+    .media-link.local-media-link {
+      color: #34d399; /* 绿色标识本地视频文件 */
+      background: rgba(52, 211, 153, 0.08);
+      border: 1px solid rgba(52, 211, 153, 0.2);
+    }
+    .media-link.local-media-link:hover {
+      color: #ffffff;
+      background: rgba(52, 211, 153, 0.25);
+      border-color: rgba(52, 211, 153, 0.5);
+      box-shadow: 0 2px 8px rgba(52, 211, 153, 0.35);
+    }
+    .media-link.remote-media-link {
+      color: #38bdf8; /* 天蓝色标识远程上传成功的视频 */
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+    }
+    .media-link.remote-media-link:hover {
+      color: #ffffff;
+      background: rgba(56, 189, 248, 0.25);
+      border-color: rgba(56, 189, 248, 0.5);
+      box-shadow: 0 2px 8px rgba(56, 189, 248, 0.35);
+    }
   </style>
 </head>
 <body>
@@ -1317,28 +1372,105 @@
         '96': 'ansi-cyan',
         '97': 'ansi-white',
         '1': 'ansi-bold',
+        '2': 'ansi-dim',
+        '3': 'ansi-italic',
+        '4': 'ansi-underline',
       };
 
+      let openSpanCount = 0;
       text = text.replace(/\x1b\[([0-9;]+)m/g, (match, p1) => {
         const codes = p1.split(';');
         if (codes.includes('0')) {
-          return '</span>';
+          let closing = '';
+          while (openSpanCount > 0) {
+            closing += '</span>';
+            openSpanCount--;
+          }
+          return closing;
         }
         const classes = codes.map(c => ansiMap[c]).filter(Boolean);
         if (classes.length > 0) {
-          return `<span class="${classes.join(' ')}">`;
+          let prefix = '';
+          if (openSpanCount > 0) {
+            prefix = '</span>';
+            openSpanCount--;
+          }
+          openSpanCount++;
+          return `${prefix}<span class="${classes.join(' ')}">`;
         }
         return '';
       });
 
+      while (openSpanCount > 0) {
+        text += '</span>';
+        openSpanCount--;
+      }
+
       text = text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+      text = linkifyMediaText(text);
       return text;
+    }
+
+    // 智能媒体链接解析 (区分远程弹窗播放与本地播放器播放)
+    function escapeAttr(str) {
+      return String(str || '').replace(/"/g, '&quot;');
+    }
+
+    function linkifyMediaText(html) {
+      if (!html) return '';
+
+      // 1. 先安全解析远程 URL (跳过已有 HTML 标签)
+      const urlRegex = /(<[^>]+>)|(https?:\/\/[^\s<>"'\r\n]+)/gi;
+      html = html.replace(urlRegex, (match, tag, url) => {
+        if (tag) return tag;
+        if (!url) return match;
+
+        let cleanUrl = url;
+        let trailing = '';
+        const trailingMatch = cleanUrl.match(/([.,;!?:)\]>]+)$/);
+        if (trailingMatch) {
+          trailing = trailingMatch[1];
+          cleanUrl = cleanUrl.slice(0, -trailing.length);
+        }
+        const isMedia = /\.(?:mp4|webm|ogg|m4v|mp3|wav|m4a|aac|flac)(\?.*)?$/i.test(cleanUrl);
+        const tip = isMedia
+          ? '点击弹窗播放该视频 (Click to play in popup window)'
+          : '点击在外部浏览器打开 (Click to open in browser)';
+        const icon = isMedia ? '🎬' : '🔗';
+        const safeUrl = escapeAttr(cleanUrl);
+        return `<a href="javascript:void(0)" class="media-link remote-media-link" data-url="${safeUrl}" title="${tip}">${icon} ${cleanUrl}</a>${trailing}`;
+      });
+
+      // 2. 解析 Windows 和 Unix 本地媒体文件绝对路径 (支持正反斜杠，跳过已有 HTML 标签)
+      const localMediaRegex = /(<[^>]+>)|([A-Za-z]:[\\/](?:[^<>\r\n"':*?|]+?)\.(?:mp4|mp3|wav|webm|m4a|mkv|aac|flac)\b)|(\/(?:Users|home|root|var|tmp|Volumes)\/(?:[^<>\r\n"':*?|]+?)\.(?:mp4|mp3|wav|webm|m4a|mkv|aac|flac)\b)/gi;
+      html = html.replace(localMediaRegex, (match, tag, winPath, unixPath) => {
+        if (tag) return tag;
+        const targetPath = winPath || unixPath;
+        if (!targetPath) return match;
+
+        const tip = '点击弹窗播放该视频 (Click to play in window, press O for system player)';
+        const safePath = escapeAttr(targetPath);
+        return `<a href="javascript:void(0)" class="media-link local-media-link" data-path="${safePath}" title="${tip}">▶️ ${targetPath}</a>`;
+      });
+
+      return html;
+    }
+
+    // 搜索词高亮函数（安全跳过已有 HTML 标签与 ANSI 样式）
+    function highlightSearchQuery(html, query) {
+      if (!query || !html) return html;
+      const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const reg = new RegExp(`(<[^>]+>)|(${escapedQuery})`, 'gi');
+      return html.replace(reg, (match, tag, text) => {
+        if (tag) return tag;
+        return `<span class="highlight">${text}</span>`;
+      });
     }
 
     // 视频渲染控制台日志多语言规则表 (支持项目全量 14 种核心语言与兼容语种)
     const RENDER_LOG_RULES = [
       {
-        pattern: /(?:(?:🎯|🚀)s*)?拾取待渲染任务[:：]s*(.*)/i,
+        pattern: /(?:(?:🎯|🚀)\\s*)?拾取待渲染任务[:：]\\s*(.*)/i,
         templates: {
           zh: '🎯 拾取待渲染任务: $1',
           en: '🎯 Picked pending video render task: $1',
@@ -1359,7 +1491,7 @@
         }
       },
       {
-        pattern: /(?:(?:📂|📁)s*)?(?:存储目录路径|任务目录路径)[:：]s*(.*)/i,
+        pattern: /(?:(?:📂|📁)\\s*)?(?:存储目录路径|任务目录路径)[:：]\\s*(.*)/i,
         templates: {
           zh: '📁 任务目录路径: $1',
           en: '📁 Task directory path: $1',
@@ -1380,7 +1512,7 @@
         }
       },
       {
-        pattern: /(?:(?:💾|🎬)s*)?(?:本地存储位置|本次目标文件)[:：]s*(.*)/i,
+        pattern: /(?:(?:💾|🎬)\\s*)?(?:本地存储位置|本次目标文件)[:：]\\s*(.*)/i,
         templates: {
           zh: '🎬 本次目标文件: $1',
           en: '🎬 Target output file: $1',
@@ -1464,7 +1596,7 @@
         }
       },
       {
-        pattern: /(?:(?:✅|📊)s*)?核心素材(?:全部|全局)就绪[:：]s*采用s*meta.duration_ens*(?:视频时长|预估时长)s*([d.]+)ss*((d+)s*帧)/i,
+        pattern: /(?:(?:✅|📊)\\s*)?核心素材(?:全部|全局)就绪[:：]\\s*采用\\s*meta\\.duration_en\\s*(?:视频时长|预估时长)\\s*([\\d.]+)s*\\(([\\d]+)\\s*帧\\)/i,
         templates: {
           zh: '📊 核心素材全局就绪: 采用 meta.duration_en 预估时长 $1s ($2 帧)',
           en: '📊 Core assets ready: using meta.duration_en estimated duration $1s ($2 frames)',
@@ -1716,7 +1848,7 @@
         }
       },
       {
-        pattern: /(?:✅\s*)?[【\[](.*?)[】\]]渲染完成[！!]\s*耗时[:：]\s*([\d.]+)s\s*\|\s*文件大小[:：]\s*([\d.]+)s*MB/i,
+        pattern: /(?:✅\s*)?[【\[](.*?)[】\]]渲染完成[！!]\s*耗时[:：]\s*([\d.]+)s\s*\|\s*文件大小[:：]\s*([\d.]+)\s*MB/i,
         templates: {
           zh: '✅ 【$1】渲染完成! 耗时: $2s | 文件大小: $3 MB',
           en: '✅ [$1] Render completed! Duration: $2s | File size: $3 MB',
@@ -1755,6 +1887,69 @@
           tr: '❌ [$1] İşleme başarısız: $2',
           bn: '❌ [$1] রেন্ডারিং ব্যর্থ হয়েছে: $2',
           ur: '❌ [$1] رینڈرنگ ناکام ہو گئی: $2',
+        }
+      },
+      {
+        pattern: /(?:✅\s*)?中文视频上传成功[:：]\s*(.*)/i,
+        templates: {
+          zh: '✅ 中文视频上传成功: $1',
+          en: '✅ Chinese video uploaded successfully: $1',
+          ja: '✅ 中国語動画のアップロードに成功しました: $1',
+          ko: '✅ 중국어 동영상 업로드 성공: $1',
+          vi: '✅ Tải lên video tiếng Trung thành công: $1',
+          th: '✅ อัปโหลดวิดีโอภาษาจีนสำเร็จ: $1',
+          id: '✅ Video bahasa Mandarin berhasil diunggah: $1',
+          es: '✅ Video en chino subido con éxito: $1',
+          fr: '✅ Vidéo en chinois téléversée avec succès : $1',
+          pt: '✅ Vídeo em chinês enviado com sucesso: $1',
+          de: '✅ Chinesisches Video erfolgreich hochgeladen: $1',
+          it: '✅ Video in cinese caricato con successo: $1',
+          ru: '✅ Китайское видео успешно загружено: $1',
+          tr: '✅ Çince video başarıyla yüklendi: $1',
+          bn: '✅ চীনা ভিডিও সফলভাবে আপলোড হয়েছে: $1',
+          ur: '✅ چینی ویڈیو کامیابی سے اپ لوڈ ہو گئی: $1',
+        }
+      },
+      {
+        pattern: /(?:✅\s*)?英文视频上传成功[:：]\s*(.*)/i,
+        templates: {
+          zh: '✅ 英文视频上传成功: $1',
+          en: '✅ English video uploaded successfully: $1',
+          ja: '✅ 英語動画のアップロードに成功しました: $1',
+          ko: '✅ 영어 동영상 업로드 성공: $1',
+          vi: '✅ Tải lên video tiếng Anh thành công: $1',
+          th: '✅ อัปโหลดวิดีโอภาษาอังกฤษสำเร็จ: $1',
+          id: '✅ Video bahasa Inggris berhasil diunggah: $1',
+          es: '✅ Video en inglés subido con éxito: $1',
+          fr: '✅ Vidéo en anglais téléversée avec succès : $1',
+          pt: '✅ Vídeo em inglês enviado com sucesso: $1',
+          de: '✅ Englisches Video erfolgreich hochgeladen: $1',
+          it: '✅ Video in inglese caricato con successo: $1',
+          ru: '✅ Английское видео успешно загружено: $1',
+          tr: '✅ İngilizce video başarıyla yüklendi: $1',
+          bn: '✅ ইংরেজি ভিডিও সফলভাবে আপলোড হয়েছে: $1',
+          ur: '✅ انگریزی ویڈیو کامیابی سے اپ لوڈ ہو گئی: $1',
+        }
+      },
+      {
+        pattern: /(?:✅\s*)?[【\[](.*?)[】\]]代理上传成功[！!]\s*耗时[:：]\s*([\d.]+)s\s*\|\s*地址[:：]\s*(.*)/i,
+        templates: {
+          zh: '✅ 【$1】代理上传成功! 耗时: $2s | 地址: $3',
+          en: '✅ [$1] Proxy upload completed! Duration: $2s | URL: $3',
+          ja: '✅ 【$1】プロキシアップロード成功！ 所要時間: $2s | URL: $3',
+          ko: '✅ 【$1】프록시 업로드 성공! 소요 시간: $2s | URL: $3',
+          vi: '✅ [$1] Tải lên proxy thành công! Thời gian: $2s | URL: $3',
+          th: '✅ [$1] อัปโหลดผ่านพร็อกซีสำเร็จ! ใช้เวลา: $2s | URL: $3',
+          id: '✅ [$1] Unggahan proksi berhasil! Waktu: $2s | URL: $3',
+          es: '✅ [$1] ¡Subida por proxy exitosa! Duración: $2s | URL: $3',
+          fr: '✅ [$1] Téléversement proxy réussi ! Durée : $2s | URL : $3',
+          pt: '✅ [$1] Upload por proxy concluído! Duração: $2s | URL: $3',
+          de: '✅ [$1] Proxy-Upload erfolgreich! Dauer: $2s | URL: $3',
+          it: '✅ [$1] Caricamento proxy completato! Durata: $2s | URL: $3',
+          ru: '✅ [$1] Прокси-загрузка завершена! Время: $2с | URL: $3',
+          tr: '✅ [$1] Proxy yükleme başarılı! Süre: $2sn | URL: $3',
+          bn: '✅ [$1] প্রক্সি আপলোড সফল হয়েছে! সময়: $2s | URL: $3',
+          ur: '✅ [$1] پراکسی اپ لوڈ کامیاب! وقت: $2s | URL: $3',
         }
       },
       {
@@ -2596,7 +2791,8 @@
       const contentSpan = document.createElement('span');
       contentSpan.className = 'log-content';
       const localizedText = localizeRenderLog(entry.text, currentRenderLang);
-      contentSpan.innerHTML = parseAnsiToHtml(localizedText);
+      const parsedHtml = parseAnsiToHtml(localizedText);
+      contentSpan.innerHTML = searchQuery ? highlightSearchQuery(parsedHtml, searchQuery) : parsedHtml;
 
       line.appendChild(timeSpan);
       line.appendChild(typeSpan);
@@ -2662,7 +2858,8 @@
           }
           if (contentSpan) {
             const localizedText = localizeRenderLog(entry.text, currentRenderLang);
-            contentSpan.innerHTML = parseAnsiToHtml(localizedText);
+            const parsedHtml = parseAnsiToHtml(localizedText);
+            contentSpan.innerHTML = searchQuery ? highlightSearchQuery(parsedHtml, searchQuery) : parsedHtml;
           }
 
           let repeatBadge = el.querySelector('.repeat-badge');
@@ -2730,6 +2927,9 @@
 
     function appendSingleLog(entry) {
       allLogs.push(entry);
+      if (allLogs.length > 2500) {
+        allLogs.shift();
+      }
       statLines.textContent = allLogs.length.toString();
 
       if (emptyState.parentNode === container) {
@@ -2738,6 +2938,14 @@
 
       if (matchQuery(entry)) {
         container.appendChild(createLogElement(entry));
+        while (container.children.length > 2500) {
+          const first = container.firstElementChild;
+          if (first && first !== emptyState) {
+            first.remove();
+          } else {
+            break;
+          }
+        }
         if (autoScroll) {
           scrollToBottom();
         }
@@ -2923,6 +3131,50 @@
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'l') {
         e.preventDefault();
         btnClear.click();
+      }
+    });
+
+    // 监听日志中媒体链接与本地视频点击播放
+    container.addEventListener('click', async (e) => {
+      // 保护：若用户正在划词选中日志文本（准备复制），不触发媒体播放
+      const sel = window.getSelection();
+      if (sel && sel.toString().trim().length > 0) return;
+
+      const link = e.target.closest('.media-link');
+      if (!link) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const localPath = link.getAttribute('data-path');
+      const remoteUrl = link.getAttribute('data-url');
+
+      if (localPath) {
+        try {
+          const res = await ipcRenderer.invoke('app:open-local-file', localPath);
+          if (res && res.success === false) {
+            console.warn('[MediaLink] 打开本地文件提示:', res.message);
+            try {
+              const { shell } = require('electron');
+              if (shell && shell.openPath) {
+                await shell.openPath(localPath);
+              }
+            } catch (fallbackErr) {}
+          }
+        } catch (err) {
+          console.error('[MediaLink] 调用系统播放器异常:', err);
+          try {
+            const { shell } = require('electron');
+            if (shell && shell.openPath) {
+              await shell.openPath(localPath);
+            }
+          } catch (fallbackErr) {}
+        }
+      } else if (remoteUrl) {
+        try {
+          await ipcRenderer.invoke('app:open-external-url', remoteUrl);
+        } catch (err) {
+          console.error('[MediaLink] 弹窗播放远程视频异常:', err);
+        }
       }
     });
 

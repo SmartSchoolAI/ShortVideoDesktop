@@ -56,35 +56,38 @@ async function downloadFile(url: string, destPath: string, minSizeBytes = 1000):
 function getMediaExactDuration(filePath: string): number | null {
   if (!fs.existsSync(filePath)) return null;
   try {
-    const cmd = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`;
-    const stdout = execSync(cmd, { encoding: 'utf-8', timeout: 4000, stdio: ['ignore', 'pipe', 'ignore'] });
-    const val = parseFloat(stdout.trim());
-    if (!isNaN(val) && val > 0) {
-      return Number(val.toFixed(3));
+    const args = [
+      '-v', 'error',
+      '-show_entries', 'format=duration',
+      '-of', 'default=noprint_wrappers=1:nokey=1',
+      filePath,
+    ];
+    const ret = spawnSync('ffprobe', args, { encoding: 'utf-8', timeout: 4000, stdio: ['ignore', 'pipe', 'ignore'] });
+    if (ret.status === 0 && ret.stdout) {
+      const val = parseFloat(ret.stdout.trim());
+      if (!isNaN(val) && val > 0) {
+        return Number(val.toFixed(3));
+      }
     }
   } catch (e) {}
   return null;
 }
 
 // Apply slight pitch shift to MP4 audio track
-// ： （Hz） ，
-// ：ffmpeg rubberband  （ ），  asetrate+atempo
-// pitchCents:  （ ），1  = 1/100  ≈ 0.058%
-// ±5~10 ，±2~6
+// 核心原理：微调音频基频（Hz），实现声学水印与听感无损去重
+// 策略顺序：优先 ffmpeg rubberband 滤镜（音质最佳），失败则降级为 asetrate+atempo 滤镜
+// pitchCents: 音调微调音分（cents），1 半音 = 100 音分 ≈ 5.95% 频率变化
 async function applyAudioPitchShift(mp4Path: string, pitchCents: number): Promise<boolean> {
   if (!pitchCents || pitchCents === 0) return true;
   if (!fs.existsSync(mp4Path)) return false;
 
   const tmpPath = mp4Path.replace(/\.mp4$/, `_pitchshift_tmp.mp4`);
 
-  // pitch ratio = 2^(cents/1200)，  asetrate
+  // pitch ratio = 2^(cents/1200)
   const pitchRatio = Math.pow(2, pitchCents / 1200);
-  // asetrate  （  44100   48000，  48000  ）
   const baseSampleRate = 48000;
   const shiftedSampleRate = Math.round(baseSampleRate * pitchRatio);
 
-  // rubberband（ ， ）
-  // ：asetrate  （ ）+ atempo
   const strategies: Array<{ name: string; audioFilter: string }> = [
     {
       name: 'rubberband',
@@ -92,32 +95,29 @@ async function applyAudioPitchShift(mp4Path: string, pitchCents: number): Promis
     },
     {
       name: 'asetrate+atempo',
-      // asetrate  / （ ），atempo
       audioFilter: `asetrate=${shiftedSampleRate},aresample=${baseSampleRate},atempo=${(1 / pitchRatio).toFixed(6)}`,
     },
   ];
 
   for (const strategy of strategies) {
     try {
-      // ffmpeg  ：  copy，
-      const cmd = [
-        'ffmpeg', '-y',
-        '-i', `"${mp4Path}"`,
+      const args = [
+        '-y',
+        '-i', mp4Path,
         '-vcodec', 'copy',
-        '-af', `"${strategy.audioFilter}"`,
+        '-af', strategy.audioFilter,
         '-acodec', 'aac',
         '-b:a', '192k',
-        `"${tmpPath}"`,
-      ].join(' ');
+        tmpPath,
+      ];
 
-      execSync(cmd, { timeout: 120000, stdio: 'pipe' });
+      const ret = spawnSync('ffmpeg', args, { timeout: 120000, stdio: 'pipe' });
 
-      if (fs.existsSync(tmpPath) && fs.statSync(tmpPath).size > 10000) {
+      if (ret.status === 0 && fs.existsSync(tmpPath) && fs.statSync(tmpPath).size > 10000) {
         fs.renameSync(tmpPath, mp4Path);
         return true;
       }
     } catch (_e) {
-      // ，
       if (fs.existsSync(tmpPath)) {
         try { fs.unlinkSync(tmpPath); } catch (_) {}
       }

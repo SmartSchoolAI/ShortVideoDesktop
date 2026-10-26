@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, Menu, MenuItemConstructorOptions, Notification, shell } from 'electron';
+import fs from 'fs';
 import { execSync } from 'child_process';
 import path from 'path';
 import { windowManager } from './services/window-manager';
@@ -429,11 +430,36 @@ function registerIpcHandlers(): void {
     return { success: true };
   });
 
-  // 7. 打开外部独立视频/网页弹窗（如 YouTube 视频播放页）
+  // 7. 打开外部独立视频/网页弹窗（如 YouTube 视频播放页或远程 MP4 直链）
   ipcMain.handle('app:open-external-url', (_event, url: string) => {
     if (!url) return { success: false };
     windowManager.openExternalVideoWindow(url);
     return { success: true };
+  });
+
+  // 8. 打开本地视频/音频文件（优先使用内置独立弹窗秒开播放，支持一键切换系统播放器与自动降级保障）
+  ipcMain.handle('app:open-local-file', async (_event, filePath: string) => {
+    if (!filePath) return { success: false, message: 'Path is required' };
+    try {
+      let cleanPath = String(filePath).trim().replace(/^["']|["']$/g, '');
+      cleanPath = cleanPath.replace(/^file:\/\/\/?/i, '');
+      cleanPath = path.normalize(cleanPath);
+      if (!fs.existsSync(cleanPath)) {
+        console.warn('[WindowManager] 本地媒体文件不存在:', cleanPath);
+        return { success: false, message: `File does not exist: ${cleanPath}` };
+      }
+      // 优先在内置原生独立弹窗播放器中播放
+      windowManager.openExternalVideoWindow(cleanPath);
+      return { success: true };
+    } catch (err: any) {
+      console.warn('[WindowManager] 内置弹窗播放异常，降级调起系统默认播放器:', err);
+      try {
+        await shell.openPath(filePath);
+        return { success: true };
+      } catch (fallbackErr: any) {
+        return { success: false, message: fallbackErr?.message || String(fallbackErr) };
+      }
+    }
   });
 }
 

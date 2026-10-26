@@ -365,10 +365,8 @@ export class WindowManager {
     const isMac = process.platform === 'darwin';
 
     const preferredName = isWin ? 'icon.ico' : isMac ? 'icon.icns' : 'icon.png';
-    const chSuffix = (APP_CONFIG?.channel || 'A').toLowerCase();
-    const channelIcon = isWin ? `icon-${chSuffix}.ico` : isMac ? `icon-${chSuffix}.icns` : `icon-${chSuffix}.png`;
-    // 优先采用原始高清 512x512 PNG，提供完整 Alpha 透明通道和高 DPI 缩放渲染，彻底杜绝模糊失真
-    const fallbackNames = ['icon-' + chSuffix + '.png', 'icon.png', 'icon.ico', 'icon.icns'];
+    // 优先采用高清标准图标与原始高清 512x512 PNG，提供完整 Alpha 透明通道和高 DPI 缩放渲染
+    const fallbackNames = [preferredName, 'icon.png', 'icon.ico', 'icon.icns'];
 
     const searchDirs = [
       path.join(app.getAppPath(), 'build'),
@@ -2054,17 +2052,47 @@ export class WindowManager {
   }
 
   /**
-   * 打开外部独立视频播放/浏览窗口（如 YouTube 视频播放页），既不覆盖主站，又能新弹出一个独立窗口
+   * 打开独立视频播放/浏览窗口（支持远程 MP4/音视频直链与本地渲染生成的音视频文件）
+   * 优先使用独立原生 HTML5 弹窗秒开播放，支持空格播放/暂停、Esc 退出及一键调用系统播放器
    */
-  public openExternalVideoWindow(videoUrl: string): BrowserWindow | null {
-    if (!videoUrl) return null;
+  public openExternalVideoWindow(videoUrlOrPath: string): BrowserWindow | null {
+    if (!videoUrlOrPath) return null;
+
+    let targetUrl = String(videoUrlOrPath).trim().replace(/^["']|["']$/g, '');
+    let isLocalFile = false;
+    let localAbsPath = '';
+
+    // 检测是否为本地文件路径
+    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+      const rawPath = targetUrl.replace(/^file:\/\/\/?/i, '');
+      const normalized = path.normalize(rawPath);
+      if (fs.existsSync(normalized)) {
+        isLocalFile = true;
+        localAbsPath = normalized;
+        const forwardSlashPath = normalized.replace(/\\/g, '/');
+        targetUrl = forwardSlashPath.startsWith('/') ? `file://${forwardSlashPath}` : `file:///${forwardSlashPath}`;
+      }
+    }
+
+    const isDirectMedia = isLocalFile || /\.(mp4|webm|ogg|m4v|mp3|wav|m4a|aac|flac)(\?.*)?$/i.test(targetUrl);
+    const cleanName = localAbsPath ? path.basename(localAbsPath) : (path.basename(targetUrl.split('?')[0]) || 'Video');
+    const playerTitle = isDirectMedia ? `🎬 ${cleanName} - ${APP_CONFIG.appName}` : `${APP_CONFIG.appName} - Video Player`;
 
     // 若视频播放窗口已存在且未销毁，直接切歌/播放并置顶激活
     if (this.videoPlayerWindow && !this.videoPlayerWindow.isDestroyed()) {
-      this.videoPlayerWindow.loadURL(videoUrl).catch((err) => {
-        console.warn('[WindowManager] 加载视频播放页面失败:', err?.message || err);
-      });
+      this.videoPlayerWindow.setTitle(playerTitle);
+      if (isDirectMedia) {
+        const playerHtml = this.generateInlinePlayerHtml(targetUrl, cleanName, localAbsPath);
+        this.videoPlayerWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(playerHtml)}`).catch((err) => {
+          console.warn('[WindowManager] 加载视频播放页面失败:', err?.message || err);
+        });
+      } else {
+        this.videoPlayerWindow.loadURL(targetUrl).catch((err) => {
+          console.warn('[WindowManager] 加载视频播放页面失败:', err?.message || err);
+        });
+      }
       if (this.videoPlayerWindow.isMinimized()) this.videoPlayerWindow.restore();
+      this.videoPlayerWindow.show();
       this.videoPlayerWindow.focus();
       return this.videoPlayerWindow;
     }
@@ -2076,14 +2104,14 @@ export class WindowManager {
       center: true,
       parent: parentWin,
       modal: false,
-      title: `${APP_CONFIG.appName} - Video Player`,
+      title: playerTitle,
       autoHideMenuBar: true,
       backgroundColor: '#0F172A',
       webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true,
+        nodeIntegration: true,
+        contextIsolation: false,
         sandbox: false,
-        webSecurity: true,
+        webSecurity: !isLocalFile, // 加载本地媒体放行 file:// 协议，保证原生 HTML5 video 顺畅解码播放
       },
     });
 
@@ -2102,11 +2130,148 @@ export class WindowManager {
       this.videoPlayerWindow = null;
     });
 
-    videoWin.loadURL(videoUrl).catch((err) => {
-      console.warn('[WindowManager] 加载视频播放页面失败:', err?.message || err);
-    });
+    if (isDirectMedia) {
+      const playerHtml = this.generateInlinePlayerHtml(targetUrl, cleanName, localAbsPath);
+      videoWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(playerHtml)}`).catch((err) => {
+        console.warn('[WindowManager] 加载视频播放器失败:', err?.message || err);
+      });
+    } else {
+      videoWin.loadURL(targetUrl).catch((err) => {
+        console.warn('[WindowManager] 加载视频播放页面失败:', err?.message || err);
+      });
+    }
 
     return videoWin;
+  }
+
+  private generateInlinePlayerHtml(videoUrl: string, title: string, localFilePath: string = ''): string {
+    const isAudio = /\.(mp3|wav|m4a|aac|flac)(\?.*)?$/i.test(videoUrl);
+    const safeEscapedPath = localFilePath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>${title}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #090d16;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .header-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 10px 18px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%);
+      color: #94a3b8;
+      font-size: 13px;
+      font-weight: 600;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      white-space: nowrap;
+    }
+    .header-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-right: 12px;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .action-btn {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #e2e8f0;
+      border-radius: 4px;
+      padding: 3px 10px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .action-btn:hover {
+      background: rgba(255, 255, 255, 0.25);
+      color: #ffffff;
+    }
+    .media-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      max-height: 100vh;
+      object-fit: contain;
+      outline: none;
+      background: #000000;
+    }
+    audio {
+      width: 80%;
+      max-width: 600px;
+      outline: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="header-bar">
+    <div class="header-title">🎬 ${title}</div>
+    <div class="header-actions">
+      ${localFilePath ? `<button class="action-btn" id="btn-open-system" title="调用系统默认播放器打开 (快捷键 O)">🖥️ 系统播放器打开</button>` : ''}
+    </div>
+  </div>
+  <div class="media-container">
+    ${isAudio
+      ? `<audio src="${videoUrl}" controls autoplay></audio>`
+      : `<video src="${videoUrl}" controls autoplay playsinline></video>`
+    }
+  </div>
+  <script>
+    const localPath = "${safeEscapedPath}";
+    function openInSystem() {
+      if (!localPath) return;
+      try {
+        const { shell } = require('electron');
+        if (shell && shell.openPath) shell.openPath(localPath);
+      } catch (e) {
+        console.error('打开系统播放器失败:', e);
+      }
+    }
+    const btnSystem = document.getElementById('btn-open-system');
+    if (btnSystem) {
+      btnSystem.addEventListener('click', openInSystem);
+    }
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        window.close();
+      } else if (e.code === 'Space') {
+        const media = document.querySelector('video, audio');
+        if (media) {
+          e.preventDefault();
+          if (media.paused) media.play();
+          else media.pause();
+        }
+      } else if (e.key.toLowerCase() === 'o') {
+        openInSystem();
+      }
+    });
+  </script>
+</body>
+</html>`;
   }
 
   /**

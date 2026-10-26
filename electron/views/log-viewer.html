@@ -520,6 +520,52 @@
       padding: 0 2px;
       border-radius: 2px;
     }
+
+    /* 媒体链接与路径高亮可点击交互样式 */
+    .media-link {
+      color: #38bdf8;
+      text-decoration: underline;
+      text-decoration-style: dashed;
+      text-underline-offset: 3px;
+      cursor: pointer;
+      padding: 1px 5px;
+      margin: 0 1px;
+      border-radius: 4px;
+      transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+      display: inline-block;
+      vertical-align: baseline;
+      font-weight: 500;
+      word-break: break-all;
+      white-space: normal;
+    }
+    .media-link:hover {
+      text-decoration-style: solid;
+    }
+    .media-link:active {
+      opacity: 0.85;
+    }
+    .media-link.local-media-link {
+      color: #34d399;
+      background: rgba(52, 211, 153, 0.08);
+      border: 1px solid rgba(52, 211, 153, 0.2);
+    }
+    .media-link.local-media-link:hover {
+      color: #ffffff;
+      background: rgba(52, 211, 153, 0.25);
+      border-color: rgba(52, 211, 153, 0.5);
+      box-shadow: 0 2px 8px rgba(52, 211, 153, 0.35);
+    }
+    .media-link.remote-media-link {
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+    }
+    .media-link.remote-media-link:hover {
+      color: #ffffff;
+      background: rgba(56, 189, 248, 0.25);
+      border-color: rgba(56, 189, 248, 0.5);
+      box-shadow: 0 2px 8px rgba(56, 189, 248, 0.35);
+    }
   </style>
 </head>
 <body>
@@ -4262,6 +4308,43 @@
       return localized;
     }
 
+
+    function escapeAttr(str) {
+      return String(str || '').replace(/"/g, '&quot;');
+    }
+
+    function linkifyMediaText(html) {
+      if (!html) return '';
+      const urlRegex = /(<[^>]+>)|(https?:\/\/[^\s<>"'\r\n]+)/gi;
+      html = html.replace(urlRegex, (match, tag, url) => {
+        if (tag) return tag;
+        if (!url) return match;
+        let cleanUrl = url;
+        let trailing = '';
+        const trailingMatch = cleanUrl.match(/([.,;!?:)\]>]+)$/);
+        if (trailingMatch) {
+          trailing = trailingMatch[1];
+          cleanUrl = cleanUrl.slice(0, -trailing.length);
+        }
+        const isMedia = /\.(?:mp4|webm|ogg|m4v|mp3|wav|m4a|aac|flac)(\?.*)?$/i.test(cleanUrl);
+        const tip = isMedia ? '点击弹窗播放该视频 (Click to play in popup window)' : '点击在外部浏览器打开 (Click to open in browser)';
+        const icon = isMedia ? '🎬' : '🔗';
+        const safeUrl = escapeAttr(cleanUrl);
+        return `<a href="javascript:void(0)" class="media-link remote-media-link" data-url="${safeUrl}" title="${tip}">${icon} ${cleanUrl}</a>${trailing}`;
+      });
+
+      const localMediaRegex = /(<[^>]+>)|([A-Za-z]:[\\/](?:[^<>\\r\\n"':*?|]+?)\\.(?:mp4|mp3|wav|webm|m4a|mkv|aac|flac)\\b)|(\\/(?:Users|home|root|var|tmp|Volumes)\\/(?:[^<>\\r\\n"':*?|]+?)\\.(?:mp4|mp3|wav|webm|m4a|mkv|aac|flac)\\b)/gi;
+      html = html.replace(localMediaRegex, (match, tag, winPath, unixPath) => {
+        if (tag) return tag;
+        const targetPath = winPath || unixPath;
+        if (!targetPath) return match;
+        const tip = '点击弹窗播放该视频 (Click to play in window, press O for system player)';
+        const safePath = escapeAttr(targetPath);
+        return `<a href="javascript:void(0)" class="media-link local-media-link" data-path="${safePath}" title="${tip}">▶️ ${targetPath}</a>`;
+      });
+      return html;
+    }
+
     // 渲染单条日志（严格消除任何模板换行与缩进空格，保证单行流式排版紧凑）
     function createLogElement(entry) {
       const el = document.createElement('div');
@@ -4282,7 +4365,7 @@
       const badgeClass = `badge-${entry.level}`;
       const cleanMsg = (entry.message || '').trim();
       const displayMsg = localizeLogMessage(cleanMsg, currentLogLang);
-      const msgHtml = highlightText(displayMsg, searchQuery);
+      const msgHtml = linkifyMediaText(highlightText(displayMsg, searchQuery));
       const timeDisplay = formatTime(entry.timestamp);
 
       let detailsHtml = '';
@@ -4587,6 +4670,47 @@
         console.error('加载系统历史日志失败:', err);
       }
     }
+
+
+    // 监听日志中媒体链接与本地视频点击播放
+    container.addEventListener('click', async (e) => {
+      // 保护：若用户正在划词选中日志文本（准备复制），不触发媒体播放
+      const sel = window.getSelection();
+      if (sel && sel.toString().trim().length > 0) return;
+
+      const link = e.target.closest('.media-link');
+      if (!link) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const localPath = link.getAttribute('data-path');
+      const remoteUrl = link.getAttribute('data-url');
+
+      if (localPath) {
+        try {
+          const res = await ipcRenderer.invoke('app:open-local-file', localPath);
+          if (res && res.success === false) {
+            console.warn('[MediaLink] 打开本地文件提示:', res.message);
+            try {
+              const { shell } = require('electron');
+              if (shell && shell.openPath) await shell.openPath(localPath);
+            } catch (fallbackErr) {}
+          }
+        } catch (err) {
+          console.error('[MediaLink] 调用系统播放器异常:', err);
+          try {
+            const { shell } = require('electron');
+            if (shell && shell.openPath) await shell.openPath(localPath);
+          } catch (fallbackErr) {}
+        }
+      } else if (remoteUrl) {
+        try {
+          await ipcRenderer.invoke('app:open-external-url', remoteUrl);
+        } catch (err) {
+          console.error('[MediaLink] 弹窗播放远程视频异常:', err);
+        }
+      }
+    });
 
     init();
   </script>
