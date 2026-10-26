@@ -2302,9 +2302,17 @@ async function processApCalculusTask(
     }
   } catch (_) { }
 
+  const taskRenderLangs: string[] = Array.isArray(questionData.renderLangs)
+    ? questionData.renderLangs
+    : Array.isArray(task.summaryData?.renderLangs)
+    ? task.summaryData.renderLangs
+    : ['zh', 'en'];
+
   const specifiedLang = (options.lang || '').trim().toLowerCase();
-  const shouldRenderZh = !specifiedLang || specifiedLang === 'all' || specifiedLang === 'zh';
-  const shouldRenderEn = !specifiedLang || specifiedLang === 'all' || specifiedLang === 'en';
+  // 微积分 AP Calculus MCQ 模块支持中英双版本同时渲染：
+  // 无论传入参数是否带有单一语言，只要任务本身要求双语渲染（或 options 未限定单一语言），就同时渲染中英文双版本
+  const shouldRenderZh = !specifiedLang || specifiedLang === 'all' || specifiedLang === 'zh' || taskRenderLangs.includes('zh');
+  const shouldRenderEn = !specifiedLang || specifiedLang === 'all' || specifiedLang === 'en' || taskRenderLangs.includes('en');
 
   const zhOutputFile = path.join(outputDir, `${safeVideoName}_zh.mp4`);
   const enOutputFile = path.join(outputDir, `${safeVideoName}_en.mp4`);
