@@ -80,12 +80,30 @@ export function findExistingLocalVideo(inputPathOrUrl: string): string | null {
         if (depth > 5) return null;
         try {
           const entries = fs.readdirSync(dir, { withFileTypes: true });
-          // 1. 先查找匹配的文件
+          // 1. 优先精确匹配（文件名与语言后缀完全一致）
+          for (const ent of entries) {
+            if (!ent.isDirectory() && ent.name.toLowerCase().endsWith(ext.toLowerCase())) {
+              const nameWithoutExt = path.basename(ent.name, ext);
+              if (nameWithoutExt.toLowerCase() === baseName.toLowerCase()) {
+                const full = path.join(dir, ent.name);
+                if (!folderSegment || dir.includes(folderSegment) || full.includes(folderSegment)) {
+                  return full;
+                }
+              }
+            }
+          }
+          // 2. 次选：当目标未显式包含语言后缀时才允许模糊匹配，严格禁止异语种错位（如请求 _zh 绝不能匹配 _en）
           for (const ent of entries) {
             if (!ent.isDirectory() && ent.name.toLowerCase().endsWith(ext.toLowerCase())) {
               const nameWithoutExt = path.basename(ent.name, ext);
               const nameRaw = nameWithoutExt.replace(/_[a-z]{2,5}$/i, '');
               if (nameRaw === rawBaseName) {
+                if (baseName.toLowerCase().endsWith('_zh') && (nameWithoutExt.toLowerCase().endsWith('_en') || nameWithoutExt.toLowerCase().includes('_en_'))) {
+                  continue;
+                }
+                if (baseName.toLowerCase().endsWith('_en') && (nameWithoutExt.toLowerCase().endsWith('_zh') || nameWithoutExt.toLowerCase().includes('_zh_'))) {
+                  continue;
+                }
                 const full = path.join(dir, ent.name);
                 if (!folderSegment || dir.includes(folderSegment) || full.includes(folderSegment)) {
                   return full;
