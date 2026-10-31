@@ -4313,36 +4313,45 @@
       return String(str || '').replace(/"/g, '&quot;');
     }
 
-    function linkifyMediaText(html) {
+        function linkifyMediaText(html) {
       if (!html) return '';
-      const urlRegex = /(<[^>]+>)|(https?:\/\/[^\s<>"'\r\n]+)/gi;
-      html = html.replace(urlRegex, (match, tag, url) => {
-        if (tag) return tag;
-        if (!url) return match;
-        let cleanUrl = url;
-        let trailing = '';
-        const trailingMatch = cleanUrl.match(/([.,;!?:)\]>]+)$/);
-        if (trailingMatch) {
-          trailing = trailingMatch[1];
-          cleanUrl = cleanUrl.slice(0, -trailing.length);
-        }
-        const isMedia = /\.(?:mp4|webm|ogg|m4v|mp3|wav|m4a|aac|flac)(\?.*)?$/i.test(cleanUrl);
-        const tip = isMedia ? '点击弹窗播放该视频 (Click to play in popup window)' : '点击在外部浏览器打开 (Click to open in browser)';
-        const icon = isMedia ? '🎬' : '🔗';
-        const safeUrl = escapeAttr(cleanUrl);
-        return `<a href="javascript:void(0)" class="media-link remote-media-link" data-url="${safeUrl}" title="${tip}">${icon} ${cleanUrl}</a>${trailing}`;
-      });
 
-      const localMediaRegex = /(<[^>]+>)|([A-Za-z]:[\\/](?:[^<>\\r\\n"':*?|]+?)\\.(?:mp4|mp3|wav|webm|m4a|mkv|aac|flac)\\b)|(\\/(?:Users|home|root|var|tmp|Volumes)\\/(?:[^<>\\r\\n"':*?|]+?)\\.(?:mp4|mp3|wav|webm|m4a|mkv|aac|flac)\\b)/gi;
-      html = html.replace(localMediaRegex, (match, tag, winPath, unixPath) => {
+      // 单次统一安全正则：依次匹配 HTML 标签、远程 HTTP(S) 媒体/网页直链、Windows 本地文件绝对路径、Unix 本地文件绝对路径
+      // 采用单个统一正则可彻底防止多轮 replace 导致 <a> 标签内部字符被二次误匹配（如 https:// 中的 s: 被当成 Windows 盘符）
+      const combinedRegex = /(<[^>]+>)|(https?:\/\/[^\s<>'"\r\n]+)|([A-Za-z]:[\\/][^\r\n<>'"*?|]+?\.(?:mp4|mp3|wav|webm|m4a|mkv|aac|flac)\b)|((?:\/(?:Users|home|root|var|tmp|Volumes)[^\r\n<>'"*?|]*?|[~][\\/][^\r\n<>'"*?|]*?)\.(?:mp4|mp3|wav|webm|m4a|mkv|aac|flac)\b)/gi;
+
+      return html.replace(combinedRegex, (match, tag, url, winPath, unixPath) => {
+        // 1. 如果匹配到已有 HTML 标签，原样放行，绝不破坏内部结构
         if (tag) return tag;
+
+        // 2. 匹配到远程 URL
+        if (url) {
+          let cleanUrl = url;
+          let trailing = '';
+          const trailingMatch = cleanUrl.match(/([.,;!?:)\]>]+)$/);
+          if (trailingMatch) {
+            trailing = trailingMatch[1];
+            cleanUrl = cleanUrl.slice(0, -trailing.length);
+          }
+          const isMedia = /\.(?:mp4|webm|ogg|m4v|mp3|wav|m4a|aac|flac)(\?.*)?$/i.test(cleanUrl);
+          const tip = isMedia
+            ? '点击弹窗播放该视频 (Click to play video in window)'
+            : '点击在外部浏览器打开 (Click to open in browser)';
+          const icon = isMedia ? '🎬' : '🔗';
+          const safeUrl = escapeAttr(cleanUrl);
+          return `<a href="javascript:void(0)" class="media-link remote-media-link" data-url="${safeUrl}" title="${tip}">${icon} ${cleanUrl}</a>${trailing}`;
+        }
+
+        // 3. 匹配到本地媒体绝对路径
         const targetPath = winPath || unixPath;
-        if (!targetPath) return match;
-        const tip = '点击弹窗播放该视频 (Click to play in window, press O for system player)';
-        const safePath = escapeAttr(targetPath);
-        return `<a href="javascript:void(0)" class="media-link local-media-link" data-path="${safePath}" title="${tip}">▶️ ${targetPath}</a>`;
+        if (targetPath) {
+          const tip = '点击弹窗播放该视频 (Click to play video in window, press O for system player)';
+          const safePath = escapeAttr(targetPath);
+          return `<a href="javascript:void(0)" class="media-link local-media-link" data-path="${safePath}" title="${tip}">▶️ ${targetPath}</a>`;
+        }
+
+        return match;
       });
-      return html;
     }
 
     // 渲染单条日志（严格消除任何模板换行与缩进空格，保证单行流式排版紧凑）

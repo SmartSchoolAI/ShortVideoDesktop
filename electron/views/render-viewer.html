@@ -3148,32 +3148,27 @@
       const localPath = link.getAttribute('data-path');
       const remoteUrl = link.getAttribute('data-url');
 
-      if (localPath) {
-        try {
-          const res = await ipcRenderer.invoke('app:open-local-file', localPath);
-          if (res && res.success === false) {
-            console.warn('[MediaLink] 打开本地文件提示:', res.message);
-            try {
-              const { shell } = require('electron');
-              if (shell && shell.openPath) {
-                await shell.openPath(localPath);
-              }
-            } catch (fallbackErr) {}
+      try {
+        if (localPath) {
+          const res = await ipcRenderer.invoke('app:open-media-player', { path: localPath });
+          if (!res || !res.success) {
+            await ipcRenderer.invoke('app:open-local-file', localPath);
           }
-        } catch (err) {
-          console.error('[MediaLink] 调用系统播放器异常:', err);
+        } else if (remoteUrl) {
+          const isMedia = /\.(?:mp4|webm|ogg|m4v|mp3|wav|m4a|aac|flac)(\?.*)?$/i.test(remoteUrl);
+          if (isMedia) {
+            await ipcRenderer.invoke('app:open-media-player', { url: remoteUrl });
+          } else {
+            await ipcRenderer.invoke('app:open-external-url', remoteUrl);
+          }
+        }
+      } catch (err) {
+        console.error('[MediaLink] 打开视频播放窗口异常:', err);
+        if (localPath) {
           try {
             const { shell } = require('electron');
-            if (shell && shell.openPath) {
-              await shell.openPath(localPath);
-            }
+            if (shell && shell.openPath) await shell.openPath(localPath);
           } catch (fallbackErr) {}
-        }
-      } else if (remoteUrl) {
-        try {
-          await ipcRenderer.invoke('app:open-external-url', remoteUrl);
-        } catch (err) {
-          console.error('[MediaLink] 弹窗播放远程视频异常:', err);
         }
       }
     });

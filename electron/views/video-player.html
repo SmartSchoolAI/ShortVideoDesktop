@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShortVideo - 视频播放器 (Video Player)</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #090d16;
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* 顶部悬浮控制栏（毛玻璃淡入淡出） */
+    .top-header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 52px;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.92) 0%, rgba(15, 23, 42, 0.6) 70%, rgba(15, 23, 42, 0) 100%);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      transition: opacity 0.28s ease, transform 0.28s ease;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .top-header.hidden {
+      opacity: 0;
+      transform: translateY(-8px);
+      pointer-events: none;
+    }
+
+    .title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      flex: 1;
+      margin-right: 16px;
+    }
+
+    .media-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 7px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      border-radius: 4px;
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+
+    .media-badge.local {
+      background: rgba(52, 211, 153, 0.15);
+      color: #34d399;
+      border-color: rgba(52, 211, 153, 0.35);
+    }
+
+    .title-text {
+      font-size: 13px;
+      font-weight: 600;
+      color: #f8fafc;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      cursor: default;
+    }
+
+    .action-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 11px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #cbd5e1;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+      outline: none;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.18);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.35);
+      transform: translateY(-1px);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+      opacity: 0.85;
+    }
+
+    .btn-close {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.3);
+      color: #fca5a5;
+    }
+
+    .btn-close:hover {
+      background: rgba(239, 68, 68, 0.3);
+      color: #ffffff;
+      border-color: rgba(239, 68, 68, 0.6);
+    }
+
+    /* 播放器容器 */
+    .player-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000000;
+      position: relative;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      max-height: 100vh;
+      object-fit: contain;
+      background: #000000;
+      outline: none;
+    }
+
+    /* 音频专用界面 */
+    .audio-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 40px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      width: 90%;
+      max-width: 580px;
+    }
+
+    .audio-icon-wrap {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #0284c7, #38bdf8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 38px;
+      box-shadow: 0 10px 25px rgba(2, 132, 199, 0.4);
+    }
+
+    .audio-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #f1f5f9;
+      text-align: center;
+      word-break: break-all;
+    }
+
+    audio {
+      width: 100%;
+      outline: none;
+    }
+
+    /* 加载中动画 */
+    .loading-overlay {
+      position: absolute;
+      inset: 0;
+      background: #090d16;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      z-index: 50;
+      transition: opacity 0.3s ease;
+    }
+
+    .loading-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid rgba(56, 189, 248, 0.2);
+      border-top-color: #38bdf8;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* 快捷键提示条（底部） */
+    .shortcuts-bar {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 5px 16px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      font-size: 11px;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      z-index: 100;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      white-space: nowrap;
+    }
+
+    .shortcuts-bar.hidden {
+      opacity: 0;
+    }
+
+    .key-badge {
+      display: inline-block;
+      padding: 1px 5px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      color: #e2e8f0;
+      font-weight: 600;
+      font-family: monospace;
+      margin-right: 3px;
+    }
+
+    /* 复制成功浮层提示 */
+    .toast-msg {
+      position: absolute;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-10px);
+      background: rgba(16, 185, 129, 0.95);
+      color: #ffffff;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .toast-msg.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* 错误提示卡片 */
+    .error-card {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      padding: 30px;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 12px;
+      color: #fca5a5;
+      text-align: center;
+      max-width: 500px;
+      z-index: 60;
+    }
+
+    .error-card.show {
+      display: flex;
+    }
+  </style>
+</head>
+<body>
+  <!-- 顶部控制栏 -->
+  <div class="top-header" id="top-header">
+    <div class="title-group">
+      <span class="media-badge" id="media-badge">MP4</span>
+      <span class="title-text" id="video-title">正在加载媒体...</span>
+    </div>
+
+    <div class="action-group">
+      <button class="btn" id="btn-open-system" style="display: none;" title="调用系统默认播放器打开 (快捷键 O)">
+        <span>🖥️</span>
+        <span id="txt-btn-system">系统播放器</span>
+      </button>
+
+      <button class="btn" id="btn-show-folder" style="display: none;" title="在文件管理器中定位该视频">
+        <span>📁</span>
+        <span id="txt-btn-folder">定位文件</span>
+      </button>
+
+      <button class="btn" id="btn-copy" title="复制完整路径或下载链接">
+        <span>📋</span>
+        <span id="txt-btn-copy">复制链接</span>
+      </button>
+
+      <button class="btn btn-close" id="btn-close" title="关闭播放窗口 (Esc)">
+        <span>✕</span>
+        <span id="txt-btn-close">关闭</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 播放主区域 -->
+  <div class="player-container" id="player-container">
+    <div class="loading-overlay" id="loading-overlay">
+      <div class="spinner"></div>
+      <div id="loading-text" style="font-size: 13px; color: #94a3b8;">正在加载音视频数据...</div>
+    </div>
+
+    <div class="error-card" id="error-card">
+      <div style="font-size: 32px;">⚠️</div>
+      <div id="error-title" style="font-weight: 600; font-size: 14px;">无法直接播放该媒体文件</div>
+      <div id="error-desc" style="font-size: 12px; opacity: 0.85;">文件编码可能不受内置内核支持，或已被占用。</div>
+      <button class="btn" id="btn-fallback-system" style="margin-top: 8px;">🖥️ 使用系统默认播放器打开</button>
+    </div>
+  </div>
+
+  <!-- 底部快捷键指南 -->
+  <div class="shortcuts-bar" id="shortcuts-bar">
+    <span><span class="key-badge">Space</span><span id="tip-play">播放/暂停</span></span>
+    <span><span class="key-badge">←/→</span><span id="tip-seek">快进/快退</span></span>
+    <span><span class="key-badge">↑/↓</span><span id="tip-vol">音量</span></span>
+    <span><span class="key-badge">F</span><span id="tip-fs">全屏</span></span>
+    <span><span class="key-badge">O</span><span id="tip-sys">系统播放器</span></span>
+    <span><span class="key-badge">Esc</span><span id="tip-esc">退出</span></span>
+  </div>
+
+  <div class="toast-msg" id="toast-msg">已复制到剪贴板</div>
+
+  <script>
+    const { ipcRenderer, shell } = require('electron');
+
+    // 多语言字典（覆盖项目 14 种核心语言与兼容语种）
+    const I18N = {
+      zh: {
+        loading: '正在加载音视频数据...',
+        systemPlayer: '系统播放器',
+        showFolder: '定位文件',
+        copyLink: '复制链接',
+        close: '关闭',
+        copied: '已复制到剪贴板',
+        errTitle: '无法直接播放该媒体文件',
+        errDesc: '文件可能格式受限或正在被占用，建议使用系统播放器打开。',
+        errBtn: '🖥️ 使用系统默认播放器打开',
+        tipPlay: '播放/暂停',
+        tipSeek: '快进/快退',
+        tipVol: '音量',
+        tipFs: '全屏',
+        tipSys: '系统播放器',
+        tipEsc: '退出',
+      },
+      en: {
+        loading: 'Loading media data...',
+        systemPlayer: 'System Player',
+        showFolder: 'Show in Folder',
+        copyLink: 'Copy Link',
+        close: 'Close',
+        copied: 'Copied to clipboard',
+        errTitle: 'Unable to play media directly',
+        errDesc: 'The file format may be unsupported or in use. Please try opening with system player.',
+        errBtn: '🖥️ Open in System Player',
+        tipPlay: 'Play/Pause',
+        tipSeek: 'Seek ±5s',
+        tipVol: 'Volume',
+        tipFs: 'Fullscreen',
+        tipSys: 'System Player',
+        tipEsc: 'Exit',
+      },
+      ja: {
+        loading: 'メディアデータを読み込み中...',
+        systemPlayer: 'システム再生',
+        showFolder: 'フォルダで表示',
+        copyLink: 'リンクをコピー',
+        close: '閉じる',
+        copied: 'クリップボードにコピーしました',
+        errTitle: '再生できませんでした',
+        errDesc: 'サポートされていないフォーマットか、使用中です。',
+        errBtn: '🖥️ 外部プレイヤーで開く',
+        tipPlay: '再生/一時停止',
+        tipSeek: '早送り/巻き戻し',
+        tipVol: '音量',
+        tipFs: '全画面',
+        tipSys: '外部再生',
+        tipEsc: '閉じる',
+      },
+      ko: {
+        loading: '미디어 로딩 중...',
+        systemPlayer: '시스템 플레이어',
+        showFolder: '폴더에서 보기',
+        copyLink: '링크 복사',
+        close: '닫기',
+        copied: '클립보드에 복사되었습니다',
+        errTitle: '미디어를 재생할 수 없습니다',
+        errDesc: '지원되지 않는 형식이거나 파일이 사용 중입니다.',
+        errBtn: '🖥️ 시스템 플레이어로 열기',
+        tipPlay: '재생/일시정지',
+        tipSeek: '탐색 ±5초',
+        tipVol: '볼륨',
+        tipFs: '전체화면',
+        tipSys: '시스템 플레이어',
+        tipEsc: '닫기',
+      },
+      vi: {
+        loading: 'Đang tải phương tiện...',
+        systemPlayer: 'Trình phát hệ thống',
+        showFolder: 'Xem trong thư mục',
+        copyLink: 'Sao chép liên kết',
+        close: 'Đóng',
+        copied: 'Đã sao chép vào bộ nhớ tạm',
+        errTitle: 'Không thể phát phương tiện',
+        errDesc: 'Định dạng có thể không được hỗ trợ hoặc tệp đang bận.',
+        errBtn: '🖥️ Mở bằng trình phát hệ thống',
+        tipPlay: 'Phát/Tạm dừng',
+        tipSeek: 'Tua ±5s',
+        tipVol: 'Âm lượng',
+        tipFs: 'Toàn màn hình',
+        tipSys: 'Trình phát hệ thống',
+        tipEsc: 'Đóng',
+      },
+      th: {
+        loading: 'กำลังโหลดสื่อ...',
+        systemPlayer: 'โปรแกรมเล่นระบบ',
+        showFolder: 'แสดงในโฟลเดอร์',
+        copyLink: 'คัดลอกลิงก์',
+        close: 'ปิด',
+        copied: 'คัดลอกไปยังคลิปบอร์ดแล้ว',
+        errTitle: 'ไม่สามารถเล่นสื่อได้',
+        errDesc: 'อาจเป็นรูปแบบที่ไม่รองรับหรือไฟล์กำลังถูกใช้งาน',
+        errBtn: '🖥️ เปิดด้วยโปรแกรมเล่นระบบ',
+        tipPlay: 'เล่น/หยุด',
+        tipSeek: 'กรอ ±5วิ',
+        tipVol: 'ระดับเสียง',
+        tipFs: 'เต็มจอ',
+        tipSys: 'โปรแกรมเล่นระบบ',
+        tipEsc: 'ออก',
+      },
+      id: {
+        loading: 'Memuat data media...',
+        systemPlayer: 'Pemutar Sistem',
+        showFolder: 'Buka di Folder',
+        copyLink: 'Salin Tautan',
+        close: 'Tutup',
+        copied: 'Disalin ke papan klip',
+        errTitle: 'Tidak dapat memutar media',
+        errDesc: 'Format mungkin tidak didukung atau sedang digunakan.',
+        errBtn: '🖥️ Buka dengan Pemutar Sistem',
+        tipPlay: 'Putar/Jeda',
+        tipSeek: 'Maju/Mundur ±5s',
+        tipVol: 'Volume',
+        tipFs: 'Layar Penuh',
+        tipSys: 'Pemutar Sistem',
+        tipEsc: 'Keluar',
+      },
+      es: {
+        loading: 'Cargando datos multimedia...',
+        systemPlayer: 'Reproductor del sistema',
+        showFolder: 'Mostrar en carpeta',
+        copyLink: 'Copiar enlace',
+        close: 'Cerrar',
+        copied: 'Copiado al portapapeles',
+        errTitle: 'No se puede reproducir',
+        errDesc: 'El formato puede no ser compatible o estar en uso.',
+        errBtn: '🖥️ Abrir en reproductor del sistema',
+        tipPlay: 'Reproducir/Pausar',
+        tipSeek: 'Avanzar/Retroceder ±5s',
+        tipVol: 'Volumen',
+        tipFs: 'Pantalla completa',
+        tipSys: 'Reproductor del sistema',
+        tipEsc: 'Salir',
+      },
+      fr: {
+        loading: 'Chargement du média...',
+        systemPlayer: 'Lecteur système',
+        showFolder: 'Afficher dans le dossier',
+        copyLink: 'Copier le lien',
+        close: 'Fermer',
+        copied: 'Copié dans le presse-papiers',
+        errTitle: 'Impossible de lire le média',
+        errDesc: 'Le format peut ne pas être pris en charge ou en cours d\'utilisation.',
+        errBtn: '🖥️ Ouvrir avec le lecteur système',
+        tipPlay: 'Lecture/Pause',
+        tipSeek: 'Avancer/Reculer ±5s',
+        tipVol: 'Volume',
+        tipFs: 'Plein écran',
+        tipSys: 'Lecteur système',
+        tipEsc: 'Fermer',
+      },
+      pt: {
+        loading: 'Carregando mídia...',
+        systemPlayer: 'Reprodutor do sistema',
+        showFolder: 'Mostrar na pasta',
+        copyLink: 'Copiar link',
+        close: 'Fechar',
+        copied: 'Copiado para a área de transferência',
+        errTitle: 'Não é possível reproduzir',
+        errDesc: 'O formato pode não ser compatível ou estar em uso.',
+        errBtn: '🖥️ Abrir no reprodutor do sistema',
+        tipPlay: 'Reproduzir/Pausar',
+        tipSeek: 'Avançar/Voltar ±5s',
+        tipVol: 'Volume',
+        tipFs: 'Tela cheia',
+        tipSys: 'Reprodutor do sistema',
+        tipEsc: 'Sair',
+      },
+      ru: {
+        loading: 'Загрузка медиа...',
+        systemPlayer: 'Системный плеер',
+        showFolder: 'Показать в папке',
+        copyLink: 'Копировать ссылку',
+        close: 'Закрыть',
+        copied: 'Скопировано в буфер',
+        errTitle: 'Не удается воспроизвести',
+        errDesc: 'Формат может не поддерживаться или файл занят.',
+        errBtn: '🖥️ Открыть в системном плеере',
+        tipPlay: 'Воспроизведение/Пауза',
+        tipSeek: 'Перемотка ±5с',
+        tipVol: 'Громкость',
+        tipFs: 'Полный экран',
+        tipSys: 'Системный плеер',
+        tipEsc: 'Выход',
+      },
+      de: {
+        loading: 'Medien werden geladen...',
+        systemPlayer: 'System-Player',
+        showFolder: 'Im Ordner anzeigen',
+        copyLink: 'Link kopieren',
+        close: 'Schließen',
+        copied: 'In die Zwischenablage kopiert',
+        errTitle: 'Wiedergabe nicht möglich',
+        errDesc: 'Format wird möglicherweise nicht unterstützt oder Datei wird verwendet.',
+        errBtn: '🖥️ Im System-Player öffnen',
+        tipPlay: 'Wiedergabe/Pause',
+        tipSeek: 'Vor/Zurück ±5s',
+        tipVol: 'Lautstärke',
+        tipFs: 'Vollbild',
+        tipSys: 'System-Player',
+        tipEsc: 'Schließen',
+      },
+      tr: {
+        loading: 'Medya yükleniyor...',
+        systemPlayer: 'Sistem Oynatıcısı',
+        showFolder: 'Klasörde Göster',
+        copyLink: 'Bağlantıyı Kopyala',
+        close: 'Kapat',
+        copied: 'Panoya kopyalandı',
+        errTitle: 'Medya oynatılamıyor',
+        errDesc: 'Biçim desteklenmiyor veya dosya kullanımda olabilir.',
+        errBtn: '🖥️ Sistem oynatıcısında aç',
+        tipPlay: 'Oynat/Duraklat',
+        tipSeek: 'İleri/Geri ±5s',
+        tipVol: 'Ses',
+        tipFs: 'Tam Ekran',
+        tipSys: 'Sistem Oynatıcısı',
+        tipEsc: 'Kapat',
+      },
+      it: {
+        loading: 'Caricamento contenuti multimediali...',
+        systemPlayer: 'Player di sistema',
+        showFolder: 'Mostra nella cartella',
+        copyLink: 'Copia link',
+        close: 'Chiudi',
+        copied: 'Copiato negli appunti',
+        errTitle: 'Impossibile riprodurre',
+        errDesc: 'Il formato potrebbe non essere supportato o il file è in uso.',
+        errBtn: '🖥️ Apri con player di sistema',
+        tipPlay: 'Riproduci/Pausa',
+        tipSeek: 'Avanti/Indietro ±5s',
+        tipVol: 'Volume',
+        tipFs: 'Schermo intero',
+        tipSys: 'Player di sistema',
+        tipEsc: 'Chiudi',
+      }
+    };
+
+    function applyI18n(lang) {
+      const dict = I18N[lang] || I18N.zh;
+      document.getElementById('loading-text').textContent = dict.loading;
+      document.getElementById('txt-btn-system').textContent = dict.systemPlayer;
+      document.getElementById('txt-btn-folder').textContent = dict.showFolder;
+      document.getElementById('txt-btn-copy').textContent = dict.copyLink;
+      document.getElementById('txt-btn-close').textContent = dict.close;
+      document.getElementById('toast-msg').textContent = dict.copied;
+      document.getElementById('error-title').textContent = dict.errTitle;
+      document.getElementById('error-desc').textContent = dict.errDesc;
+      document.getElementById('btn-fallback-system').textContent = dict.errBtn;
+      document.getElementById('tip-play').textContent = dict.tipPlay;
+      document.getElementById('tip-seek').textContent = dict.tipSeek;
+      document.getElementById('tip-vol').textContent = dict.tipVol;
+      document.getElementById('tip-fs').textContent = dict.tipFs;
+      document.getElementById('tip-sys').textContent = dict.tipSys;
+      document.getElementById('tip-esc').textContent = dict.tipEsc;
+    }
+
+    // 从 URL 参数中解析播放源
+    const urlParams = new URLSearchParams(window.location.search);
+    const rawSrc = urlParams.get('src') || '';
+    const rawTitle = urlParams.get('title') || '';
+    const localFilePath = urlParams.get('localPath') || '';
+    const lang = urlParams.get('lang') || 'zh';
+
+    applyI18n(lang);
+
+    const isLocal = !!localFilePath;
+    const mediaBadge = document.getElementById('media-badge');
+    const titleEl = document.getElementById('video-title');
+    const btnSystem = document.getElementById('btn-open-system');
+    const btnFolder = document.getElementById('btn-show-folder');
+    const btnCopy = document.getElementById('btn-copy');
+    const btnClose = document.getElementById('btn-close');
+    const playerContainer = document.getElementById('player-container');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const errorCard = document.getElementById('error-card');
+    const toastMsg = document.getElementById('toast-msg');
+    const topHeader = document.getElementById('top-header');
+    const shortcutsBar = document.getElementById('shortcuts-bar');
+
+    // 确定拓展名
+    const cleanUrl = rawSrc.split('?')[0];
+    const extMatch = cleanUrl.match(/\.([a-z0-9]+)$/i);
+    const ext = extMatch ? extMatch[1].toUpperCase() : 'MP4';
+    const isAudio = ['MP3', 'WAV', 'M4A', 'AAC', 'FLAC', 'OGG'].includes(ext);
+
+    mediaBadge.textContent = ext;
+    if (isLocal) mediaBadge.classList.add('local');
+
+    const displayTitle = rawTitle || (localFilePath ? localFilePath.split(/[\\/]/).pop() : cleanUrl.split('/').pop()) || 'Media';
+    titleEl.textContent = displayTitle;
+    titleEl.title = localFilePath || rawSrc;
+    document.title = `🎬 ${displayTitle} - ShortVideo Player`;
+
+    if (isLocal) {
+      btnSystem.style.display = 'inline-flex';
+      btnFolder.style.display = 'inline-flex';
+    }
+
+    function showToast(text) {
+      if (text) toastMsg.textContent = text;
+      toastMsg.classList.add('show');
+      setTimeout(() => {
+        toastMsg.classList.remove('show');
+      }, 1600);
+    }
+
+    // 复制功能
+    btnCopy.addEventListener('click', () => {
+      const copyContent = localFilePath || rawSrc;
+      navigator.clipboard.writeText(copyContent).then(() => {
+        showToast();
+      }).catch(() => {});
+    });
+
+    // 调起系统播放器
+    async function openInSystemPlayer() {
+      const target = localFilePath || rawSrc;
+      if (!target) return;
+      try {
+        await ipcRenderer.invoke('app:open-system-player', target);
+      } catch (e) {
+        if (shell && shell.openPath && localFilePath) {
+          shell.openPath(localFilePath);
+        }
+      }
+    }
+
+    btnSystem.addEventListener('click', openInSystemPlayer);
+    document.getElementById('btn-fallback-system').addEventListener('click', openInSystemPlayer);
+
+    // 在文件夹中定位
+    btnFolder.addEventListener('click', async () => {
+      if (!localFilePath) return;
+      try {
+        await ipcRenderer.invoke('app:show-in-folder', localFilePath);
+      } catch (e) {
+        if (shell && shell.showItemInFolder) {
+          shell.showItemInFolder(localFilePath);
+        }
+      }
+    });
+
+    // 关闭按钮
+    btnClose.addEventListener('click', () => {
+      window.close();
+    });
+
+    // 创建媒体 DOM
+    let mediaEl = null;
+
+    if (isAudio) {
+      const card = document.createElement('div');
+      card.className = 'audio-card';
+      card.innerHTML = `
+        <div class="audio-icon-wrap">🎵</div>
+        <div class="audio-title">${displayTitle}</div>
+        <audio id="active-media" src="${rawSrc}" controls autoplay></audio>
+      `;
+      playerContainer.appendChild(card);
+      mediaEl = card.querySelector('audio');
+    } else {
+      const video = document.createElement('video');
+      video.id = 'active-media';
+      video.src = rawSrc;
+      video.controls = true;
+      video.autoplay = true;
+      video.playsInline = true;
+      playerContainer.appendChild(video);
+      mediaEl = video;
+    }
+
+    // 监听加载事件
+    if (mediaEl) {
+      mediaEl.addEventListener('loadeddata', () => {
+        loadingOverlay.classList.add('hidden');
+      });
+
+      mediaEl.addEventListener('canplay', () => {
+        loadingOverlay.classList.add('hidden');
+      });
+
+      mediaEl.addEventListener('error', (e) => {
+        console.error('[VideoPlayer] 媒体加载失败:', e);
+        loadingOverlay.classList.add('hidden');
+        errorCard.classList.add('show');
+      });
+
+      // 双击全屏 (仅视频)
+      if (!isAudio) {
+        mediaEl.addEventListener('dblclick', () => {
+          toggleFullscreen();
+        });
+      }
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+    }
+
+    // 鼠标空闲自动隐藏 Header 和 ShortcutBar
+    let idleTimer = null;
+    function resetIdleTimer() {
+      topHeader.classList.remove('hidden');
+      shortcutsBar.classList.remove('hidden');
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        if (mediaEl && !mediaEl.paused) {
+          topHeader.classList.add('hidden');
+          shortcutsBar.classList.add('hidden');
+        }
+      }, 2500);
+    }
+
+    window.addEventListener('mousemove', resetIdleTimer);
+    window.addEventListener('mousedown', resetIdleTimer);
+
+    // 键盘全局快捷键
+    window.addEventListener('keydown', (e) => {
+      resetIdleTimer();
+
+      if (e.key === 'Escape') {
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+        } else {
+          window.close();
+        }
+        return;
+      }
+
+      if (!mediaEl) return;
+
+      if (e.code === 'Space' || e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        if (mediaEl.paused) {
+          mediaEl.play();
+        } else {
+          mediaEl.pause();
+        }
+      } else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'j') {
+        e.preventDefault();
+        mediaEl.currentTime = Math.max(0, mediaEl.currentTime - 5);
+      } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'l') {
+        e.preventDefault();
+        mediaEl.currentTime = Math.min(mediaEl.duration || 999999, mediaEl.currentTime + 5);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        mediaEl.volume = Math.min(1, mediaEl.volume + 0.1);
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        mediaEl.volume = Math.max(0, mediaEl.volume - 0.1);
+      } else if (e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        toggleFullscreen();
+      } else if (e.key.toLowerCase() === 'm') {
+        e.preventDefault();
+        mediaEl.muted = !mediaEl.muted;
+      } else if (e.key.toLowerCase() === 'o') {
+        e.preventDefault();
+        openInSystemPlayer();
+      }
+    });
+  </script>
+</body>
+</html>

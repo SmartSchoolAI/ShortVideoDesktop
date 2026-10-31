@@ -1,5 +1,6 @@
 import { BrowserWindow, BrowserView, session, app, ipcMain, WebContents, Menu, MenuItemConstructorOptions, shell, nativeImage } from 'electron';
 import path from 'path';
+import { pathToFileURL } from 'url';
 import fs from 'fs';
 import crypto from 'crypto';
 import { APP_CONFIG } from '../config';
@@ -2055,7 +2056,21 @@ export class WindowManager {
    * 打开独立视频播放/浏览窗口（支持远程 MP4/音视频直链与本地渲染生成的音视频文件）
    * 优先使用独立原生 HTML5 弹窗秒开播放，支持空格播放/暂停、Esc 退出及一键调用系统播放器
    */
-  public openExternalVideoWindow(videoUrlOrPath: string): BrowserWindow | null {
+    public getVideoPlayerHtmlPath(): string {
+    const candidates = [
+      path.join(app.getAppPath(), 'electron', 'views', 'video-player.html'),
+      path.join(app.getAppPath(), 'dist-electron', 'views', 'video-player.html'),
+      path.join(__dirname, 'views', 'video-player.html'),
+      path.join(__dirname, '..', 'views', 'video-player.html'),
+    ];
+    return candidates.find((p) => fs.existsSync(p)) || candidates[0];
+  }
+
+  /**
+   * 打开独立视频播放窗口（支持远程 MP4/音视频直链与本地渲染生成的音视频文件）
+   * 优先使用独立原生 HTML5 弹窗秒开播放，支持空格播放/暂停、Esc 退出及一键调用系统播放器
+   */
+  public openExternalVideoWindow(videoUrlOrPath: string, customTitle?: string): BrowserWindow | null {
     if (!videoUrlOrPath) return null;
 
     let targetUrl = String(videoUrlOrPath).trim().replace(/^["']|["']$/g, '');
@@ -2069,21 +2084,33 @@ export class WindowManager {
       if (fs.existsSync(normalized)) {
         isLocalFile = true;
         localAbsPath = normalized;
-        const forwardSlashPath = normalized.replace(/\\/g, '/');
-        targetUrl = forwardSlashPath.startsWith('/') ? `file://${forwardSlashPath}` : `file:///${forwardSlashPath}`;
+        try {
+          targetUrl = pathToFileURL(normalized).href;
+        } catch {
+          const forwardSlashPath = normalized.replace(/\\/g, '/');
+          targetUrl = forwardSlashPath.startsWith('/') ? `file://${forwardSlashPath}` : `file:///${forwardSlashPath}`;
+        }
       }
     }
 
     const isDirectMedia = isLocalFile || /\.(mp4|webm|ogg|m4v|mp3|wav|m4a|aac|flac)(\?.*)?$/i.test(targetUrl);
     const cleanName = localAbsPath ? path.basename(localAbsPath) : (path.basename(targetUrl.split('?')[0]) || 'Video');
-    const playerTitle = isDirectMedia ? `🎬 ${cleanName} - ${APP_CONFIG.appName}` : `${APP_CONFIG.appName} - Video Player`;
+    const displayName = customTitle || cleanName;
+    const playerTitle = isDirectMedia ? `🎬 ${displayName} - ${APP_CONFIG.appName}` : `${APP_CONFIG.appName} - Video Player`;
 
-    // 若视频播放窗口已存在且未销毁，直接切歌/播放并置顶激活
+    const playerHtmlPath = this.getVideoPlayerHtmlPath();
+    const query = {
+      src: targetUrl,
+      title: displayName,
+      localPath: localAbsPath,
+      lang: this.currentLanguage || 'zh',
+    };
+
+    // 若视频播放窗口已存在且未销毁，直接切换媒体播放并置顶激活
     if (this.videoPlayerWindow && !this.videoPlayerWindow.isDestroyed()) {
       this.videoPlayerWindow.setTitle(playerTitle);
-      if (isDirectMedia) {
-        const playerHtml = this.generateInlinePlayerHtml(targetUrl, cleanName, localAbsPath);
-        this.videoPlayerWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(playerHtml)}`).catch((err) => {
+      if (isDirectMedia && fs.existsSync(playerHtmlPath)) {
+        this.videoPlayerWindow.loadFile(playerHtmlPath, { query }).catch((err) => {
           console.warn('[WindowManager] 加载视频播放页面失败:', err?.message || err);
         });
       } else {
@@ -2106,12 +2133,12 @@ export class WindowManager {
       modal: false,
       title: playerTitle,
       autoHideMenuBar: true,
-      backgroundColor: '#0F172A',
+      backgroundColor: '#090D16',
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: false,
         sandbox: false,
-        webSecurity: !isLocalFile, // 加载本地媒体放行 file:// 协议，保证原生 HTML5 video 顺畅解码播放
+        webSecurity: false, // 放行本地媒体资源 file://，保证原生 HTML5 video 顺畅解码播放
       },
     });
 
@@ -2130,9 +2157,8 @@ export class WindowManager {
       this.videoPlayerWindow = null;
     });
 
-    if (isDirectMedia) {
-      const playerHtml = this.generateInlinePlayerHtml(targetUrl, cleanName, localAbsPath);
-      videoWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(playerHtml)}`).catch((err) => {
+    if (isDirectMedia && fs.existsSync(playerHtmlPath)) {
+      videoWin.loadFile(playerHtmlPath, { query }).catch((err) => {
         console.warn('[WindowManager] 加载视频播放器失败:', err?.message || err);
       });
     } else {
