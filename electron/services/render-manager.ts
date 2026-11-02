@@ -723,6 +723,13 @@ export class RenderManager {
         for (const rawLine of lines) {
           const line = rawLine.replace(/^\r+|\r+$/g, '');
           if (line.trim().length > 0) {
+            if (
+              line.includes('LaTeX-incompatible input') ||
+              line.includes('unicodeTextInMathMode') ||
+              line.includes("strict mode is set to 'warn'")
+            ) {
+              continue;
+            }
             this.appendLog(type, line);
           }
         }
