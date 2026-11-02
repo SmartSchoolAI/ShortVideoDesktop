@@ -2134,7 +2134,11 @@ async function executeRemotionRender(
         }
 
         // 屏蔽 FFmpeg 崩溃时底层的冗长日志输出
-        if (NOISY_FFMPEG_LOG_REGEX.test(trimmedLine)) {
+        if (
+          NOISY_FFMPEG_LOG_REGEX.test(trimmedLine) ||
+          trimmedLine.includes('LaTeX-incompatible input') ||
+          trimmedLine.includes('unicodeTextInMathMode')
+        ) {
           continue;
         }
 
