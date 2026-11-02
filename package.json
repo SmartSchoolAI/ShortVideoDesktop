@@ -21,6 +21,8 @@
     "start": "tsc -p tsconfig.json && tsc -p tsconfig.render.json && node scripts/copy-electron-views.js && electron dist-electron/main.js",
     "render": "node dist-electron/scripts/scripts/RenderWorker.js",
     "render:legacy": "node dist-electron/scripts/scripts/CompareEnglishWord.js",
+    "render:mcq": "npx tsx scripts/render_mcq.ts",
+    "render:frq": "npx tsx scripts/render_frq.ts",
     "pack": "node scripts/clean-electron.js && tsc -p tsconfig.json && tsc -p tsconfig.render.json && node scripts/copy-electron-views.js && electron-builder --dir",
     "dist:win:a": "node scripts/build-channel.js a --win",
     "dist:win:b": "node scripts/build-channel.js b --win",

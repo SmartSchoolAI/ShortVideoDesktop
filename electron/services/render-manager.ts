@@ -588,6 +588,7 @@ export class RenderManager {
         path.join(process.resourcesPath || '', 'app.asar.unpacked', 'dist-electron', 'scripts', 'scripts', name),
         path.join(process.resourcesPath || '', 'dist-electron', 'scripts', 'scripts', name),
         // 开发环境：tsc 输出 dist-electron/scripts/scripts/
+        path.join(__dirname, '..', 'scripts', 'scripts', name),
         path.join(__dirname, '..', 'dist-electron', 'scripts', 'scripts', name),
         path.join(__dirname, 'scripts', 'scripts', name),
         path.join(app.getAppPath(), 'dist-electron', 'scripts', 'scripts', name)
