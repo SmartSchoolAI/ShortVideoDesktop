@@ -1411,9 +1411,19 @@ async function fetchWaitingTasks(
   }
 }
 
-export type VideoModule = 'compare-english-word' | 'ap-calculus-mcq';
+export type VideoModule = 'compare-english-word' | 'ap-calculus-mcq' | 'ap-calculus-frq';
 
 export function detectTaskModule(task: any): VideoModule {
+  if (
+    task?.__module === 'ap-calculus-frq' ||
+    (typeof task?.folderPath === 'string' && /ap[\s_-]?calculus[\s_-]?frq/i.test(task.folderPath)) ||
+    (typeof task?.videoId === 'string' && /ap[\s_-]?calculus[\s_-]?frq/i.test(task.videoId)) ||
+    (typeof task?.id === 'string' && /ap[\s_-]?calculus[\s_-]?frq/i.test(task.id)) ||
+    Boolean(task?.question_header) ||
+    Boolean(task?.summaryData?.question_header)
+  ) {
+    return 'ap-calculus-frq';
+  }
   if (
     task?.__module === 'ap-calculus-mcq' ||
     task?.course ||
@@ -1433,7 +1443,7 @@ async function claimNextTask(
   scope: 'current_user' | 'all_users' = (IS_ELECTRON_CLIENT ? 'current_user' : 'all_users'),
   module: VideoModule = 'compare-english-word'
 ): Promise<any | null> {
-  const endpoint = module === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
+  const endpoint = module === 'ap-calculus-frq' ? 'ap-calculus-frq' : module === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
   const targetUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/${endpoint}/tasks`;
   try {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -1470,6 +1480,8 @@ async function claimNextTaskAnyModule(
   if (cewTask) return cewTask;
   const mcqTask = await claimNextTask(baseUrl, token, scope, 'ap-calculus-mcq');
   if (mcqTask) return mcqTask;
+  const frqTask = await claimNextTask(baseUrl, token, scope, 'ap-calculus-frq');
+  if (frqTask) return frqTask;
   return null;
 }
 
@@ -1489,11 +1501,13 @@ async function updateTaskStatus(
   if (!module) {
     const f = String(folderPath || '').toLowerCase();
     const tid = String(taskId || '').toLowerCase();
-    if (f.includes('apcalculusmcq') || f.includes('ap-calculus-mcq') || tid.includes('ap-calculus-mcq')) {
+    if (f.includes('apcalculusfrq') || f.includes('ap-calculus-frq') || tid.includes('ap-calculus-frq')) {
+      effectiveModule = 'ap-calculus-frq';
+    } else if (f.includes('apcalculusmcq') || f.includes('ap-calculus-mcq') || tid.includes('ap-calculus-mcq')) {
       effectiveModule = 'ap-calculus-mcq';
     }
   }
-  const endpoint = effectiveModule === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
+  const endpoint = effectiveModule === 'ap-calculus-frq' ? 'ap-calculus-frq' : effectiveModule === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
   const targetUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/${endpoint}/tasks`;
   try {
     return await retryOperation(
@@ -1556,11 +1570,13 @@ async function uploadVideoViaServerProxy(
   if (!module) {
     const f = String(folderPath || '').toLowerCase();
     const tid = String(taskId || '').toLowerCase();
-    if (f.includes('apcalculusmcq') || f.includes('ap-calculus-mcq') || tid.includes('ap-calculus-mcq')) {
+    if (f.includes('apcalculusfrq') || f.includes('ap-calculus-frq') || tid.includes('ap-calculus-frq')) {
+      effectiveModule = 'ap-calculus-frq';
+    } else if (f.includes('apcalculusmcq') || f.includes('ap-calculus-mcq') || tid.includes('ap-calculus-mcq')) {
       effectiveModule = 'ap-calculus-mcq';
     }
   }
-  const endpoint = effectiveModule === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
+  const endpoint = effectiveModule === 'ap-calculus-frq' ? 'ap-calculus-frq' : effectiveModule === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
   const targetUrl = new URL(`${baseUrl.replace(/\/+$/, '')}/api/video/${endpoint}/upload-video`);
   targetUrl.searchParams.set('taskId', String(taskId));
   targetUrl.searchParams.set('lang', lang);
@@ -2234,6 +2250,266 @@ export interface RenderWorkerOptions {
  * 专门处理微积分 AP Calculus MCQ 视频渲染流水线
  * 包含：中文视频渲染 (ApCalculusMCQ-Demo-ZH) 与 英文视频渲染 (ApCalculusMCQ-Demo-EN) 双版本自动生产与上云
  */
+
+/**
+ * 专门处理微积分 AP Calculus FRQ 视频渲染流水线
+ * 包含：中文视频渲染 (ApCalculusFRQ-Demo-ZH) 与 英文视频渲染 (ApCalculusFRQ-Demo-EN) 双版本自动生产与上云
+ */
+async function processApCalculusFRQTask(
+  task: any,
+  baseUrl: string,
+  options: RenderWorkerOptions = {}
+) {
+  const taskId = task.videoId || task.id;
+  const rawFolder = (task.folderPath || '').trim();
+  const cleanFolder = rawFolder
+    .replace(/^\/+|\/+$/g, '')
+    .replace(/^ApCalculusFRQ\//i, '') || `task_${taskId}`;
+
+  const rawEmail = (task.userEmail || '').trim();
+  const safeUserEmail = rawEmail
+    ? rawEmail.replace(/[\\/:*?"<>|]/g, '_')
+    : 'default_user';
+
+  let rawVideoName = cleanFolder;
+  if (!rawVideoName) {
+    rawVideoName = (task.title || '').trim() || `frq_${taskId}`;
+  }
+  const safeVideoName = path.basename(rawVideoName)
+    .replace(/[\\/:*?"<>|]/g, '_')
+    .replace(/\s+/g, '_');
+
+  const baseOutputDir = resolveBaseOutputDir();
+  const outputDir = path.join(baseOutputDir, 'ApCalculusFRQ', safeUserEmail, safeVideoName);
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+
+  log(`\n============================================================`, 'blue');
+  log(localizeScriptLog(`🎬 [微积分 FRQ] 开始渲染任务: [${taskId}] ${safeVideoName}`), 'blue');
+  log(localizeScriptLog(`📂 本地输出目录: ${outputDir}`), 'gray');
+  log(`============================================================`, 'blue');
+
+  // 解析 summaryData
+  let questionData: any = task.summaryData;
+  if (typeof questionData === 'string') {
+    try {
+      questionData = JSON.parse(questionData);
+    } catch (_) {
+      questionData = {};
+    }
+  } else {
+    questionData = { ...(questionData || {}) };
+  }
+
+  // 确保获取云端最新最完整的微积分 FRQ 题目结构与时间戳数据
+  try {
+    const summaryCdnUrl = `${getCdnDomain()}/ApCalculusFRQ/${cleanFolder}/summary.json?_t=${Date.now()}`;
+    const sRes = await fetch(summaryCdnUrl);
+    if (sRes.ok) {
+      const remoteData = await sRes.json();
+      if (remoteData && typeof remoteData === 'object') {
+        questionData = {
+          ...questionData,
+          ...remoteData,
+          audio_src_zh: remoteData.audio_src_zh || questionData.audio_src_zh || '',
+          audio_src_en: remoteData.audio_src_en || questionData.audio_src_en || '',
+          audio_src: remoteData.audio_src || questionData.audio_src || '',
+          total_duration_frames: remoteData.total_duration_frames || questionData.total_duration_frames,
+          totalDurationFrames: remoteData.totalDurationFrames || questionData.totalDurationFrames,
+        };
+        log(localizeScriptLog(`📥 已从云端同步最新微积分 FRQ 剧本与时间戳数据 (summary.json)`), 'gray');
+      }
+    } else {
+      const origCdnUrl = `${getCdnDomain()}/ApCalculusFRQ/${cleanFolder}/original.json?_t=${Date.now()}`;
+      const oRes = await fetch(origCdnUrl);
+      if (oRes.ok) {
+        const oData = await oRes.json();
+        if (oData && typeof oData === 'object') {
+          questionData = { ...questionData, ...oData };
+          log(localizeScriptLog(`📥 已从云端同步最新微积分 FRQ 原始数据 (original.json)`), 'gray');
+        }
+      }
+    }
+  } catch (_) { }
+
+  const taskRenderLangs: string[] = Array.isArray(questionData.renderLangs)
+    ? questionData.renderLangs
+    : Array.isArray(task.summaryData?.renderLangs)
+    ? task.summaryData.renderLangs
+    : ['zh', 'en'];
+
+  const specifiedLang = (options.lang || '').trim().toLowerCase();
+  const shouldRenderZh = !specifiedLang || specifiedLang === 'all' || specifiedLang === 'zh' || taskRenderLangs.includes('zh');
+  const shouldRenderEn = !specifiedLang || specifiedLang === 'all' || specifiedLang === 'en' || taskRenderLangs.includes('en');
+
+  const zhOutputFile = path.join(outputDir, `${safeVideoName}_zh.mp4`);
+  const enOutputFile = path.join(outputDir, `${safeVideoName}_en.mp4`);
+
+  // 1. 渲染中文版本 (使用微积分专属核心缓存 BundledCodeCache/ApCalculusFRQ)
+  if (shouldRenderZh) {
+    log(localizeScriptLog(`\n[1/2] 正在渲染中文视频 (ApCalculusFRQ-Demo-ZH)...`), 'blue');
+    const zhAudio =
+      questionData.audio_src_zh ||
+      questionData.meta?.audio_src_zh ||
+      (questionData.audio_src && !questionData.audio_src.includes('_en_') && !questionData.audio_src.includes('_en.') ? questionData.audio_src : undefined) ||
+      (task.audioPath && !task.audioPath.includes('_en_') && !task.audioPath.includes('_en.') ? task.audioPath : undefined);
+    const zhProps = {
+      question: questionData,
+      lang: 'zh',
+      showAudio: true,
+      audioSrc: zhAudio,
+    };
+    await renderVideoWithRemotion(zhOutputFile, zhProps, options.concurrency, 'ApCalculusFRQ-Demo-ZH', 'ApCalculusFRQ');
+    log(localizeScriptLog(`✅ 中文视频渲染完成: ${zhOutputFile}`), 'green');
+  }
+
+  // 2. 渲染英文版本 (使用微积分专属核心缓存 BundledCodeCache/ApCalculusFRQ)
+  if (shouldRenderEn) {
+    log(localizeScriptLog(`\n[2/2] 正在渲染英文视频 (ApCalculusFRQ-Demo-EN)...`), 'blue');
+    const enAudio =
+      questionData.audio_src_en ||
+      questionData.meta?.audio_src_en ||
+      (questionData.audio_src && !questionData.audio_src.includes('_zh_') && !questionData.audio_src.includes('_zh.') ? questionData.audio_src : undefined) ||
+      (task.audioPath && !task.audioPath.includes('_zh_') && !task.audioPath.includes('_zh.') ? task.audioPath : undefined);
+    const enProps = {
+      question: questionData,
+      lang: 'en',
+      showAudio: true,
+      audioSrc: enAudio,
+    };
+    await renderVideoWithRemotion(enOutputFile, enProps, options.concurrency, 'ApCalculusFRQ-Demo-EN', 'ApCalculusFRQ');
+    log(localizeScriptLog(`✅ 英文视频渲染完成: ${enOutputFile}`), 'green');
+  }
+
+  // 3. 上传视频
+  const uploadedVideos: Record<string, string> = {};
+  let primaryCdnUrl = '';
+  let primarySize = 0;
+
+  if (fs.existsSync(zhOutputFile)) {
+    primarySize = fs.statSync(zhOutputFile).size;
+  } else if (fs.existsSync(enOutputFile)) {
+    primarySize = fs.statSync(enOutputFile).size;
+  }
+
+  if (options.skipUpload) {
+    log(localizeScriptLog(`⏩ 跳过云端上传 (--skip-upload)`), 'gray');
+    if (shouldRenderZh && fs.existsSync(zhOutputFile)) {
+      primaryCdnUrl = zhOutputFile;
+      uploadedVideos['zh'] = zhOutputFile;
+    }
+    if (shouldRenderEn && fs.existsSync(enOutputFile)) {
+      if (!primaryCdnUrl) primaryCdnUrl = enOutputFile;
+      uploadedVideos['en'] = enOutputFile;
+    }
+  } else {
+    // 上传中文视频
+    if (shouldRenderZh && fs.existsSync(zhOutputFile)) {
+      log(localizeScriptLog(`\n☁️ 正在上传中文视频...`), 'blue');
+      let zhCdn = '';
+      if (HAS_R2_CONFIG) {
+        const r2Key = `ApCalculusFRQ/${cleanFolder}/${safeVideoName}_zh.mp4`;
+        await retryOperation(
+          async () => {
+            const res = await uploadToR2(r2Key, fs.readFileSync(zhOutputFile), 'video/mp4');
+            if (!res.success) {
+              throw new Error(res.error || localizeScriptLog('R2 上传接口返回失败'));
+            }
+            zhCdn = res.url || `${getCdnDomain()}/${r2Key}`;
+            return res;
+          },
+          3,
+          2500,
+          localizeScriptLog(`R2 微积分 FRQ 中文视频上传`)
+        );
+      } else {
+        const res = await uploadVideoViaServerProxy(
+          baseUrl,
+          taskId,
+          'zh',
+          zhOutputFile,
+          `${safeVideoName}_zh.mp4`,
+          task.folderPath,
+          CURRENT_AUTH_TOKEN,
+          !shouldRenderEn,
+          'ap-calculus-frq'
+        );
+        if (res.success && res.cdnUrl) zhCdn = res.cdnUrl;
+      }
+      if (zhCdn) {
+        uploadedVideos['zh'] = zhCdn;
+        primaryCdnUrl = zhCdn;
+        log(localizeScriptLog(`✅ 中文视频上传成功: ${zhCdn}`), 'green');
+      }
+    }
+
+    // 上传英文视频
+    if (shouldRenderEn && fs.existsSync(enOutputFile)) {
+      log(localizeScriptLog(`\n☁️ 正在上传英文视频...`), 'blue');
+      let enCdn = '';
+      if (HAS_R2_CONFIG) {
+        const r2Key = `ApCalculusFRQ/${cleanFolder}/${safeVideoName}_en.mp4`;
+        await retryOperation(
+          async () => {
+            const res = await uploadToR2(r2Key, fs.readFileSync(enOutputFile), 'video/mp4');
+            if (!res.success) {
+              throw new Error(res.error || localizeScriptLog('R2 上传接口返回失败'));
+            }
+            enCdn = res.url || `${getCdnDomain()}/${r2Key}`;
+            return res;
+          },
+          3,
+          2500,
+          localizeScriptLog(`R2 微积分 FRQ 英文视频上传`)
+        );
+      } else {
+        const res = await uploadVideoViaServerProxy(
+          baseUrl,
+          taskId,
+          'en',
+          enOutputFile,
+          `${safeVideoName}_en.mp4`,
+          task.folderPath,
+          CURRENT_AUTH_TOKEN,
+          true,
+          'ap-calculus-frq'
+        );
+        if (res.success && res.cdnUrl) enCdn = res.cdnUrl;
+      }
+      if (enCdn) {
+        uploadedVideos['en'] = enCdn;
+        if (!primaryCdnUrl) primaryCdnUrl = enCdn;
+        log(localizeScriptLog(`✅ 英文视频上传成功: ${enCdn}`), 'green');
+      }
+    }
+  }
+
+  if (!primaryCdnUrl) {
+    throw new Error(localizeScriptLog('微积分 FRQ 视频渲染产物未能成功生成或上传'));
+  }
+
+  // 4. 更新任务状态为已完成
+  log(localizeScriptLog(`\n📝 正在更新微积分 FRQ 视频任务状态为已完成 (video_finished)...`), 'blue');
+  const updateSuccess = await updateTaskStatus(
+    baseUrl,
+    taskId,
+    'video_finished',
+    primaryCdnUrl,
+    task.folderPath,
+    primarySize,
+    uploadedVideos,
+    CURRENT_AUTH_TOKEN,
+    'ap-calculus-frq'
+  );
+
+  if (updateSuccess) {
+    log(localizeScriptLog(`🎉 [微积分 FRQ] 任务 [${taskId}] 全部渲染与上传完成!`), 'green');
+  } else {
+    log(localizeScriptLog(`⚠️ [微积分 FRQ] 任务 [${taskId}] 视频已生成，但更新服务端状态失败`), 'yellow');
+  }
+}
+
 async function processApCalculusTask(
   task: any,
   baseUrl: string,
@@ -2488,6 +2764,10 @@ async function processSingleTask(
   baseUrl: string,
   options: RenderWorkerOptions = {}
 ) {
+    // 识别微积分 AP Calculus FRQ 模块任务并执行双语渲染流程
+  if (detectTaskModule(task) === 'ap-calculus-frq') {
+    return await processApCalculusFRQTask(task, baseUrl, options);
+  }
   // 识别微积分 AP Calculus MCQ 模块任务并执行双语渲染流程
   if (detectTaskModule(task) === 'ap-calculus-mcq') {
     return await processApCalculusTask(task, baseUrl, options);
@@ -3032,8 +3312,8 @@ async function triggerQueue(
         const clientScope = options.scope || (IS_ELECTRON_CLIENT ? 'current_user' : 'all_users');
         const nextTask = await claimNextTaskAnyModule(baseUrl, CURRENT_AUTH_TOKEN, clientScope);
         if (nextTask) {
-          const modName = nextTask.__module === 'ap-calculus-mcq' ? '[微积分 MCQ]' : '[对比学单词]';
-          const taskDesc = nextTask.__module === 'ap-calculus-mcq'
+          const modName = nextTask.__module === 'ap-calculus-frq' ? '[微积分 FRQ]' : nextTask.__module === 'ap-calculus-mcq' ? '[微积分 MCQ]' : '[对比学单词]';
+          const taskDesc = nextTask.__module === 'ap-calculus-frq' || nextTask.__module === 'ap-calculus-mcq'
             ? `${nextTask.title || nextTask.folderPath || nextTask.id}`
             : `${nextTask.wordA} vs ${nextTask.wordB}`;
           log(localizeScriptLog(`\n⚡ [流水线接续抢单] 成功锁定待渲染任务: ${modName} [${nextTask.videoId || nextTask.id}] ${taskDesc}`), 'green');
@@ -3069,7 +3349,7 @@ async function listenSSEForModule(
   options: RenderWorkerOptions = {}
 ) {
   const eventsUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/${module}/events/`;
-  const modLabel = module === 'ap-calculus-mcq' ? '微积分 MCQ' : '对比学单词';
+  const modLabel = module === 'ap-calculus-frq' ? '微积分 FRQ' : module === 'ap-calculus-mcq' ? '微积分 MCQ' : '对比学单词';
 
   while (true) {
     try {
@@ -3156,6 +3436,9 @@ async function startSSEListener(
   listenSSEForModule(baseUrl, 'ap-calculus-mcq', options).catch((err) => {
     log(localizeScriptLog(`[微积分 MCQ] SSE 线程异常: ${err.message}`), 'red');
   });
+  listenSSEForModule(baseUrl, 'ap-calculus-frq', options).catch((err) => {
+    log(localizeScriptLog(`[微积分 FRQ] SSE 线程异常: ${err.message}`), 'red');
+  });
 }
 
 // ── 7. 主启动入口 / 调度循环 ───────────────────────────────────────────
@@ -3188,10 +3471,12 @@ async function main() {
   try {
     await ensureRemotionBundle(rebuildBundle, 'CompareEnglishWord');
     await ensureRemotionBundle(rebuildBundle, 'ApCalculusMCQ');
+    await ensureRemotionBundle(rebuildBundle, 'ApCalculusFRQ');
   } catch (_) { }
 
   const cewCache = getBundleCacheDir('CompareEnglishWord');
   const mcqCache = getBundleCacheDir('ApCalculusMCQ');
+  const frqCache = getBundleCacheDir('ApCalculusFRQ');
 
   console.clear();
   log(`============================================================`, 'green');
@@ -3207,6 +3492,7 @@ async function main() {
   log(localizeScriptLog(`🔑 用户会话鉴权: ${CURRENT_AUTH_TOKEN ? '✅ 已绑定当前用户 Token (安全会话)' : '⚠️ 未传入 Token (公共无鉴权模式)'}`), CURRENT_AUTH_TOKEN ? 'green' : 'yellow');
   log(localizeScriptLog(`⚡ Remotion 缓存 (单词对比): ${fs.existsSync(path.join(cewCache, 'index.html')) ? '✅ 已就绪 (秒级免打包)' : '⏳ 首次任务自动固化'} (${cewCache})`), 'blue');
   log(localizeScriptLog(`⚡ Remotion 缓存 (微积分 MCQ): ${fs.existsSync(path.join(mcqCache, 'index.html')) ? '✅ 已就绪 (秒级免打包)' : '⏳ 首次任务自动固化'} (${mcqCache})`), 'blue');
+  log(localizeScriptLog(`⚡ Remotion 缓存 (微积分 FRQ): ${fs.existsSync(path.join(frqCache, 'index.html')) ? '✅ 已就绪 (秒级免打包)' : '⏳ 首次任务自动固化'} (${frqCache})`), 'blue');
   log(localizeScriptLog(`🔁 运行模式: ${isOnce ? '单次执行 (--once)' : '后台守护监听'}`), 'blue');
   log(`============================================================\n`, 'green');
 
@@ -3231,8 +3517,8 @@ async function main() {
       if (!isProcessingQueue && pendingQueue.length === 0 && currentRunningTaskId == null) {
         const claimedTask = await claimNextTaskAnyModule(baseUrl, CURRENT_AUTH_TOKEN, clientScope);
         if (claimedTask) {
-          const modName = claimedTask.__module === 'ap-calculus-mcq' ? '[微积分 MCQ]' : '[对比学单词]';
-          const taskDesc = claimedTask.__module === 'ap-calculus-mcq'
+          const modName = claimedTask.__module === 'ap-calculus-frq' ? '[微积分 FRQ]' : claimedTask.__module === 'ap-calculus-mcq' ? '[微积分 MCQ]' : '[对比学单词]';
+          const taskDesc = claimedTask.__module === 'ap-calculus-frq' || claimedTask.__module === 'ap-calculus-mcq'
             ? `${claimedTask.title || claimedTask.folderPath || claimedTask.id}`
             : `${claimedTask.wordA} vs ${claimedTask.wordB}`;
           log(localizeScriptLog(`\n⚡ [轮询抢单] 成功锁定待渲染任务: ${modName} [${claimedTask.videoId || claimedTask.id}] ${taskDesc}`), 'green');

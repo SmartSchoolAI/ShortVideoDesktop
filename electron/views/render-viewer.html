@@ -1419,7 +1419,7 @@
     function linkifyMediaText(html) {
       if (!html) return '';
 
-      // 1. 先安全解析远程 URL (跳过已有 HTML 标签)
+      // 1. 先安全解析远程 URL：只对 .mp4 视频文件增加链接，普通 URL 不加链接保持纯文本
       const urlRegex = /(<[^>]+>)|(https?:\/\/[^\s<>"'\r\n]+)/gi;
       html = html.replace(urlRegex, (match, tag, url) => {
         if (tag) return tag;
@@ -1432,23 +1432,26 @@
           trailing = trailingMatch[1];
           cleanUrl = cleanUrl.slice(0, -trailing.length);
         }
-        const isMedia = /\.(?:mp4|webm|ogg|m4v|mp3|wav|m4a|aac|flac)(\?.*)?$/i.test(cleanUrl);
-        const tip = isMedia
-          ? '点击弹窗播放该视频 (Click to play in popup window)'
-          : '点击在外部浏览器打开 (Click to open in browser)';
-        const icon = isMedia ? '🎬' : '🔗';
+
+        // 仅对 .mp4 格式的视频添加播放链接，普通 URL 绝不加链接
+        const isMp4 = /\.mp4(\?.*)?$/i.test(cleanUrl);
+        if (!isMp4) {
+          return match;
+        }
+
+        const tip = '点击播放该视频 (Click to play MP4)';
         const safeUrl = escapeAttr(cleanUrl);
-        return `<a href="javascript:void(0)" class="media-link remote-media-link" data-url="${safeUrl}" title="${tip}">${icon} ${cleanUrl}</a>${trailing}`;
+        return `<a href="javascript:void(0)" class="media-link remote-media-link" data-url="${safeUrl}" title="${tip}">🎬 ${cleanUrl}</a>${trailing}`;
       });
 
-      // 2. 解析 Windows 和 Unix 本地媒体文件绝对路径 (支持正反斜杠，跳过已有 HTML 标签)
-      const localMediaRegex = /(<[^>]+>)|([A-Za-z]:[\\/](?:[^<>\r\n"':*?|]+?)\.(?:mp4|mp3|wav|webm|m4a|mkv|aac|flac)\b)|(\/(?:Users|home|root|var|tmp|Volumes)\/(?:[^<>\r\n"':*?|]+?)\.(?:mp4|mp3|wav|webm|m4a|mkv|aac|flac)\b)/gi;
+      // 2. 解析 Windows 和 Unix 本地媒体文件绝对路径：只对 .mp4 视频文件增加链接
+      const localMediaRegex = /(<[^>]+>)|([A-Za-z]:[\\/](?:[^<>\r\n"':*?|]+?)\.mp4\b)|(\/(?:Users|home|root|var|tmp|Volumes)\/(?:[^<>\r\n"':*?|]+?)\.mp4\b)/gi;
       html = html.replace(localMediaRegex, (match, tag, winPath, unixPath) => {
         if (tag) return tag;
         const targetPath = winPath || unixPath;
         if (!targetPath) return match;
 
-        const tip = '点击弹窗播放该视频 (Click to play in window, press O for system player)';
+        const tip = '点击播放该视频 (Click to play MP4)';
         const safePath = escapeAttr(targetPath);
         return `<a href="javascript:void(0)" class="media-link local-media-link" data-path="${safePath}" title="${tip}">▶️ ${targetPath}</a>`;
       });
@@ -3148,27 +3151,32 @@
       const localPath = link.getAttribute('data-path');
       const remoteUrl = link.getAttribute('data-url');
 
-      try {
-        if (localPath) {
-          const res = await ipcRenderer.invoke('app:open-media-player', { path: localPath });
-          if (!res || !res.success) {
-            await ipcRenderer.invoke('app:open-local-file', localPath);
+      if (localPath) {
+        try {
+          const res = await ipcRenderer.invoke('app:open-local-file', localPath);
+          if (res && res.success === false) {
+            console.warn('[MediaLink] 打开本地文件提示:', res.message);
+            try {
+              const { shell } = require('electron');
+              if (shell && shell.openPath) {
+                await shell.openPath(localPath);
+              }
+            } catch (fallbackErr) {}
           }
-        } else if (remoteUrl) {
-          const isMedia = /\.(?:mp4|webm|ogg|m4v|mp3|wav|m4a|aac|flac)(\?.*)?$/i.test(remoteUrl);
-          if (isMedia) {
-            await ipcRenderer.invoke('app:open-media-player', { url: remoteUrl });
-          } else {
-            await ipcRenderer.invoke('app:open-external-url', remoteUrl);
-          }
-        }
-      } catch (err) {
-        console.error('[MediaLink] 打开视频播放窗口异常:', err);
-        if (localPath) {
+        } catch (err) {
+          console.error('[MediaLink] 调用系统播放器异常:', err);
           try {
             const { shell } = require('electron');
-            if (shell && shell.openPath) await shell.openPath(localPath);
+            if (shell && shell.openPath) {
+              await shell.openPath(localPath);
+            }
           } catch (fallbackErr) {}
+        }
+      } else if (remoteUrl) {
+        try {
+          await ipcRenderer.invoke('app:open-external-url', remoteUrl);
+        } catch (err) {
+          console.error('[MediaLink] 弹窗播放远程视频异常:', err);
         }
       }
     });
