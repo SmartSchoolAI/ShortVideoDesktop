@@ -4341,7 +4341,7 @@
       });
 
       // 2. 解析 Windows 和 Unix 本地媒体文件绝对路径：只对 .mp4 视频文件增加链接
-      const localMediaRegex = /(<[^>]+>)|([A-Za-z]:[\\/](?:[^<>\\r\\n"':*?|]+?)\.mp4\b)|(\\/(?:Users|home|root|var|tmp|Volumes)\\/(?:[^<>\\r\\n"':*?|]+?)\.mp4\b)/gi;
+      const localMediaRegex = /(<[^>]+>)|([A-Za-z]:[\\/](?:[^<>\r\n"':*?|]+?)\.mp4\b)|(\/(?:Users|home|root|var|tmp|Volumes)\/(?:[^<>\r\n"':*?|]+?)\.mp4\b)/gi;
       html = html.replace(localMediaRegex, (match, tag, winPath, unixPath) => {
         if (tag) return tag;
         const targetPath = winPath || unixPath;
