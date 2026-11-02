@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
-import { spawn, execSync } from 'child_process';
+import { spawn, execSync, spawnSync } from 'child_process';
 import { uploadToR2, CDN_BASE_DOMAIN } from '../src/functions/r2-client';
 
 // Material download helper function
@@ -56,35 +56,38 @@ async function downloadFile(url: string, destPath: string, minSizeBytes = 1000):
 function getMediaExactDuration(filePath: string): number | null {
   if (!fs.existsSync(filePath)) return null;
   try {
-    const cmd = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`;
-    const stdout = execSync(cmd, { encoding: 'utf-8', timeout: 4000, stdio: ['ignore', 'pipe', 'ignore'] });
-    const val = parseFloat(stdout.trim());
-    if (!isNaN(val) && val > 0) {
-      return Number(val.toFixed(3));
+    const args = [
+      '-v', 'error',
+      '-show_entries', 'format=duration',
+      '-of', 'default=noprint_wrappers=1:nokey=1',
+      filePath,
+    ];
+    const ret = spawnSync('ffprobe', args, { encoding: 'utf-8', timeout: 4000, stdio: ['ignore', 'pipe', 'ignore'] });
+    if (ret.status === 0 && ret.stdout) {
+      const val = parseFloat(ret.stdout.trim());
+      if (!isNaN(val) && val > 0) {
+        return Number(val.toFixed(3));
+      }
     }
   } catch (e) {}
   return null;
 }
 
 // Apply slight pitch shift to MP4 audio track
-// ： （Hz） ，
-// ：ffmpeg rubberband  （ ），  asetrate+atempo
-// pitchCents:  （ ），1  = 1/100  ≈ 0.058%
-// ±5~10 ，±2~6
+// 核心原理：微调音频基频（Hz），实现声学水印与听感无损去重
+// 策略顺序：优先 ffmpeg rubberband 滤镜（音质最佳），失败则降级为 asetrate+atempo 滤镜
+// pitchCents: 音调微调音分（cents），1 半音 = 100 音分 ≈ 5.95% 频率变化
 async function applyAudioPitchShift(mp4Path: string, pitchCents: number): Promise<boolean> {
   if (!pitchCents || pitchCents === 0) return true;
   if (!fs.existsSync(mp4Path)) return false;
 
   const tmpPath = mp4Path.replace(/\.mp4$/, `_pitchshift_tmp.mp4`);
 
-  // pitch ratio = 2^(cents/1200)，  asetrate
+  // pitch ratio = 2^(cents/1200)
   const pitchRatio = Math.pow(2, pitchCents / 1200);
-  // asetrate  （  44100   48000，  48000  ）
   const baseSampleRate = 48000;
   const shiftedSampleRate = Math.round(baseSampleRate * pitchRatio);
 
-  // rubberband（ ， ）
-  // ：asetrate  （ ）+ atempo
   const strategies: Array<{ name: string; audioFilter: string }> = [
     {
       name: 'rubberband',
@@ -92,32 +95,29 @@ async function applyAudioPitchShift(mp4Path: string, pitchCents: number): Promis
     },
     {
       name: 'asetrate+atempo',
-      // asetrate  / （ ），atempo
       audioFilter: `asetrate=${shiftedSampleRate},aresample=${baseSampleRate},atempo=${(1 / pitchRatio).toFixed(6)}`,
     },
   ];
 
   for (const strategy of strategies) {
     try {
-      // ffmpeg  ：  copy，
-      const cmd = [
-        'ffmpeg', '-y',
-        '-i', `"${mp4Path}"`,
+      const args = [
+        '-y',
+        '-i', mp4Path,
         '-vcodec', 'copy',
-        '-af', `"${strategy.audioFilter}"`,
+        '-af', strategy.audioFilter,
         '-acodec', 'aac',
         '-b:a', '192k',
-        `"${tmpPath}"`,
-      ].join(' ');
+        tmpPath,
+      ];
 
-      execSync(cmd, { timeout: 120000, stdio: 'pipe' });
+      const ret = spawnSync('ffmpeg', args, { timeout: 120000, stdio: 'pipe' });
 
-      if (fs.existsSync(tmpPath) && fs.statSync(tmpPath).size > 10000) {
+      if (ret.status === 0 && fs.existsSync(tmpPath) && fs.statSync(tmpPath).size > 10000) {
         fs.renameSync(tmpPath, mp4Path);
         return true;
       }
     } catch (_e) {
-      // ，
       if (fs.existsSync(tmpPath)) {
         try { fs.unlinkSync(tmpPath); } catch (_) {}
       }
@@ -1411,9 +1411,19 @@ async function fetchWaitingTasks(
   }
 }
 
-export type VideoModule = 'compare-english-word' | 'ap-calculus-mcq';
+export type VideoModule = 'compare-english-word' | 'ap-calculus-mcq' | 'ap-calculus-frq';
 
 export function detectTaskModule(task: any): VideoModule {
+  if (
+    task?.__module === 'ap-calculus-frq' ||
+    (typeof task?.folderPath === 'string' && /ap[\s_-]?calculus[\s_-]?frq/i.test(task.folderPath)) ||
+    (typeof task?.videoId === 'string' && /ap[\s_-]?calculus[\s_-]?frq/i.test(task.videoId)) ||
+    (typeof task?.id === 'string' && /ap[\s_-]?calculus[\s_-]?frq/i.test(task.id)) ||
+    Boolean(task?.question_header) ||
+    Boolean(task?.summaryData?.question_header)
+  ) {
+    return 'ap-calculus-frq';
+  }
   if (
     task?.__module === 'ap-calculus-mcq' ||
     task?.course ||
@@ -1433,7 +1443,7 @@ async function claimNextTask(
   scope: 'current_user' | 'all_users' = (IS_ELECTRON_CLIENT ? 'current_user' : 'all_users'),
   module: VideoModule = 'compare-english-word'
 ): Promise<any | null> {
-  const endpoint = module === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
+  const endpoint = module === 'ap-calculus-frq' ? 'ap-calculus-frq' : module === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
   const targetUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/${endpoint}/tasks`;
   try {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -1470,6 +1480,8 @@ async function claimNextTaskAnyModule(
   if (cewTask) return cewTask;
   const mcqTask = await claimNextTask(baseUrl, token, scope, 'ap-calculus-mcq');
   if (mcqTask) return mcqTask;
+  const frqTask = await claimNextTask(baseUrl, token, scope, 'ap-calculus-frq');
+  if (frqTask) return frqTask;
   return null;
 }
 
@@ -1489,11 +1501,13 @@ async function updateTaskStatus(
   if (!module) {
     const f = String(folderPath || '').toLowerCase();
     const tid = String(taskId || '').toLowerCase();
-    if (f.includes('apcalculusmcq') || f.includes('ap-calculus-mcq') || tid.includes('ap-calculus-mcq')) {
+    if (f.includes('apcalculusfrq') || f.includes('ap-calculus-frq') || tid.includes('ap-calculus-frq')) {
+      effectiveModule = 'ap-calculus-frq';
+    } else if (f.includes('apcalculusmcq') || f.includes('ap-calculus-mcq') || tid.includes('ap-calculus-mcq')) {
       effectiveModule = 'ap-calculus-mcq';
     }
   }
-  const endpoint = effectiveModule === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
+  const endpoint = effectiveModule === 'ap-calculus-frq' ? 'ap-calculus-frq' : effectiveModule === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
   const targetUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/${endpoint}/tasks`;
   try {
     return await retryOperation(
@@ -1556,11 +1570,13 @@ async function uploadVideoViaServerProxy(
   if (!module) {
     const f = String(folderPath || '').toLowerCase();
     const tid = String(taskId || '').toLowerCase();
-    if (f.includes('apcalculusmcq') || f.includes('ap-calculus-mcq') || tid.includes('ap-calculus-mcq')) {
+    if (f.includes('apcalculusfrq') || f.includes('ap-calculus-frq') || tid.includes('ap-calculus-frq')) {
+      effectiveModule = 'ap-calculus-frq';
+    } else if (f.includes('apcalculusmcq') || f.includes('ap-calculus-mcq') || tid.includes('ap-calculus-mcq')) {
       effectiveModule = 'ap-calculus-mcq';
     }
   }
-  const endpoint = effectiveModule === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
+  const endpoint = effectiveModule === 'ap-calculus-frq' ? 'ap-calculus-frq' : effectiveModule === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
   const targetUrl = new URL(`${baseUrl.replace(/\/+$/, '')}/api/video/${endpoint}/upload-video`);
   targetUrl.searchParams.set('taskId', String(taskId));
   targetUrl.searchParams.set('lang', lang);
@@ -1613,12 +1629,25 @@ async function uploadVideoViaServerProxy(
 }
 
 
-// ── 3.   Remotion   ────────────────────────────────────────────
-// Electron   REMOTION_BUNDLE_CACHE_DIR（ ），
-// BundledCodeCache（ ）
-const BUNDLE_CACHE_DIR = process.env.REMOTION_BUNDLE_CACHE_BASE_DIR
-  ? path.join(process.env.REMOTION_BUNDLE_CACHE_BASE_DIR, 'CompareEnglishWord')
-  : (process.env.REMOTION_BUNDLE_CACHE_DIR || path.resolve(ROOT_DIR, 'BundledCodeCache', 'CompareEnglishWord'));
+// ── 3. Remotion 模板核心缓存与执行 ────────────────────────────────────────────
+// 根据不同视频模板隔离运行缓存目录（如 CompareEnglishWord 与 ApCalculusMCQ 互不污染）
+function getBundleCacheDir(moduleName: string = 'CompareEnglishWord'): string {
+  if (process.env.REMOTION_BUNDLE_CACHE_BASE_DIR) {
+    return path.join(process.env.REMOTION_BUNDLE_CACHE_BASE_DIR, moduleName);
+  }
+  if (process.env.REMOTION_BUNDLE_CACHE_DIR) {
+    const customDir = process.env.REMOTION_BUNDLE_CACHE_DIR;
+    const lastPart = path.basename(customDir);
+    const parentDir = path.dirname(customDir);
+    if (lastPart === 'CompareEnglishWord' && moduleName !== 'CompareEnglishWord') {
+      return path.join(parentDir, moduleName);
+    }
+    return customDir;
+  }
+  return path.resolve(ROOT_DIR, 'BundledCodeCache', moduleName);
+}
+
+const BUNDLE_CACHE_DIR = getBundleCacheDir('CompareEnglishWord');
 
 /**
  * 动态定位 Remotion 执行器：
@@ -1750,9 +1779,9 @@ function copyDirSafe(srcDir: string, destDir: string): void {
 }
 
 /**
- * 动态检索可用的内置预编译渲染包路径
+ * 动态检索可用的内置预编译渲染包路径 (优先按模块专属查找)
  */
-function getBuiltinBundleDir(): string | null {
+function getBuiltinBundleDir(moduleName: string = 'CompareEnglishWord'): string | null {
   const exeDir = process.execPath ? path.dirname(process.execPath) : '';
   const procResourcesPath =
     process.env.ELECTRON_RESOURCES_PATH ||
@@ -1760,14 +1789,21 @@ function getBuiltinBundleDir(): string | null {
     (exeDir ? path.join(exeDir, 'resources') : '');
 
   const builtInBundleDirs = [
+    process.env.REMOTION_BUILTIN_BUNDLE_DIR ? path.join(process.env.REMOTION_BUILTIN_BUNDLE_DIR, moduleName) : '',
     process.env.REMOTION_BUILTIN_BUNDLE_DIR,
+    path.join(procResourcesPath, 'app.asar.unpacked', 'build', 'remotion-bundle', moduleName),
     path.join(procResourcesPath, 'app.asar.unpacked', 'build', 'remotion-bundle'),
+    path.join(procResourcesPath, 'app.asar', 'build', 'remotion-bundle', moduleName),
     path.join(procResourcesPath, 'app.asar', 'build', 'remotion-bundle'),
+    path.join(procResourcesPath, 'build', 'remotion-bundle', moduleName),
     path.join(procResourcesPath, 'build', 'remotion-bundle'),
-    exeDir ? path.join(exeDir, 'resources', 'app.asar.unpacked', 'build', 'remotion-bundle') : '',
-    exeDir ? path.join(exeDir, 'resources', 'build', 'remotion-bundle') : '',
+    exeDir ? path.join(exeDir, 'resources', 'app.asar.unpacked', 'build', 'remotion-bundle', moduleName) : '',
+    exeDir ? path.join(exeDir, 'resources', 'build', 'remotion-bundle', moduleName) : '',
+    path.join(__dirname, '..', '..', 'build', 'remotion-bundle', moduleName),
     path.join(__dirname, '..', '..', 'build', 'remotion-bundle'),
+    path.join(__dirname, '..', 'build', 'remotion-bundle', moduleName),
     path.join(__dirname, '..', 'build', 'remotion-bundle'),
+    path.resolve(ROOT_DIR, 'build/remotion-bundle', moduleName),
     path.resolve(ROOT_DIR, 'build/remotion-bundle'),
   ].filter(Boolean) as string[];
 
@@ -1780,15 +1816,15 @@ function getBuiltinBundleDir(): string | null {
 }
 
 /**
- * 确保 Remotion 渲染核心目录 ./BundledCodeCache/CompareEnglishWord 就绪
- * 桌面控制台完全独立运行，100% 免源码依赖：直接加载本地缓存或安装包自带的预编译渲染核心
+ * 确保对应视频模块的 Remotion 渲染核心目录就绪
+ * 比如 CompareEnglishWord -> ./BundledCodeCache/CompareEnglishWord
+ *      ApCalculusMCQ      -> ./BundledCodeCache/ApCalculusMCQ
  */
-let bundlePromise: Promise<string> | null = null;
-
-function ensureRemotionBundle(forceRebuild = false): Promise<string> {
-  const indexHtml = path.join(BUNDLE_CACHE_DIR, 'index.html');
-  const cacheBundleJs = path.join(BUNDLE_CACHE_DIR, 'bundle.js');
-  const builtinDir = getBuiltinBundleDir();
+function ensureRemotionBundle(forceRebuild = false, moduleName: string = 'CompareEnglishWord'): Promise<string> {
+  const targetCacheDir = getBundleCacheDir(moduleName);
+  const indexHtml = path.join(targetCacheDir, 'index.html');
+  const cacheBundleJs = path.join(targetCacheDir, 'bundle.js');
+  const builtinDir = getBuiltinBundleDir(moduleName);
 
   // 若存在内置预编译包，且当前缓存的 bundle.js 大小与内置包不一致，说明内置包已更新或本地缓存已损坏，自动清理重建
   let cacheStale = false;
@@ -1802,26 +1838,25 @@ function ensureRemotionBundle(forceRebuild = false): Promise<string> {
     } catch (_) {}
   }
 
-  if (!forceRebuild && !cacheStale && isRemotionBundleValid(BUNDLE_CACHE_DIR)) {
-    log(localizeScriptLog(`⚡ 检测到已有 Remotion 渲染核心缓存 (4.0.534): ${BUNDLE_CACHE_DIR}，直接复用免打包`), 'green');
-    return Promise.resolve(BUNDLE_CACHE_DIR);
+  if (!forceRebuild && !cacheStale && isRemotionBundleValid(targetCacheDir)) {
+    log(localizeScriptLog(`⚡ 检测到已有 [${moduleName}] Remotion 渲染核心缓存 (4.0.534): ${targetCacheDir}，直接复用免打包`), 'green');
+    return Promise.resolve(targetCacheDir);
   } else if (!forceRebuild && (fs.existsSync(indexHtml) || cacheStale)) {
-    log(localizeScriptLog(`🧹 检测到 Remotion 缓存版本过期或不完整，自动清理并刷新: ${BUNDLE_CACHE_DIR}`), 'yellow');
-    try { fs.rmSync(BUNDLE_CACHE_DIR, { recursive: true, force: true }); } catch (_) {}
+    log(localizeScriptLog(`🧹 检测到 [${moduleName}] Remotion 缓存版本过期或不完整，自动清理并刷新: ${targetCacheDir}`), 'yellow');
+    try { fs.rmSync(targetCacheDir, { recursive: true, force: true }); } catch (_) {}
   }
 
-  // 优先从安装包内置资源或自身工程 build/remotion-bundle 加载（完全无外部源码依赖）
+  // 1. 优先从安装包内置资源或自身工程 build/remotion-bundle 加载（完全无外部源码依赖）
   if (builtinDir) {
-    log(localizeScriptLog(`📦 检测到客户端内置预编译 Remotion 渲染核心 (${builtinDir})，正在注入运行缓存...`), 'green');
+    log(localizeScriptLog(`📦 检测到客户端内置预编译 Remotion 渲染核心 (${builtinDir})，正在注入 [${moduleName}] 运行缓存...`), 'green');
     try {
-      if (!fs.existsSync(BUNDLE_CACHE_DIR)) {
-        fs.mkdirSync(BUNDLE_CACHE_DIR, { recursive: true });
+      if (!fs.existsSync(targetCacheDir)) {
+        fs.mkdirSync(targetCacheDir, { recursive: true });
       }
-      // 使用支持 asar 虚拟流的安全复制，秒级固化至运行缓存
-      copyDirSafe(builtinDir, BUNDLE_CACHE_DIR);
-      if (fs.existsSync(indexHtml) && isRemotionBundleValid(BUNDLE_CACHE_DIR)) {
-        log(localizeScriptLog(`✅ 内置 Remotion 渲染核心固化就绪: ${BUNDLE_CACHE_DIR}，免源码秒级执行！`), 'green');
-        return Promise.resolve(BUNDLE_CACHE_DIR);
+      copyDirSafe(builtinDir, targetCacheDir);
+      if (fs.existsSync(indexHtml) && isRemotionBundleValid(targetCacheDir)) {
+        log(localizeScriptLog(`✅ [${moduleName}] 内置 Remotion 渲染核心固化就绪: ${targetCacheDir}，免源码秒级执行！`), 'green');
+        return Promise.resolve(targetCacheDir);
       }
     } catch (cpErr: any) {
       log(localizeScriptLog(`⚠️ 复制内置资源警告: ${cpErr.message}，直接挂载内置核心路径使用`), 'yellow');
@@ -1829,8 +1864,59 @@ function ensureRemotionBundle(forceRebuild = false): Promise<string> {
     }
   }
 
+  // 2. 独立模板快速派生机制：若已有基础 bundle 缓存且包含多模板代码，快速派生至专属模块目录
+  const fallbackBaseDir = path.resolve(ROOT_DIR, 'BundledCodeCache', 'CompareEnglishWord');
+  if (moduleName !== 'CompareEnglishWord' && isRemotionBundleValid(fallbackBaseDir)) {
+    log(localizeScriptLog(`📦 正在从已有核心包派生 [${moduleName}] 专属缓存目录: ${targetCacheDir}...`), 'blue');
+    try {
+      if (!fs.existsSync(targetCacheDir)) {
+        fs.mkdirSync(targetCacheDir, { recursive: true });
+      }
+      copyDirSafe(fallbackBaseDir, targetCacheDir);
+      // 清除专属缓存中的旧模块静态媒体资源目录，确保微积分缓存干净独立
+      const dirtySub = path.join(targetCacheDir, 'CompareEnglishWord');
+      if (fs.existsSync(dirtySub)) {
+        try { fs.rmSync(dirtySub, { recursive: true, force: true }); } catch (_) {}
+      }
+      if (isRemotionBundleValid(targetCacheDir)) {
+        log(localizeScriptLog(`✅ 成功就绪 [${moduleName}] 专属渲染核心缓存: ${targetCacheDir}`), 'green');
+        return Promise.resolve(targetCacheDir);
+      }
+    } catch (deriveErr: any) {
+      log(localizeScriptLog(`⚠️ 派生专属缓存跳过: ${deriveErr.message}`), 'yellow');
+    }
+  }
+
+  // 3. 源码环境动态编译：若存在 src/index.ts，通过 Remotion CLI 打包生成
+  const srcEntryPoint = path.resolve(ROOT_DIR, 'src/index.ts');
+  if (fs.existsSync(srcEntryPoint)) {
+    log(localizeScriptLog(`⚙️ 正在通过 Remotion CLI 编译 [${moduleName}] 专属渲染核心: ${targetCacheDir}...`), 'blue');
+    try {
+      if (!fs.existsSync(targetCacheDir)) {
+        fs.mkdirSync(targetCacheDir, { recursive: true });
+      }
+      const executor = getRemotionExecutor();
+      const bundleArgs = [...executor.baseArgs, 'bundle', srcEntryPoint, targetCacheDir, '--disable-web-security'];
+      const buildRes = spawnSync(executor.command, bundleArgs, {
+        cwd: ROOT_DIR,
+        shell: !executor.isNode,
+        stdio: 'inherit',
+        env: {
+          ...process.env,
+          NODE_PATH: buildEnhancedNodePath(),
+        },
+      });
+      if (buildRes.status === 0 && isRemotionBundleValid(targetCacheDir)) {
+        log(localizeScriptLog(`✅ [${moduleName}] Remotion 渲染核心编译成功: ${targetCacheDir}`), 'green');
+        return Promise.resolve(targetCacheDir);
+      }
+    } catch (bundleErr: any) {
+      log(localizeScriptLog(`⚠️ 动态编译 Remotion 核心失败: ${bundleErr.message}`), 'yellow');
+    }
+  }
+
   // 若运行缓存与内置包均未检测到，报告核心组件状态
-  const errMsg = localizeScriptLog(`❌ 客户端视频渲染核心组件缺失，未检测到内置预编译包。请重新安装客户端以恢复渲染功能。`);
+  const errMsg = localizeScriptLog(`❌ 客户端视频渲染核心组件缺失，未检测到 [${moduleName}] 预编译包。请重新安装客户端以恢复渲染功能。`);
   log(errMsg, 'red');
   return Promise.reject(new Error(errMsg));
 }
@@ -1909,13 +1995,14 @@ async function executeRemotionRender(
   outputFile: string,
   props: Record<string, any>,
   concurrency?: number | string,
-  compositionId: string = 'CompareEnglishWord'
+  compositionId: string = 'CompareEnglishWord',
+  moduleName: string = 'CompareEnglishWord'
 ): Promise<void> {
-  // 确保 Remotion 渲染包已就绪
-  const bundleTarget = await ensureRemotionBundle();
+  // 确保对应视频模块的 Remotion 渲染包已就绪
+  const bundleTarget = await ensureRemotionBundle(false, moduleName);
 
   // 仅在 CompareEnglishWord 渲染时同步专用本地静态素材
-  if (compositionId === 'CompareEnglishWord') {
+  if (moduleName === 'CompareEnglishWord' || compositionId === 'CompareEnglishWord') {
     log(localizeScriptLog(`📥 正在同步 Remotion 本地静态素材 (${getCdnDomain()}/CompareEnglishWord)...`), 'gray');
     await ensureBundleStaticAssets(bundleTarget, props.folder);
   }
@@ -2123,12 +2210,13 @@ async function renderVideoWithRemotion(
   outputFile: string,
   props: Record<string, any>,
   concurrency?: number | string,
-  compositionId: string = 'CompareEnglishWord'
+  compositionId: string = 'CompareEnglishWord',
+  moduleName: string = 'CompareEnglishWord'
 ): Promise<void> {
   const defaultConcurrency = '2';
   const initialConcurrency = globalAdaptiveConcurrency ?? (concurrency || defaultConcurrency);
   try {
-    await executeRemotionRender(outputFile, props, initialConcurrency, compositionId);
+    await executeRemotionRender(outputFile, props, initialConcurrency, compositionId, moduleName);
   } catch (err: any) {
     const isOom = Boolean(err?.isOom) || OOM_ERROR_REGEX.test(err?.message || '');
     const currentNum = Number(initialConcurrency);
@@ -2139,7 +2227,7 @@ async function renderVideoWithRemotion(
         try { fs.unlinkSync(outputFile); } catch {}
       }
       try {
-        await executeRemotionRender(outputFile, props, 1, compositionId);
+        await executeRemotionRender(outputFile, props, 1, compositionId, moduleName);
         log(localizeScriptLog(`✅ 降级并发度 1x 重新渲染成功!`), 'green');
         return;
       } catch (retryErr: any) {
@@ -2162,6 +2250,266 @@ export interface RenderWorkerOptions {
  * 专门处理微积分 AP Calculus MCQ 视频渲染流水线
  * 包含：中文视频渲染 (ApCalculusMCQ-Demo-ZH) 与 英文视频渲染 (ApCalculusMCQ-Demo-EN) 双版本自动生产与上云
  */
+
+/**
+ * 专门处理微积分 AP Calculus FRQ 视频渲染流水线
+ * 包含：中文视频渲染 (ApCalculusFRQ-Demo-ZH) 与 英文视频渲染 (ApCalculusFRQ-Demo-EN) 双版本自动生产与上云
+ */
+async function processApCalculusFRQTask(
+  task: any,
+  baseUrl: string,
+  options: RenderWorkerOptions = {}
+) {
+  const taskId = task.videoId || task.id;
+  const rawFolder = (task.folderPath || '').trim();
+  const cleanFolder = rawFolder
+    .replace(/^\/+|\/+$/g, '')
+    .replace(/^ApCalculusFRQ\//i, '') || `task_${taskId}`;
+
+  const rawEmail = (task.userEmail || '').trim();
+  const safeUserEmail = rawEmail
+    ? rawEmail.replace(/[\\/:*?"<>|]/g, '_')
+    : 'default_user';
+
+  let rawVideoName = cleanFolder;
+  if (!rawVideoName) {
+    rawVideoName = (task.title || '').trim() || `frq_${taskId}`;
+  }
+  const safeVideoName = path.basename(rawVideoName)
+    .replace(/[\\/:*?"<>|]/g, '_')
+    .replace(/\s+/g, '_');
+
+  const baseOutputDir = resolveBaseOutputDir();
+  const outputDir = path.join(baseOutputDir, 'ApCalculusFRQ', safeUserEmail, safeVideoName);
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+
+  log(`\n============================================================`, 'blue');
+  log(localizeScriptLog(`🎬 [微积分 FRQ] 开始渲染任务: [${taskId}] ${safeVideoName}`), 'blue');
+  log(localizeScriptLog(`📂 本地输出目录: ${outputDir}`), 'gray');
+  log(`============================================================`, 'blue');
+
+  // 解析 summaryData
+  let questionData: any = task.summaryData;
+  if (typeof questionData === 'string') {
+    try {
+      questionData = JSON.parse(questionData);
+    } catch (_) {
+      questionData = {};
+    }
+  } else {
+    questionData = { ...(questionData || {}) };
+  }
+
+  // 确保获取云端最新最完整的微积分 FRQ 题目结构与时间戳数据
+  try {
+    const summaryCdnUrl = `${getCdnDomain()}/ApCalculusFRQ/${cleanFolder}/summary.json?_t=${Date.now()}`;
+    const sRes = await fetch(summaryCdnUrl);
+    if (sRes.ok) {
+      const remoteData = await sRes.json();
+      if (remoteData && typeof remoteData === 'object') {
+        questionData = {
+          ...questionData,
+          ...remoteData,
+          audio_src_zh: remoteData.audio_src_zh || questionData.audio_src_zh || '',
+          audio_src_en: remoteData.audio_src_en || questionData.audio_src_en || '',
+          audio_src: remoteData.audio_src || questionData.audio_src || '',
+          total_duration_frames: remoteData.total_duration_frames || questionData.total_duration_frames,
+          totalDurationFrames: remoteData.totalDurationFrames || questionData.totalDurationFrames,
+        };
+        log(localizeScriptLog(`📥 已从云端同步最新微积分 FRQ 剧本与时间戳数据 (summary.json)`), 'gray');
+      }
+    } else {
+      const origCdnUrl = `${getCdnDomain()}/ApCalculusFRQ/${cleanFolder}/original.json?_t=${Date.now()}`;
+      const oRes = await fetch(origCdnUrl);
+      if (oRes.ok) {
+        const oData = await oRes.json();
+        if (oData && typeof oData === 'object') {
+          questionData = { ...questionData, ...oData };
+          log(localizeScriptLog(`📥 已从云端同步最新微积分 FRQ 原始数据 (original.json)`), 'gray');
+        }
+      }
+    }
+  } catch (_) { }
+
+  const taskRenderLangs: string[] = Array.isArray(questionData.renderLangs)
+    ? questionData.renderLangs
+    : Array.isArray(task.summaryData?.renderLangs)
+    ? task.summaryData.renderLangs
+    : ['zh', 'en'];
+
+  const specifiedLang = (options.lang || '').trim().toLowerCase();
+  const shouldRenderZh = !specifiedLang || specifiedLang === 'all' || specifiedLang === 'zh' || taskRenderLangs.includes('zh');
+  const shouldRenderEn = !specifiedLang || specifiedLang === 'all' || specifiedLang === 'en' || taskRenderLangs.includes('en');
+
+  const zhOutputFile = path.join(outputDir, `${safeVideoName}_zh.mp4`);
+  const enOutputFile = path.join(outputDir, `${safeVideoName}_en.mp4`);
+
+  // 1. 渲染中文版本 (使用微积分专属核心缓存 BundledCodeCache/ApCalculusFRQ)
+  if (shouldRenderZh) {
+    log(localizeScriptLog(`\n[1/2] 正在渲染中文视频 (ApCalculusFRQ-Demo-ZH)...`), 'blue');
+    const zhAudio =
+      questionData.audio_src_zh ||
+      questionData.meta?.audio_src_zh ||
+      (questionData.audio_src && !questionData.audio_src.includes('_en_') && !questionData.audio_src.includes('_en.') ? questionData.audio_src : undefined) ||
+      (task.audioPath && !task.audioPath.includes('_en_') && !task.audioPath.includes('_en.') ? task.audioPath : undefined);
+    const zhProps = {
+      question: questionData,
+      lang: 'zh',
+      showAudio: true,
+      audioSrc: zhAudio,
+    };
+    await renderVideoWithRemotion(zhOutputFile, zhProps, options.concurrency, 'ApCalculusFRQ-Demo-ZH', 'ApCalculusFRQ');
+    log(localizeScriptLog(`✅ 中文视频渲染完成: ${zhOutputFile}`), 'green');
+  }
+
+  // 2. 渲染英文版本 (使用微积分专属核心缓存 BundledCodeCache/ApCalculusFRQ)
+  if (shouldRenderEn) {
+    log(localizeScriptLog(`\n[2/2] 正在渲染英文视频 (ApCalculusFRQ-Demo-EN)...`), 'blue');
+    const enAudio =
+      questionData.audio_src_en ||
+      questionData.meta?.audio_src_en ||
+      (questionData.audio_src && !questionData.audio_src.includes('_zh_') && !questionData.audio_src.includes('_zh.') ? questionData.audio_src : undefined) ||
+      (task.audioPath && !task.audioPath.includes('_zh_') && !task.audioPath.includes('_zh.') ? task.audioPath : undefined);
+    const enProps = {
+      question: questionData,
+      lang: 'en',
+      showAudio: true,
+      audioSrc: enAudio,
+    };
+    await renderVideoWithRemotion(enOutputFile, enProps, options.concurrency, 'ApCalculusFRQ-Demo-EN', 'ApCalculusFRQ');
+    log(localizeScriptLog(`✅ 英文视频渲染完成: ${enOutputFile}`), 'green');
+  }
+
+  // 3. 上传视频
+  const uploadedVideos: Record<string, string> = {};
+  let primaryCdnUrl = '';
+  let primarySize = 0;
+
+  if (fs.existsSync(zhOutputFile)) {
+    primarySize = fs.statSync(zhOutputFile).size;
+  } else if (fs.existsSync(enOutputFile)) {
+    primarySize = fs.statSync(enOutputFile).size;
+  }
+
+  if (options.skipUpload) {
+    log(localizeScriptLog(`⏩ 跳过云端上传 (--skip-upload)`), 'gray');
+    if (shouldRenderZh && fs.existsSync(zhOutputFile)) {
+      primaryCdnUrl = zhOutputFile;
+      uploadedVideos['zh'] = zhOutputFile;
+    }
+    if (shouldRenderEn && fs.existsSync(enOutputFile)) {
+      if (!primaryCdnUrl) primaryCdnUrl = enOutputFile;
+      uploadedVideos['en'] = enOutputFile;
+    }
+  } else {
+    // 上传中文视频
+    if (shouldRenderZh && fs.existsSync(zhOutputFile)) {
+      log(localizeScriptLog(`\n☁️ 正在上传中文视频...`), 'blue');
+      let zhCdn = '';
+      if (HAS_R2_CONFIG) {
+        const r2Key = `ApCalculusFRQ/${cleanFolder}/${safeVideoName}_zh.mp4`;
+        await retryOperation(
+          async () => {
+            const res = await uploadToR2(r2Key, fs.readFileSync(zhOutputFile), 'video/mp4');
+            if (!res.success) {
+              throw new Error(res.error || localizeScriptLog('R2 上传接口返回失败'));
+            }
+            zhCdn = res.url || `${getCdnDomain()}/${r2Key}`;
+            return res;
+          },
+          3,
+          2500,
+          localizeScriptLog(`R2 微积分 FRQ 中文视频上传`)
+        );
+      } else {
+        const res = await uploadVideoViaServerProxy(
+          baseUrl,
+          taskId,
+          'zh',
+          zhOutputFile,
+          `${safeVideoName}_zh.mp4`,
+          task.folderPath,
+          CURRENT_AUTH_TOKEN,
+          !shouldRenderEn,
+          'ap-calculus-frq'
+        );
+        if (res.success && res.cdnUrl) zhCdn = res.cdnUrl;
+      }
+      if (zhCdn) {
+        uploadedVideos['zh'] = zhCdn;
+        primaryCdnUrl = zhCdn;
+        log(localizeScriptLog(`✅ 中文视频上传成功: ${zhCdn}`), 'green');
+      }
+    }
+
+    // 上传英文视频
+    if (shouldRenderEn && fs.existsSync(enOutputFile)) {
+      log(localizeScriptLog(`\n☁️ 正在上传英文视频...`), 'blue');
+      let enCdn = '';
+      if (HAS_R2_CONFIG) {
+        const r2Key = `ApCalculusFRQ/${cleanFolder}/${safeVideoName}_en.mp4`;
+        await retryOperation(
+          async () => {
+            const res = await uploadToR2(r2Key, fs.readFileSync(enOutputFile), 'video/mp4');
+            if (!res.success) {
+              throw new Error(res.error || localizeScriptLog('R2 上传接口返回失败'));
+            }
+            enCdn = res.url || `${getCdnDomain()}/${r2Key}`;
+            return res;
+          },
+          3,
+          2500,
+          localizeScriptLog(`R2 微积分 FRQ 英文视频上传`)
+        );
+      } else {
+        const res = await uploadVideoViaServerProxy(
+          baseUrl,
+          taskId,
+          'en',
+          enOutputFile,
+          `${safeVideoName}_en.mp4`,
+          task.folderPath,
+          CURRENT_AUTH_TOKEN,
+          true,
+          'ap-calculus-frq'
+        );
+        if (res.success && res.cdnUrl) enCdn = res.cdnUrl;
+      }
+      if (enCdn) {
+        uploadedVideos['en'] = enCdn;
+        if (!primaryCdnUrl) primaryCdnUrl = enCdn;
+        log(localizeScriptLog(`✅ 英文视频上传成功: ${enCdn}`), 'green');
+      }
+    }
+  }
+
+  if (!primaryCdnUrl) {
+    throw new Error(localizeScriptLog('微积分 FRQ 视频渲染产物未能成功生成或上传'));
+  }
+
+  // 4. 更新任务状态为已完成
+  log(localizeScriptLog(`\n📝 正在更新微积分 FRQ 视频任务状态为已完成 (video_finished)...`), 'blue');
+  const updateSuccess = await updateTaskStatus(
+    baseUrl,
+    taskId,
+    'video_finished',
+    primaryCdnUrl,
+    task.folderPath,
+    primarySize,
+    uploadedVideos,
+    CURRENT_AUTH_TOKEN,
+    'ap-calculus-frq'
+  );
+
+  if (updateSuccess) {
+    log(localizeScriptLog(`🎉 [微积分 FRQ] 任务 [${taskId}] 全部渲染与上传完成!`), 'green');
+  } else {
+    log(localizeScriptLog(`⚠️ [微积分 FRQ] 任务 [${taskId}] 视频已生成，但更新服务端状态失败`), 'yellow');
+  }
+}
+
 async function processApCalculusTask(
   task: any,
   baseUrl: string,
@@ -2171,7 +2519,7 @@ async function processApCalculusTask(
   const rawFolder = (task.folderPath || '').trim();
   const cleanFolder = rawFolder
     .replace(/^\/+|\/+$/g, '')
-    .replace(/^ApCalculusMCQ\//, '') || `task_${taskId}`;
+    .replace(/^ApCalculusMCQ\//i, '') || `task_${taskId}`;
 
   const rawEmail = (task.userEmail || '').trim();
   const safeUserEmail = rawEmail
@@ -2216,33 +2564,70 @@ async function processApCalculusTask(
     if (sRes.ok) {
       const remoteData = await sRes.json();
       if (remoteData && typeof remoteData === 'object') {
-        questionData = { ...remoteData, ...questionData };
+        questionData = {
+          ...questionData,
+          ...remoteData,
+          audio_src_zh: remoteData.audio_src_zh || questionData.audio_src_zh || '',
+          audio_src_en: remoteData.audio_src_en || questionData.audio_src_en || '',
+          audio_src: remoteData.audio_src || questionData.audio_src || '',
+          total_duration_frames: remoteData.total_duration_frames || questionData.total_duration_frames,
+          totalDurationFrames: remoteData.totalDurationFrames || questionData.totalDurationFrames,
+        };
         log(localizeScriptLog(`📥 已从云端同步最新微积分剧本与时间戳数据 (summary.json)`), 'gray');
       }
     }
   } catch (_) { }
 
-  // 1. 渲染中文版本
-  const zhOutputFile = path.join(outputDir, `${safeVideoName}_zh.mp4`);
-  log(localizeScriptLog(`\n[1/2] 正在渲染中文视频 (ApCalculusMCQ-Demo-ZH)...`), 'blue');
-  const zhProps = {
-    question: questionData,
-    lang: 'zh',
-    showAudio: true,
-  };
-  await renderVideoWithRemotion(zhOutputFile, zhProps, options.concurrency, 'ApCalculusMCQ-Demo-ZH');
-  log(localizeScriptLog(`✅ 中文视频渲染完成: ${zhOutputFile}`), 'green');
+  const taskRenderLangs: string[] = Array.isArray(questionData.renderLangs)
+    ? questionData.renderLangs
+    : Array.isArray(task.summaryData?.renderLangs)
+    ? task.summaryData.renderLangs
+    : ['zh', 'en'];
 
-  // 2. 渲染英文版本
+  const specifiedLang = (options.lang || '').trim().toLowerCase();
+  // 微积分 AP Calculus MCQ 模块支持中英双版本同时渲染：
+  // 无论传入参数是否带有单一语言，只要任务本身要求双语渲染（或 options 未限定单一语言），就同时渲染中英文双版本
+  const shouldRenderZh = !specifiedLang || specifiedLang === 'all' || specifiedLang === 'zh' || taskRenderLangs.includes('zh');
+  const shouldRenderEn = !specifiedLang || specifiedLang === 'all' || specifiedLang === 'en' || taskRenderLangs.includes('en');
+
+  const zhOutputFile = path.join(outputDir, `${safeVideoName}_zh.mp4`);
   const enOutputFile = path.join(outputDir, `${safeVideoName}_en.mp4`);
-  log(localizeScriptLog(`\n[2/2] 正在渲染英文视频 (ApCalculusMCQ-Demo-EN)...`), 'blue');
-  const enProps = {
-    question: questionData,
-    lang: 'en',
-    showAudio: true,
-  };
-  await renderVideoWithRemotion(enOutputFile, enProps, options.concurrency, 'ApCalculusMCQ-Demo-EN');
-  log(localizeScriptLog(`✅ 英文视频渲染完成: ${enOutputFile}`), 'green');
+
+  // 1. 渲染中文版本 (使用微积分专属核心缓存 BundledCodeCache/ApCalculusMCQ)
+  if (shouldRenderZh) {
+    log(localizeScriptLog(`\n[1/2] 正在渲染中文视频 (ApCalculusMCQ-Demo-ZH)...`), 'blue');
+    const zhAudio =
+      questionData.audio_src_zh ||
+      questionData.meta?.audio_src_zh ||
+      (questionData.audio_src && !questionData.audio_src.includes('_en_') && !questionData.audio_src.includes('_en.') ? questionData.audio_src : undefined) ||
+      (task.audioPath && !task.audioPath.includes('_en_') && !task.audioPath.includes('_en.') ? task.audioPath : undefined);
+    const zhProps = {
+      question: questionData,
+      lang: 'zh',
+      showAudio: true,
+      audioSrc: zhAudio,
+    };
+    await renderVideoWithRemotion(zhOutputFile, zhProps, options.concurrency, 'ApCalculusMCQ-Demo-ZH', 'ApCalculusMCQ');
+    log(localizeScriptLog(`✅ 中文视频渲染完成: ${zhOutputFile}`), 'green');
+  }
+
+  // 2. 渲染英文版本 (使用微积分专属核心缓存 BundledCodeCache/ApCalculusMCQ)
+  if (shouldRenderEn) {
+    log(localizeScriptLog(`\n[2/2] 正在渲染英文视频 (ApCalculusMCQ-Demo-EN)...`), 'blue');
+    const enAudio =
+      questionData.audio_src_en ||
+      questionData.meta?.audio_src_en ||
+      (questionData.audio_src && !questionData.audio_src.includes('_zh_') && !questionData.audio_src.includes('_zh.') ? questionData.audio_src : undefined) ||
+      (task.audioPath && !task.audioPath.includes('_zh_') && !task.audioPath.includes('_zh.') ? task.audioPath : undefined);
+    const enProps = {
+      question: questionData,
+      lang: 'en',
+      showAudio: true,
+      audioSrc: enAudio,
+    };
+    await renderVideoWithRemotion(enOutputFile, enProps, options.concurrency, 'ApCalculusMCQ-Demo-EN', 'ApCalculusMCQ');
+    log(localizeScriptLog(`✅ 英文视频渲染完成: ${enOutputFile}`), 'green');
+  }
 
   // 3. 上传视频
   const uploadedVideos: Record<string, string> = {};
@@ -2251,67 +2636,105 @@ async function processApCalculusTask(
 
   if (fs.existsSync(zhOutputFile)) {
     primarySize = fs.statSync(zhOutputFile).size;
+  } else if (fs.existsSync(enOutputFile)) {
+    primarySize = fs.statSync(enOutputFile).size;
   }
 
   if (options.skipUpload) {
     log(localizeScriptLog(`⏩ 跳过云端上传 (--skip-upload)`), 'gray');
-    primaryCdnUrl = zhOutputFile;
-    uploadedVideos['zh'] = zhOutputFile;
-    uploadedVideos['en'] = enOutputFile;
+    if (shouldRenderZh && fs.existsSync(zhOutputFile)) {
+      primaryCdnUrl = zhOutputFile;
+      uploadedVideos['zh'] = zhOutputFile;
+    }
+    if (shouldRenderEn && fs.existsSync(enOutputFile)) {
+      if (!primaryCdnUrl) primaryCdnUrl = enOutputFile;
+      uploadedVideos['en'] = enOutputFile;
+    }
   } else {
     // 上传中文视频
-    log(localizeScriptLog(`\n☁️ 正在上传中文视频...`), 'blue');
-    let zhCdn = '';
-    if (HAS_R2_CONFIG) {
-      const r2Key = `ApCalculusMCQ/${cleanFolder}/${safeVideoName}_zh.mp4`;
-      const uploaded = await uploadToR2(r2Key, fs.readFileSync(zhOutputFile), 'video/mp4');
-      if (uploaded) zhCdn = `${getCdnDomain()}/${r2Key}`;
-    } else {
-      const res = await uploadVideoViaServerProxy(
-        baseUrl,
-        taskId,
-        'zh',
-        zhOutputFile,
-        `${safeVideoName}_zh.mp4`,
-        task.folderPath,
-        CURRENT_AUTH_TOKEN,
-        false,
-        'ap-calculus-mcq'
-      );
-      if (res.success && res.cdnUrl) zhCdn = res.cdnUrl;
-    }
-    if (zhCdn) {
-      uploadedVideos['zh'] = zhCdn;
-      primaryCdnUrl = zhCdn;
-      log(localizeScriptLog(`✅ 中文视频上传成功: ${zhCdn}`), 'green');
+    if (shouldRenderZh && fs.existsSync(zhOutputFile)) {
+      log(localizeScriptLog(`\n☁️ 正在上传中文视频...`), 'blue');
+      let zhCdn = '';
+      if (HAS_R2_CONFIG) {
+        const r2Key = `ApCalculusMCQ/${cleanFolder}/${safeVideoName}_zh.mp4`;
+        await retryOperation(
+          async () => {
+            const res = await uploadToR2(r2Key, fs.readFileSync(zhOutputFile), 'video/mp4');
+            if (!res.success) {
+              throw new Error(res.error || localizeScriptLog('R2 上传接口返回失败'));
+            }
+            zhCdn = res.url || `${getCdnDomain()}/${r2Key}`;
+            return res;
+          },
+          3,
+          2500,
+          localizeScriptLog(`R2 微积分中文视频上传`)
+        );
+      } else {
+        const res = await uploadVideoViaServerProxy(
+          baseUrl,
+          taskId,
+          'zh',
+          zhOutputFile,
+          `${safeVideoName}_zh.mp4`,
+          task.folderPath,
+          CURRENT_AUTH_TOKEN,
+          !shouldRenderEn, // 若不渲染英文，则中文为最终产物标记已完成
+          'ap-calculus-mcq'
+        );
+        if (res.success && res.cdnUrl) zhCdn = res.cdnUrl;
+      }
+      if (zhCdn) {
+        uploadedVideos['zh'] = zhCdn;
+        primaryCdnUrl = zhCdn;
+        log(localizeScriptLog(`✅ 中文视频上传成功: ${zhCdn}`), 'green');
+      }
     }
 
     // 上传英文视频
-    log(localizeScriptLog(`\n☁️ 正在上传英文视频...`), 'blue');
-    let enCdn = '';
-    if (HAS_R2_CONFIG) {
-      const r2Key = `ApCalculusMCQ/${cleanFolder}/${safeVideoName}_en.mp4`;
-      const uploaded = await uploadToR2(r2Key, fs.readFileSync(enOutputFile), 'video/mp4');
-      if (uploaded) enCdn = `${getCdnDomain()}/${r2Key}`;
-    } else {
-      const res = await uploadVideoViaServerProxy(
-        baseUrl,
-        taskId,
-        'en',
-        enOutputFile,
-        `${safeVideoName}_en.mp4`,
-        task.folderPath,
-        CURRENT_AUTH_TOKEN,
-        true,
-        'ap-calculus-mcq'
-      );
-      if (res.success && res.cdnUrl) enCdn = res.cdnUrl;
+    if (shouldRenderEn && fs.existsSync(enOutputFile)) {
+      log(localizeScriptLog(`\n☁️ 正在上传英文视频...`), 'blue');
+      let enCdn = '';
+      if (HAS_R2_CONFIG) {
+        const r2Key = `ApCalculusMCQ/${cleanFolder}/${safeVideoName}_en.mp4`;
+        await retryOperation(
+          async () => {
+            const res = await uploadToR2(r2Key, fs.readFileSync(enOutputFile), 'video/mp4');
+            if (!res.success) {
+              throw new Error(res.error || localizeScriptLog('R2 上传接口返回失败'));
+            }
+            enCdn = res.url || `${getCdnDomain()}/${r2Key}`;
+            return res;
+          },
+          3,
+          2500,
+          localizeScriptLog(`R2 微积分英文视频上传`)
+        );
+      } else {
+        const res = await uploadVideoViaServerProxy(
+          baseUrl,
+          taskId,
+          'en',
+          enOutputFile,
+          `${safeVideoName}_en.mp4`,
+          task.folderPath,
+          CURRENT_AUTH_TOKEN,
+          true,
+          'ap-calculus-mcq'
+        );
+        if (res.success && res.cdnUrl) enCdn = res.cdnUrl;
+      }
+      if (enCdn) {
+        uploadedVideos['en'] = enCdn;
+        if (!primaryCdnUrl) primaryCdnUrl = enCdn;
+        log(localizeScriptLog(`✅ 英文视频上传成功: ${enCdn}`), 'green');
+      }
     }
-    if (enCdn) {
-      uploadedVideos['en'] = enCdn;
-      if (!primaryCdnUrl) primaryCdnUrl = enCdn;
-      log(localizeScriptLog(`✅ 英文视频上传成功: ${enCdn}`), 'green');
-    }
+  }
+
+  // 严谨校验：如果未成功获取主视频 URL，禁止标记已完成
+  if (!primaryCdnUrl) {
+    throw new Error(localizeScriptLog('微积分视频渲染产物未能成功生成或上传'));
   }
 
   // 4. 更新任务状态为已完成
@@ -2341,6 +2764,10 @@ async function processSingleTask(
   baseUrl: string,
   options: RenderWorkerOptions = {}
 ) {
+    // 识别微积分 AP Calculus FRQ 模块任务并执行双语渲染流程
+  if (detectTaskModule(task) === 'ap-calculus-frq') {
+    return await processApCalculusFRQTask(task, baseUrl, options);
+  }
   // 识别微积分 AP Calculus MCQ 模块任务并执行双语渲染流程
   if (detectTaskModule(task) === 'ap-calculus-mcq') {
     return await processApCalculusTask(task, baseUrl, options);
@@ -2885,8 +3312,8 @@ async function triggerQueue(
         const clientScope = options.scope || (IS_ELECTRON_CLIENT ? 'current_user' : 'all_users');
         const nextTask = await claimNextTaskAnyModule(baseUrl, CURRENT_AUTH_TOKEN, clientScope);
         if (nextTask) {
-          const modName = nextTask.__module === 'ap-calculus-mcq' ? '[微积分 MCQ]' : '[对比学单词]';
-          const taskDesc = nextTask.__module === 'ap-calculus-mcq'
+          const modName = nextTask.__module === 'ap-calculus-frq' ? '[微积分 FRQ]' : nextTask.__module === 'ap-calculus-mcq' ? '[微积分 MCQ]' : '[对比学单词]';
+          const taskDesc = nextTask.__module === 'ap-calculus-frq' || nextTask.__module === 'ap-calculus-mcq'
             ? `${nextTask.title || nextTask.folderPath || nextTask.id}`
             : `${nextTask.wordA} vs ${nextTask.wordB}`;
           log(localizeScriptLog(`\n⚡ [流水线接续抢单] 成功锁定待渲染任务: ${modName} [${nextTask.videoId || nextTask.id}] ${taskDesc}`), 'green');
@@ -2922,7 +3349,7 @@ async function listenSSEForModule(
   options: RenderWorkerOptions = {}
 ) {
   const eventsUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/${module}/events/`;
-  const modLabel = module === 'ap-calculus-mcq' ? '微积分 MCQ' : '对比学单词';
+  const modLabel = module === 'ap-calculus-frq' ? '微积分 FRQ' : module === 'ap-calculus-mcq' ? '微积分 MCQ' : '对比学单词';
 
   while (true) {
     try {
@@ -3009,6 +3436,9 @@ async function startSSEListener(
   listenSSEForModule(baseUrl, 'ap-calculus-mcq', options).catch((err) => {
     log(localizeScriptLog(`[微积分 MCQ] SSE 线程异常: ${err.message}`), 'red');
   });
+  listenSSEForModule(baseUrl, 'ap-calculus-frq', options).catch((err) => {
+    log(localizeScriptLog(`[微积分 FRQ] SSE 线程异常: ${err.message}`), 'red');
+  });
 }
 
 // ── 7. 主启动入口 / 调度循环 ───────────────────────────────────────────
@@ -3036,11 +3466,17 @@ async function main() {
 
   const options: RenderWorkerOptions = { skipUpload, concurrency, lang: targetLang, scope: clientScope };
 
-  // 启动即主动预热/固化 Remotion Bundle，确保独立客户端完全脱离源码也能秒级免打包就绪
+  // 启动即主动预热/固化各个模板模块的 Remotion Bundle，确保独立客户端完全脱离源码也能秒级免打包就绪
   const rebuildBundle = args.includes('--rebuild-bundle') || args.includes('--clean-bundle');
   try {
-    await ensureRemotionBundle(rebuildBundle);
+    await ensureRemotionBundle(rebuildBundle, 'CompareEnglishWord');
+    await ensureRemotionBundle(rebuildBundle, 'ApCalculusMCQ');
+    await ensureRemotionBundle(rebuildBundle, 'ApCalculusFRQ');
   } catch (_) { }
+
+  const cewCache = getBundleCacheDir('CompareEnglishWord');
+  const mcqCache = getBundleCacheDir('ApCalculusMCQ');
+  const frqCache = getBundleCacheDir('ApCalculusFRQ');
 
   console.clear();
   log(`============================================================`, 'green');
@@ -3054,7 +3490,9 @@ async function main() {
   log(localizeScriptLog(`🌐 目标服务端: ${baseUrl}`), 'blue');
   log(localizeScriptLog(`☁️ 视频上传通道: ${HAS_R2_CONFIG ? '⚡ 本地直传模式 (Local R2)' : '🌐 服务端安全代理模式 (Server R2 Proxy)'}`), 'green');
   log(localizeScriptLog(`🔑 用户会话鉴权: ${CURRENT_AUTH_TOKEN ? '✅ 已绑定当前用户 Token (安全会话)' : '⚠️ 未传入 Token (公共无鉴权模式)'}`), CURRENT_AUTH_TOKEN ? 'green' : 'yellow');
-  log(localizeScriptLog(`⚡ Remotion 缓存: ${fs.existsSync(path.join(BUNDLE_CACHE_DIR, 'index.html')) ? '✅ 已就绪 (秒级免打包)' : '⏳ 首次任务将自动构建并固化缓存'} (${BUNDLE_CACHE_DIR})`), 'blue');
+  log(localizeScriptLog(`⚡ Remotion 缓存 (单词对比): ${fs.existsSync(path.join(cewCache, 'index.html')) ? '✅ 已就绪 (秒级免打包)' : '⏳ 首次任务自动固化'} (${cewCache})`), 'blue');
+  log(localizeScriptLog(`⚡ Remotion 缓存 (微积分 MCQ): ${fs.existsSync(path.join(mcqCache, 'index.html')) ? '✅ 已就绪 (秒级免打包)' : '⏳ 首次任务自动固化'} (${mcqCache})`), 'blue');
+  log(localizeScriptLog(`⚡ Remotion 缓存 (微积分 FRQ): ${fs.existsSync(path.join(frqCache, 'index.html')) ? '✅ 已就绪 (秒级免打包)' : '⏳ 首次任务自动固化'} (${frqCache})`), 'blue');
   log(localizeScriptLog(`🔁 运行模式: ${isOnce ? '单次执行 (--once)' : '后台守护监听'}`), 'blue');
   log(`============================================================\n`, 'green');
 
@@ -3079,8 +3517,8 @@ async function main() {
       if (!isProcessingQueue && pendingQueue.length === 0 && currentRunningTaskId == null) {
         const claimedTask = await claimNextTaskAnyModule(baseUrl, CURRENT_AUTH_TOKEN, clientScope);
         if (claimedTask) {
-          const modName = claimedTask.__module === 'ap-calculus-mcq' ? '[微积分 MCQ]' : '[对比学单词]';
-          const taskDesc = claimedTask.__module === 'ap-calculus-mcq'
+          const modName = claimedTask.__module === 'ap-calculus-frq' ? '[微积分 FRQ]' : claimedTask.__module === 'ap-calculus-mcq' ? '[微积分 MCQ]' : '[对比学单词]';
+          const taskDesc = claimedTask.__module === 'ap-calculus-frq' || claimedTask.__module === 'ap-calculus-mcq'
             ? `${claimedTask.title || claimedTask.folderPath || claimedTask.id}`
             : `${claimedTask.wordA} vs ${claimedTask.wordB}`;
           log(localizeScriptLog(`\n⚡ [轮询抢单] 成功锁定待渲染任务: ${modName} [${claimedTask.videoId || claimedTask.id}] ${taskDesc}`), 'green');
