@@ -1712,7 +1712,7 @@ function buildEnhancedNodePath(): string {
  * 校验 Remotion Bundle 是否属于当前匹配的 4.0.534 版本
  * 严格防止复用 4.0.520 的旧缓存导致版本不匹配警告
  */
-function isRemotionBundleValid(bundleDir: string): boolean {
+function isRemotionBundleValid(bundleDir: string, moduleName?: string): boolean {
   const indexHtml = path.join(bundleDir, 'index.html');
   const bundleJs = path.join(bundleDir, 'bundle.js');
   if (!fs.existsSync(indexHtml) || !fs.existsSync(bundleJs)) {
@@ -1808,7 +1808,7 @@ function getBuiltinBundleDir(moduleName: string = 'CompareEnglishWord'): string 
   ].filter(Boolean) as string[];
 
   for (const bDir of builtInBundleDirs) {
-    if (isRemotionBundleValid(bDir)) {
+    if (isRemotionBundleValid(bDir, moduleName)) {
       return bDir;
     }
   }
@@ -1838,7 +1838,7 @@ function ensureRemotionBundle(forceRebuild = false, moduleName: string = 'Compar
     } catch (_) {}
   }
 
-  if (!forceRebuild && !cacheStale && isRemotionBundleValid(targetCacheDir)) {
+  if (!forceRebuild && !cacheStale && isRemotionBundleValid(targetCacheDir, moduleName)) {
     log(localizeScriptLog(`⚡ 检测到已有 [${moduleName}] Remotion 渲染核心缓存 (4.0.534): ${targetCacheDir}，直接复用免打包`), 'green');
     return Promise.resolve(targetCacheDir);
   } else if (!forceRebuild && (fs.existsSync(indexHtml) || cacheStale)) {
@@ -1854,7 +1854,7 @@ function ensureRemotionBundle(forceRebuild = false, moduleName: string = 'Compar
         fs.mkdirSync(targetCacheDir, { recursive: true });
       }
       copyDirSafe(builtinDir, targetCacheDir);
-      if (fs.existsSync(indexHtml) && isRemotionBundleValid(targetCacheDir)) {
+      if (fs.existsSync(indexHtml) && isRemotionBundleValid(targetCacheDir, moduleName)) {
         log(localizeScriptLog(`✅ [${moduleName}] 内置 Remotion 渲染核心固化就绪: ${targetCacheDir}，免源码秒级执行！`), 'green');
         return Promise.resolve(targetCacheDir);
       }
@@ -1866,7 +1866,7 @@ function ensureRemotionBundle(forceRebuild = false, moduleName: string = 'Compar
 
   // 2. 独立模板快速派生机制：若已有基础 bundle 缓存且包含多模板代码，快速派生至专属模块目录
   const fallbackBaseDir = path.resolve(ROOT_DIR, 'BundledCodeCache', 'CompareEnglishWord');
-  if (moduleName !== 'CompareEnglishWord' && isRemotionBundleValid(fallbackBaseDir)) {
+  if (moduleName !== 'CompareEnglishWord' && isRemotionBundleValid(fallbackBaseDir, moduleName)) {
     log(localizeScriptLog(`📦 正在从已有核心包派生 [${moduleName}] 专属缓存目录: ${targetCacheDir}...`), 'blue');
     try {
       if (!fs.existsSync(targetCacheDir)) {
@@ -1878,7 +1878,7 @@ function ensureRemotionBundle(forceRebuild = false, moduleName: string = 'Compar
       if (fs.existsSync(dirtySub)) {
         try { fs.rmSync(dirtySub, { recursive: true, force: true }); } catch (_) {}
       }
-      if (isRemotionBundleValid(targetCacheDir)) {
+      if (isRemotionBundleValid(targetCacheDir, moduleName)) {
         log(localizeScriptLog(`✅ 成功就绪 [${moduleName}] 专属渲染核心缓存: ${targetCacheDir}`), 'green');
         return Promise.resolve(targetCacheDir);
       }
@@ -1896,7 +1896,7 @@ function ensureRemotionBundle(forceRebuild = false, moduleName: string = 'Compar
         fs.mkdirSync(targetCacheDir, { recursive: true });
       }
       const executor = getRemotionExecutor();
-      const bundleArgs = [...executor.baseArgs, 'bundle', srcEntryPoint, targetCacheDir, '--disable-web-security'];
+      const bundleArgs = [...executor.baseArgs, 'bundle', srcEntryPoint, `--out-dir=${targetCacheDir}`, '--disable-web-security'];
       const buildRes = spawnSync(executor.command, bundleArgs, {
         cwd: ROOT_DIR,
         shell: !executor.isNode,
@@ -1906,7 +1906,7 @@ function ensureRemotionBundle(forceRebuild = false, moduleName: string = 'Compar
           NODE_PATH: buildEnhancedNodePath(),
         },
       });
-      if (buildRes.status === 0 && isRemotionBundleValid(targetCacheDir)) {
+      if (buildRes.status === 0 && isRemotionBundleValid(targetCacheDir, moduleName)) {
         log(localizeScriptLog(`✅ [${moduleName}] Remotion 渲染核心编译成功: ${targetCacheDir}`), 'green');
         return Promise.resolve(targetCacheDir);
       }
