@@ -2,16 +2,20 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "CommonJS",
-    "lib": ["ES2022", "DOM"],
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
     "skipLibCheck": true,
     "sourceMap": true,
     "rootDir": "electron",
     "outDir": "dist-electron",
     "moduleResolution": "node",
-    "ignoreDeprecations": "6.0",
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "strict": true
   },
-  "include": ["electron/**/*"]
+  "include": [
+    "electron/**/*"
+  ]
 }
