@@ -8,6 +8,7 @@
     "rootDir": "electron",
     "outDir": "dist-electron",
     "moduleResolution": "node",
+    "ignoreDeprecations": "6.0",
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "strict": true
