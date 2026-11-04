@@ -295,9 +295,7 @@ export class RenderManager {
    */
   private parseProgress(text: string): RenderLogEntry['progress'] | undefined {
     // 匹配中文渲染进度: 渲染进度: 72.3% (5600/7749 帧) | 剩余预计: 2m 38s
-    const mZh = text.match(/渲染进度[:：]?\s*([\d\.]+)%\s*\((\d+)\/(\d+)\s*帧\)(?:.*?剩余预计[:：]?\s*([^
-
-]+))?/i);
+    const mZh = text.match(/渲染进度[:：]?\s*([\d\.]+)%\s*\((\d+)\/(\d+)\s*帧\)(?:.*?剩余预计[:：]?\s*([^\r\n]+))?/i);
     if (mZh) {
       const pct = parseFloat(mZh[1]);
       const cur = parseInt(mZh[2], 10);
