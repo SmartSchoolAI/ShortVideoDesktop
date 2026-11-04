@@ -41,6 +41,7 @@ export class RenderManager {
   private nextLogId = 1;
   private activeProgressLogId: number | null = null;
   private activeIdleLogId: number | null = null;
+  private activeNoiseLogId: number | null = null;
   private status: RenderStatus = 'idle';
   private startTime: number | null = null;
   private endTime: number | null = null;
@@ -235,7 +236,20 @@ export class RenderManager {
     return /Rendered\s+\d+\/\d+/i.test(t) ||
       /time remaining/i.test(t) ||
       /Rendering frame\s+\d+/i.test(t) ||
-      /\[\s*\d+%\s*\]/i.test(t);
+      /\[\s*\d+%\s*\]/i.test(t) ||
+      /渲染进度/i.test(t) ||
+      /Rendering progress/i.test(t);
+  }
+
+  /**
+   * 判断是否为 Chromium / React 内部无害噪音日志 (如 Tab 0/1 react-dom-client 堆栈)
+   */
+  private isNoisyInternalLog(t: string): boolean {
+    if (!t) return false;
+    return /react-dom-client\.production\.js/i.test(t) ||
+      /Tab\s+\d+,\s*node_modules.*react-dom/i.test(t) ||
+      /Tab\s+\d+.*react-dom-client/i.test(t) ||
+      /Download the React DevTools/i.test(t);
   }
 
   /**
@@ -280,6 +294,22 @@ export class RenderManager {
    * 解析日志文本中的帧进度与百分比
    */
   private parseProgress(text: string): RenderLogEntry['progress'] | undefined {
+    // 匹配中文渲染进度: 渲染进度: 72.3% (5600/7749 帧) | 剩余预计: 2m 38s
+    const mZh = text.match(/渲染进度[:：]?\s*([\d\.]+)%\s*\((\d+)\/(\d+)\s*帧\)(?:.*?剩余预计[:：]?\s*([^
+
+]+))?/i);
+    if (mZh) {
+      const pct = parseFloat(mZh[1]);
+      const cur = parseInt(mZh[2], 10);
+      const tot = parseInt(mZh[3], 10);
+      return {
+        current: cur,
+        total: tot,
+        percent: pct,
+        eta: mZh[4] ? mZh[4].trim() : undefined,
+      };
+    }
+
     // 匹配 Remotion 输出: Rendered 416/607, time remaining: 9s
     const m = text.match(/Rendered\s+(\d+)\/(\d+)(?:,\s*time remaining:\s*([0-9a-zA-Z\s]+))?/i);
     if (m) {
@@ -318,7 +348,9 @@ export class RenderManager {
     const isProgressText = this.isRenderProgress(text);
     const isIdleText = this.isIdleWaitLog(text);
 
-    // 1. 如果是渲染帧进度日志 (如 Rendered 133/660...)，持续原地覆写该行
+    const isNoiseText = this.isNoisyInternalLog(text);
+
+    // 1. 如果是渲染帧进度日志 (如 Rendered 133/660... 或 渲染进度: 72.3%)，持续原地覆写该行，绝不换行
     if (isProgressText) {
       if (this.activeProgressLogId !== null) {
         const existing = this.logs.find((l) => l.id === this.activeProgressLogId);
@@ -350,6 +382,19 @@ export class RenderManager {
       }
     }
 
+    // 3. 如果是 Chromium / React DOM 内部无害追踪噪音，持续原地折叠计数，绝不在主控制台交替刷屏
+    if (isNoiseText) {
+      if (this.activeNoiseLogId !== null) {
+        const existing = this.logs.find((l) => l.id === this.activeNoiseLogId);
+        if (existing) {
+          existing.timestamp = timestamp;
+          existing.count = (existing.count || 1) + 1;
+          this.broadcast('render:log-update', existing);
+          return;
+        }
+      }
+    }
+
     // 3. 通用相似连续日志合并 (如连续重复的普通输出)
     const lastLog = this.logs.length > 0 ? this.logs[this.logs.length - 1] : null;
     if (lastLog && lastLog.type === type && this.isSimilarProgressLog(lastLog.text, text)) {
@@ -372,6 +417,7 @@ export class RenderManager {
     // 若一个渲染阶段结束或进入新步骤（如完成、失败、开始新语言），重置 activeProgressLogId
     if (text.includes('渲染完成') || text.includes('渲染失败') || text.includes('▶️') || text.includes('🏆') || text.includes('全部')) {
       this.activeProgressLogId = null;
+      this.activeNoiseLogId = null;
     }
 
     const entry: RenderLogEntry = {
@@ -387,6 +433,8 @@ export class RenderManager {
       this.activeProgressLogId = entry.id;
     } else if (isIdleText) {
       this.activeIdleLogId = entry.id;
+    } else if (isNoiseText) {
+      this.activeNoiseLogId = entry.id;
     }
 
     if (progress) {
@@ -405,6 +453,7 @@ export class RenderManager {
     this.logs = [];
     this.activeProgressLogId = null;
     this.activeIdleLogId = null;
+    this.activeNoiseLogId = null;
     this.broadcast('render:cleared', {});
   }
 
