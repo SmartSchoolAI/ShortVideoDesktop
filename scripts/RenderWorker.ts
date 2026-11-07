@@ -1303,6 +1303,63 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
       "ru": "Повторный рендеринг успешно завершен после снижения параллелизма до 1x!",
       "tr": "Eşzamanlılık 1x'e düşürüldükten sonra yeniden işleme başarılı!",
     }
+  },
+  {
+    regex: /⚠️ 同类型错误 \[(.*?)\] 连续出现 \((\d+)\/(\d+)\) 次/g,
+    translations: {
+      "zh": "⚠️ 同类型错误 [$1] 连续出现 ($2/$3) 次",
+      "en": "⚠️ Consecutive error of the same type [$1] occurred ($2/$3) times",
+      "ja": "⚠️ 同じ種類のエラー [$1] が連続で ($2/$3) 回発生しました",
+      "ko": "⚠️ 동일한 유형의 오류 [$1]가 연속 ($2/$3)회 발생했습니다",
+      "vi": "⚠️ Lỗi cùng loại [$1] xuất hiện liên tiếp ($2/$3) lần",
+      "th": "⚠️ ข้อผิดพลาดประเภทเดียวกัน [$1] เกิดขึ้นติดต่อกัน ($2/$3) ครั้ง",
+      "id": "⚠️ Kesalahan jenis yang sama [$1] terjadi berturut-turut ($2/$3) kali",
+      "es": "⚠️ El error del mismo tipo [$1] ocurrió consecutivamente ($2/$3) veces",
+      "fr": "⚠️ L'erreur du même type [$1] s'est produite consécutivement ($2/$3) fois",
+      "pt": "⚠️ Erro do mesmo tipo [$1] ocorreu consecutivamente ($2/$3) vezes",
+      "de": "⚠️ Fehler desselben Typs [$1] ist ($2/$3) Mal hintereinander aufgetreten",
+      "it": "⚠️ Si è verificato consecutivamente l'errore dello stesso tipo [$1] ($2/$3) volte",
+      "ru": "⚠️ Ошибка одного типа [$1] произошла подряд ($2/$3) раз(а)",
+      "tr": "⚠️ Aynı tür hata [$1] art arda ($2/$3) kez meydana geldi",
+    }
+  },
+  {
+    regex: /🛑 \[熔断机制触发\] 同类型错误 \[(.*?)\] 已连续出现 3 次，为防止系统无限死循环重试，立即停止执行后续渲染操作！/g,
+    translations: {
+      "zh": "🛑 [熔断机制触发] 同类型错误 [$1] 已连续出现 3 次，为防止系统无限死循环重试，立即停止执行后续渲染操作！",
+      "en": "🛑 [Circuit Breaker Tripped] Same error type [$1] occurred 3 times consecutively. Halting rendering operations immediately to prevent infinite retry loops!",
+      "ja": "🛑 [サーキットブレーカー発動] 同じ種類のエラー [$1] が3回連続で発生したため、無限ループを防ぐためレンダリング操作を直ちに停止します！",
+      "ko": "🛑 [회로 차단기 작동] 동일한 유형의 오류 [$1]가 3회 연속 발생하여 무한 루프 재시도를 방지하기 위해 렌더링 작업을 즉시 중단합니다!",
+      "vi": "🛑 [Cơ chế ngắt mạch kích hoạt] Lỗi cùng loại [$1] đã xảy ra 3 lần liên tiếp, dừng ngay thao tác kết xuất để tránh vòng lặp thử lại vô hạn!",
+      "th": "🛑 [เบรกเกอร์ทำงาน] เกิดข้อผิดพลาดประเภทเดียวกัน [$1] ติดต่อกัน 3 ครั้งแล้ว หยุดการเรนเดอร์ทันทีเพื่อป้องกันการลองใหม่แบบวนซ้ำไม่รู้จบ!",
+      "id": "🛑 [Pemutus Sirkuit Dipicu] Kesalahan jenis yang sama [$1] telah terjadi 3 kali berturut-turut, segera menghentikan operasi perenderan untuk mencegah pengulangan tak terbatas!",
+      "es": "🛑 [Disyuntor Activado] El mismo tipo de error [$1] ocurrió 3 veces consecutivas. ¡Deteniendo las operaciones de renderizado inmediatamente para evitar bucles infinitos de reintento!",
+      "fr": "🛑 [Disjoncteur Déclenché] Le même type d'erreur [$1] s'est produit 3 fois consécutivement. Arrêt immédiat des opérations de rendu pour éviter les boucles infinies !",
+      "pt": "🛑 [Disjuntor Acionado] O mesmo tipo de erro [$1] ocorreu 3 vezes consecutivas. Interrompendo as operações de renderização imediatamente para evitar loops infinitos!",
+      "de": "🛑 [Schutzschalter ausgelöst] Derselbe Fehlertyp [$1] ist 3 Mal hintereinander aufgetreten. Der Rendering-Vorgang wird sofort gestoppt, um Endlosschleifen zu vermeiden!",
+      "it": "🛑 [Interruttore automatico scattato] Lo stesso tipo di errore [$1] si è verificato per 3 volte consecutive. Interruzione immediata del rendering per evitare cicli infiniti!",
+      "ru": "🛑 [Сработал автоматический выключатель] Ошибка одного типа [$1] произошла подряд 3 раза. Немедленная остановка операций рендеринга для предотвращения бесконечного цикла!",
+      "tr": "🛑 [Devre Kesici Tetiklendi] Aynı hata türü [$1] art arda 3 kez meydana geldi. Sonsuz yeniden deneme döngüsünü önlemek için işleme işlemleri derhal durduruluyor!",
+    }
+  },
+  {
+    regex: /🛑 渲染器已触发同类错误 3 次熔断机制并停止，请排查原因修复后重新启动。/g,
+    translations: {
+      "zh": "🛑 渲染器已触发同类错误 3 次熔断机制并停止，请排查原因修复后重新启动。",
+      "en": "🛑 The renderer has stopped due to tripping the 3-consecutive-same-error circuit breaker. Please investigate, fix the issue, and restart.",
+      "ja": "🛑 レンダラーは同じエラーが3回連続したためサーキットブレーカーにより停止しました。原因を確認・修正してから再起動してください。",
+      "ko": "🛑 동일 오류 3회 발생 회로 차단기가 작동하여 렌더러가 중지되었습니다. 원인을 조사 및 해결한 후 다시 시작하십시오.",
+      "vi": "🛑 Trình kết xuất đã dừng do kích hoạt ngắt mạch lỗi 3 lần liên tiếp. Vui lòng kiểm tra, khắc phục sự cố và khởi động lại.",
+      "th": "🛑 ตัวเรนเดอร์หยุดทำงานเนื่องจากเบรกเกอร์ตรวจพบข้อผิดพลาดเดิมติดต่อกัน 3 ครั้ง กรุณาตรวจสอบ แก้ไขปัญหา และเริ่มต้นใหม่",
+      "id": "🛑 Perender telah berhenti karena memicu pemutus sirkuit 3 kali kesalahan berturut-turut. Silakan periksa, perbaiki masalah, dan mulai ulang.",
+      "es": "🛑 El renderizador se ha detenido debido a la activación del disyuntor por 3 errores idénticos consecutivos. Investigue, solucione el problema y reinicie.",
+      "fr": "🛑 Le moteur de rendu s'est arrêté après le déclenchement du disjoncteur (3 erreurs identiques consécutives). Veuillez corriger le problème puis redémarrer.",
+      "pt": "🛑 O renderizador parou devido ao acionamento do disjuntor por 3 erros consecutivos iguais. Investigue, corrija o problema e reinicie.",
+      "de": "🛑 Der Renderer wurde gestoppt, da der Schutzschalter nach 3 identischen Fehlern ausgelöst wurde. Bitte beheben Sie den Fehler und starten Sie neu.",
+      "it": "🛑 Il motore di rendering si è arrestato dopo l'intervento dell'interruttore automatico per 3 errori consecutivi. Risolvere il problema e riavviare.",
+      "ru": "🛑 Рендерер остановлен из-за срабатывания выключателя при 3 одинаковых ошибках подряд. Устраните проблему и перезапустите.",
+      "tr": "🛑 Oluşturucu, 3 ardışık aynı hata devre kesicisinin tetiklenmesi nedeniyle durduruldu. Lütfen sorunu giderin ve yeniden başlatın.",
+    }
   }
 ];
 
@@ -2108,6 +2165,7 @@ async function executeRemotionRender(
     let stdoutBuffer = '';
     let isOomError = false;
     let hasLoggedOomWarning = false;
+    const recentErrorLines: string[] = [];
 
     // 过滤掉内部 FFmpeg 与浏览器崩溃时倾泻的大量底层编译配置、模块版本、以及堆栈调试杂音
     const NOISY_FFMPEG_LOG_REGEX = /^(?:ffmpeg version|built with|configuration:\s*--prefix|libavutil|libavcodec|libavformat|libavdevice|libavfilter|libswscale|libswresample|libpostproc|\[swscaler\s*@|\[libx264\s*@|\[vost#|\[vf#|\[out#|Conversion failed!|Nothing was written into output file|Terminating thread with return code|Task finished with error code|at renderFramesProc|at async renderFrameWithOptionToReject|Error:\s*FFmpeg quit with code|x264\s*\[error\]:\s*malloc.*failed|.*net::ERR_INSUFFICIENT_RESOURCES|.*ProtocolError:\s*Protocol error|.*Target closed|.*remotion\.dev\/docs\/target-closed)/i;
@@ -2131,6 +2189,15 @@ async function executeRemotionRender(
             }
             log(localizeScriptLog('⚠️ [内存告警] 2x 并发下系统资源受限 (ERR_INSUFFICIENT_RESOURCES / malloc failed)'), 'yellow');
           }
+        }
+
+        // 收集关键错误特征行用于智能熔断分类判定
+        if (
+          /error|exception|referenceerror|typeerror|syntaxerror|inputrange/i.test(trimmedLine) &&
+          !NOISY_FFMPEG_LOG_REGEX.test(trimmedLine)
+        ) {
+          recentErrorLines.push(trimmedLine);
+          if (recentErrorLines.length > 10) recentErrorLines.shift();
         }
 
         // 屏蔽 FFmpeg 崩溃时底层的冗长日志输出
@@ -2194,12 +2261,15 @@ async function executeRemotionRender(
       if (code === 0) {
         resolve();
       } else {
+        const errorDetail = recentErrorLines.filter(Boolean).join('\n');
+        const defaultMsg = localizeScriptLog(`Remotion 渲染进程异常退出，状态码: ${code}`);
         const errorMsg = isOomError
           ? localizeScriptLog('检测到渲染内存不足 (Out of memory / malloc failed)')
-          : localizeScriptLog(`Remotion 渲染进程异常退出，状态码: ${code}`);
+          : (errorDetail || defaultMsg);
         const err: any = new Error(errorMsg);
         err.isOom = isOomError;
         err.exitCode = code;
+        err.errorSnippet = errorDetail;
         reject(err);
       }
     });
@@ -3362,16 +3432,114 @@ async function processSingleTask(
   }
 }
 
-// ── 5.   ──────────────────────────────────────────────
+// ── 5. 渲染任务队列与同类错误熔断机制 ──────────────────────────────────────
 let isProcessingQueue = false;
 let currentRunningTaskId: string | number | null = null;
 const pendingQueue: any[] = [];
+
+// 同类错误连续触发熔断保护 (防止无限重试死循环)
+let consecutiveSameErrorCount = 0;
+let lastErrorCategory: string | null = null;
+const MAX_CONSECUTIVE_SAME_ERROR = 3;
+let isCircuitBreakerTripped = false;
+
+function resetErrorCircuitBreaker() {
+  if (consecutiveSameErrorCount > 0 || lastErrorCategory !== null) {
+    consecutiveSameErrorCount = 0;
+    lastErrorCategory = null;
+  }
+}
+
+function extractErrorCategory(err: any): string {
+  if (!err) return 'UnknownError';
+  const fullText = [
+    err.message,
+    err.errorSnippet,
+    err.details,
+    err.stderr,
+    err.stdout,
+    String(err),
+  ].filter(Boolean).join(' ');
+
+  // 1. Remotion 单调递增区间校验失败 (inputRange must be strictly monotonically increasing)
+  if (fullText.includes('inputRange must be strictly monotonically increasing')) {
+    return 'RemotionMonotonicInputRangeError';
+  }
+  // 2. ReferenceError: xxx is not defined
+  if (fullText.includes('ReferenceError')) {
+    const match = fullText.match(/ReferenceError:\s*(\w+)/);
+    return match ? `ReferenceError (${match[1]})` : 'ReferenceError';
+  }
+  // 3. TypeError
+  if (fullText.includes('TypeError')) {
+    const match = fullText.match(/TypeError:\s*([^:\n\r]+)/);
+    return match ? `TypeError (${match[1].trim().slice(0, 30)})` : 'TypeError';
+  }
+  // 4. SyntaxError
+  if (fullText.includes('SyntaxError')) {
+    return 'SyntaxError';
+  }
+  // 5. 内存溢出 / OOM
+  if (err.isOom || /Out of memory|malloc.*failed|ERR_INSUFFICIENT_RESOURCES/i.test(fullText)) {
+    return 'OutOfMemoryError';
+  }
+  // 6. Remotion 进程崩溃退出
+  if (fullText.includes('Remotion 渲染进程异常退出') || fullText.includes('Remotion render process exited unexpectedly')) {
+    const match = fullText.match(/状态码[:：]\s*(\d+)|status code:\s*(\d+)/i);
+    const code = match ? (match[1] || match[2]) : (err.exitCode != null ? String(err.exitCode) : 'unknown');
+    return `RemotionProcessExit (code ${code})`;
+  }
+  // 7. 网络连接错误
+  if (fullText.includes('ECONNREFUSED') || fullText.includes('ETIMEDOUT') || fullText.includes('fetch failed')) {
+    return 'NetworkConnectionError';
+  }
+  // 8. 磁盘满
+  if (fullText.includes('ENOSPC')) {
+    return 'DiskFullError';
+  }
+  // 9. 匹配通用标准 Error 名称
+  const errMatch = fullText.match(/^([A-Za-z]+Error):/);
+  if (errMatch) return errMatch[1];
+
+  const firstLine = String(err.message || fullText).split(/[\r\n]/)[0].trim();
+  return firstLine.slice(0, 50) || 'UnknownError';
+}
+
+async function handleTaskErrorWithCircuitBreaker(task: any, baseUrl: string, err: any) {
+  const currentCategory = extractErrorCategory(err);
+  if (lastErrorCategory && currentCategory === lastErrorCategory) {
+    consecutiveSameErrorCount++;
+  } else {
+    lastErrorCategory = currentCategory;
+    consecutiveSameErrorCount = 1;
+  }
+
+  log(localizeScriptLog(`❌ 任务 [${currentRunningTaskId}] 执行异常: ${err.message}，已自动恢复为待渲染状态`), 'red');
+
+  if (consecutiveSameErrorCount > 1 && consecutiveSameErrorCount < MAX_CONSECUTIVE_SAME_ERROR) {
+    log(localizeScriptLog(`⚠️ 同类型错误 [${currentCategory}] 连续出现 (${consecutiveSameErrorCount}/${MAX_CONSECUTIVE_SAME_ERROR}) 次`), 'yellow');
+  }
+
+  if (currentRunningTaskId) {
+    const mod: VideoModule = detectTaskModule(task);
+    await updateTaskStatus(baseUrl, currentRunningTaskId, 'waiting_render', undefined, task.folderPath, undefined, undefined, CURRENT_AUTH_TOKEN, mod).catch(() => null);
+  }
+
+  if (consecutiveSameErrorCount >= MAX_CONSECUTIVE_SAME_ERROR) {
+    isCircuitBreakerTripped = true;
+    log(localizeScriptLog(`\n🛑 [熔断机制触发] 同类型错误 [${currentCategory}] 已连续出现 3 次，为防止系统无限死循环重试，立即停止执行后续渲染操作！`), 'red');
+    pendingQueue.length = 0;
+  }
+}
 
 async function enqueueRenderTask(
   task: any,
   baseUrl: string,
   options: RenderWorkerOptions = {}
 ) {
+  if (isCircuitBreakerTripped) {
+    return;
+  }
   const taskId = task.videoId || task.id;
   // ，
   if (currentRunningTaskId != null && currentRunningTaskId === taskId) {
@@ -3389,11 +3557,11 @@ async function triggerQueue(
   baseUrl: string,
   options: RenderWorkerOptions = {}
 ) {
-  if (isProcessingQueue) return;
+  if (isProcessingQueue || isCircuitBreakerTripped) return;
   isProcessingQueue = true;
 
   try {
-    while (true) {
+    while (!isCircuitBreakerTripped) {
       let task = pendingQueue.shift();
       if (!task) {
         // 尝试即刻连贯抢占下一个任务，实现批量任务流水线无缝渲染，免除空档等待
@@ -3414,11 +3582,12 @@ async function triggerQueue(
       currentRunningTaskId = task.videoId || task.id;
       try {
         await processSingleTask(task, baseUrl, options);
+        // 成功完成任务，重置同类错误熔断器
+        resetErrorCircuitBreaker();
       } catch (err: any) {
-        log(localizeScriptLog(`❌ 任务 [${currentRunningTaskId}] 执行异常: ${err.message}，已自动恢复为待渲染状态`), 'red');
-        if (currentRunningTaskId) {
-          const mod: VideoModule = detectTaskModule(task);
-          await updateTaskStatus(baseUrl, currentRunningTaskId, 'waiting_render', undefined, task.folderPath, undefined, undefined, CURRENT_AUTH_TOKEN, mod).catch(() => null);
+        await handleTaskErrorWithCircuitBreaker(task, baseUrl, err);
+        if (isCircuitBreakerTripped) {
+          break;
         }
       } finally {
         currentRunningTaskId = null;
@@ -3440,6 +3609,7 @@ async function listenSSEForModule(
   const modLabel = module === 'ap-calculus-frq' ? '微积分 FRQ' : module === 'ap-calculus-mcq' ? '微积分 MCQ' : '对比学单词';
 
   while (true) {
+    if (isCircuitBreakerTripped) return;
     try {
       log(localizeScriptLog(`📡 正在建立 [${modLabel}] SSE 实时任务下发长连接: ${eventsUrl}...`), 'blue');
       const headers: Record<string, string> = {
@@ -3462,6 +3632,10 @@ async function listenSSEForModule(
       let buffer = '';
 
       while (true) {
+        if (isCircuitBreakerTripped) {
+          try { await reader.cancel(); } catch (_) {}
+          return;
+        }
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -3600,6 +3774,11 @@ async function main() {
 
   // 主轮询循环：补偿 SSE 丢包/重连空档，每隔 POLL_INTERVAL_MS 向服务端原子抢单
   while (true) {
+    if (isCircuitBreakerTripped) {
+      log(localizeScriptLog(`🛑 渲染器已触发同类错误 3 次熔断机制并停止，请排查原因修复后重新启动。`), 'red');
+      process.exit(1);
+    }
+
     try {
       // 如果当前已有任务正在执行或队列非空，跳过主动轮询，避免超额抢单
       if (!isProcessingQueue && pendingQueue.length === 0 && currentRunningTaskId == null) {
@@ -3618,6 +3797,10 @@ async function main() {
 
       if (isOnce) {
         while (isProcessingQueue || pendingQueue.length > 0) {
+          if (isCircuitBreakerTripped) {
+            log(localizeScriptLog(`🛑 渲染器已触发同类错误 3 次熔断机制并停止，请排查原因修复后重新启动。`), 'red');
+            process.exit(1);
+          }
           await new Promise((resolve) => setTimeout(resolve, 500));
         }
         log(localizeScriptLog(`\n单次运行模式完成，退出。`), 'gray');
@@ -3625,7 +3808,11 @@ async function main() {
       }
 
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-    } catch (e) {
+    } catch (e: any) {
+      if (isCircuitBreakerTripped) {
+        log(localizeScriptLog(`🛑 渲染器已触发同类错误 3 次熔断机制并停止，请排查原因修复后重新启动。`), 'red');
+        process.exit(1);
+      }
       log(localizeScriptLog(`轮询异常: ${e.message}`), 'red');
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     }
