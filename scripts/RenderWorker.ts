@@ -3589,6 +3589,8 @@ async function triggerQueue(
         if (isCircuitBreakerTripped) {
           break;
         }
+        // 异常冷静防抖缓冲：休眠 3 秒，避免极速死循环抢单消耗系统与数据库资源
+        await new Promise((resolve) => setTimeout(resolve, 3000));
       } finally {
         currentRunningTaskId = null;
       }
