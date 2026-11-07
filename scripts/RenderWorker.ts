@@ -3806,7 +3806,9 @@ async function main() {
           enqueueRenderTask(claimedTask, baseUrl, options);
         } else if (!isProcessingQueue && currentRunningTaskId == null) {
           idlePollCount++;
-          process.stdout.write(localizeScriptLog(`\r渲染调度服务端连接正常，当前队列中没有视频任务，等待中...\n`));
+          if (idlePollCount === 1 || idlePollCount % 6 === 0) {
+            log(localizeScriptLog(`⏳ 渲染调度服务端连接正常，当前队列中没有待渲染视频任务，静默等待中...`), 'gray');
+          }
         }
       }
 
