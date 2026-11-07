@@ -2256,6 +2256,47 @@ export interface RenderWorkerOptions {
  */
 
 /**
+ * 安全校验并解析用于 Remotion 渲染的音频地址，彻底杜绝相对占位符导致 404 挂掉
+ */
+function resolveSafeAudioForRender(rawAudioUrl: any, bundleDirName: string): string | undefined {
+  if (!rawAudioUrl || typeof rawAudioUrl !== 'string') return undefined;
+  const s = rawAudioUrl.trim();
+  if (!s) return undefined;
+  if (s.startsWith('http://') || s.startsWith('https://')) return s;
+  if (/^[a-zA-Z]:\\/.test(s) && fs.existsSync(s)) return s;
+  const cleanRel = s.replace(/^[/\\]+/, '').replace(/^public[/\\]+/, '');
+  try {
+    const bundleCache = getBundleCacheDir(bundleDirName);
+    const localInBundle = path.join(bundleCache, 'public', cleanRel);
+    if (fs.existsSync(localInBundle)) return s;
+  } catch (_) {}
+  try {
+    const localInWorkspace = path.join(__dirname, '..', 'public', cleanRel);
+    if (fs.existsSync(localInWorkspace)) return s;
+  } catch (_) {}
+  return undefined;
+}
+/**
+ * 智能挑选最佳有效音轨：优先挑选合法 CDN 远程链接或真实本地文件，杜绝相对假路径遮挡真实音频
+ */
+function pickBestAudioForRender(candidates: any[], bundleDirName: string): string | undefined {
+  // 1. 优先在候选列表中寻找真实可用的远程 CDN 或真实存在的本地绝对路径
+  for (const c of candidates) {
+    if (!c || typeof c !== "string") continue;
+    const s = c.trim();
+    if (s.startsWith("http://") || s.startsWith("https://")) return s;
+    if (/^[a-zA-Z]:\\/.test(s) && fs.existsSync(s)) return s;
+  }
+  // 2. 其次通过 resolveSafeAudioForRender 验证本地或缓存中的文件
+  for (const c of candidates) {
+    if (!c || typeof c !== "string") continue;
+    const safe = resolveSafeAudioForRender(c, bundleDirName);
+    if (safe) return safe;
+  }
+  return undefined;
+}
+
+/**
  * 专门处理微积分 AP Calculus FRQ 视频渲染流水线
  * 包含：中文视频渲染 (ApCalculusFRQ-Demo-ZH) 与 英文视频渲染 (ApCalculusFRQ-Demo-EN) 双版本自动生产与上云
  */
@@ -2353,15 +2394,25 @@ async function processApCalculusFRQTask(
   // 1. 渲染中文版本 (使用微积分专属核心缓存 BundledCodeCache/ApCalculusFRQ)
   if (shouldRenderZh) {
     log(localizeScriptLog(`\n[1/2] 正在渲染中文视频 (ApCalculusFRQ-Demo-ZH)...`), 'blue');
-    const zhAudio =
-      questionData.audio_src_zh ||
-      questionData.meta?.audio_src_zh ||
-      (questionData.audio_src && !questionData.audio_src.includes('_en_') && !questionData.audio_src.includes('_en.') ? questionData.audio_src : undefined) ||
-      (task.audioPath && !task.audioPath.includes('_en_') && !task.audioPath.includes('_en.') ? task.audioPath : undefined);
+    const zhAudio = pickBestAudioForRender([
+      task.audioPath && !task.audioPath.includes('_en_') && !task.audioPath.includes('_en.') ? task.audioPath : undefined,
+      questionData.audio_src_zh,
+      questionData.meta?.audio_src_zh,
+      questionData.audio_src && !questionData.audio_src.includes('_en_') && !questionData.audio_src.includes('_en.') ? questionData.audio_src : undefined,
+    ], 'ApCalculusFRQ');
+    if (zhAudio) {
+      questionData.audio_src_zh = zhAudio;
+      questionData.audio_src = zhAudio;
+      if (questionData.meta) questionData.meta.audio_src_zh = zhAudio;
+    } else {
+      delete questionData.audio_src_zh;
+      delete questionData.audio_src;
+      if (questionData.meta) delete questionData.meta.audio_src_zh;
+    }
     const zhProps = {
       question: questionData,
       lang: 'zh',
-      showAudio: true,
+      showAudio: Boolean(zhAudio),
       audioSrc: zhAudio,
     };
     await renderVideoWithRemotion(zhOutputFile, zhProps, options.concurrency, 'ApCalculusFRQ-Demo-ZH', 'ApCalculusFRQ');
@@ -2371,15 +2422,26 @@ async function processApCalculusFRQTask(
   // 2. 渲染英文版本 (使用微积分专属核心缓存 BundledCodeCache/ApCalculusFRQ)
   if (shouldRenderEn) {
     log(localizeScriptLog(`\n[2/2] 正在渲染英文视频 (ApCalculusFRQ-Demo-EN)...`), 'blue');
-    const enAudio =
-      questionData.audio_src_en ||
-      questionData.meta?.audio_src_en ||
-      (questionData.audio_src && !questionData.audio_src.includes('_zh_') && !questionData.audio_src.includes('_zh.') ? questionData.audio_src : undefined) ||
-      (task.audioPath && !task.audioPath.includes('_zh_') && !task.audioPath.includes('_zh.') ? task.audioPath : undefined);
+    const rawEnAudioCandidates = [
+      (task as any).audioPathEn,
+      task.audioPath && !task.audioPath.includes('_zh_') && !task.audioPath.includes('_zh.') && (task.audioPath.includes('_en_') || task.audioPath.includes('_en.')) ? task.audioPath : undefined,
+      questionData.audio_src_en,
+      questionData.meta?.audio_src_en,
+      questionData.audio_src && !questionData.audio_src.includes('_zh_') && !questionData.audio_src.includes('_zh.') ? questionData.audio_src : undefined,
+    ];
+    const enAudio = pickBestAudioForRender(rawEnAudioCandidates, 'ApCalculusFRQ');
+    if (enAudio) {
+      questionData.audio_src_en = enAudio;
+      if (questionData.meta) questionData.meta.audio_src_en = enAudio;
+    } else {
+      delete questionData.audio_src_en;
+      delete questionData.audio_src;
+      if (questionData.meta) delete questionData.meta.audio_src_en;
+    }
     const enProps = {
       question: questionData,
       lang: 'en',
-      showAudio: true,
+      showAudio: Boolean(enAudio),
       audioSrc: enAudio,
     };
     await renderVideoWithRemotion(enOutputFile, enProps, options.concurrency, 'ApCalculusFRQ-Demo-EN', 'ApCalculusFRQ');
@@ -2600,15 +2662,25 @@ async function processApCalculusTask(
   // 1. 渲染中文版本 (使用微积分专属核心缓存 BundledCodeCache/ApCalculusMCQ)
   if (shouldRenderZh) {
     log(localizeScriptLog(`\n[1/2] 正在渲染中文视频 (ApCalculusMCQ-Demo-ZH)...`), 'blue');
-    const zhAudio =
-      questionData.audio_src_zh ||
-      questionData.meta?.audio_src_zh ||
-      (questionData.audio_src && !questionData.audio_src.includes('_en_') && !questionData.audio_src.includes('_en.') ? questionData.audio_src : undefined) ||
-      (task.audioPath && !task.audioPath.includes('_en_') && !task.audioPath.includes('_en.') ? task.audioPath : undefined);
+    const zhAudio = pickBestAudioForRender([
+      task.audioPath && !task.audioPath.includes('_en_') && !task.audioPath.includes('_en.') ? task.audioPath : undefined,
+      questionData.audio_src_zh,
+      questionData.meta?.audio_src_zh,
+      questionData.audio_src && !questionData.audio_src.includes('_en_') && !questionData.audio_src.includes('_en.') ? questionData.audio_src : undefined,
+    ], 'ApCalculusMCQ');
+    if (zhAudio) {
+      questionData.audio_src_zh = zhAudio;
+      questionData.audio_src = zhAudio;
+      if (questionData.meta) questionData.meta.audio_src_zh = zhAudio;
+    } else {
+      delete questionData.audio_src_zh;
+      delete questionData.audio_src;
+      if (questionData.meta) delete questionData.meta.audio_src_zh;
+    }
     const zhProps = {
       question: questionData,
       lang: 'zh',
-      showAudio: true,
+      showAudio: Boolean(zhAudio),
       audioSrc: zhAudio,
     };
     await renderVideoWithRemotion(zhOutputFile, zhProps, options.concurrency, 'ApCalculusMCQ-Demo-ZH', 'ApCalculusMCQ');
@@ -2618,15 +2690,26 @@ async function processApCalculusTask(
   // 2. 渲染英文版本 (使用微积分专属核心缓存 BundledCodeCache/ApCalculusMCQ)
   if (shouldRenderEn) {
     log(localizeScriptLog(`\n[2/2] 正在渲染英文视频 (ApCalculusMCQ-Demo-EN)...`), 'blue');
-    const enAudio =
-      questionData.audio_src_en ||
-      questionData.meta?.audio_src_en ||
-      (questionData.audio_src && !questionData.audio_src.includes('_zh_') && !questionData.audio_src.includes('_zh.') ? questionData.audio_src : undefined) ||
-      (task.audioPath && !task.audioPath.includes('_zh_') && !task.audioPath.includes('_zh.') ? task.audioPath : undefined);
+    const rawEnAudioCandidates = [
+      (task as any).audioPathEn,
+      task.audioPath && !task.audioPath.includes('_zh_') && !task.audioPath.includes('_zh.') && (task.audioPath.includes('_en_') || task.audioPath.includes('_en.')) ? task.audioPath : undefined,
+      questionData.audio_src_en,
+      questionData.meta?.audio_src_en,
+      questionData.audio_src && !questionData.audio_src.includes('_zh_') && !questionData.audio_src.includes('_zh.') ? questionData.audio_src : undefined,
+    ];
+    const enAudio = pickBestAudioForRender(rawEnAudioCandidates, 'ApCalculusMCQ');
+    if (enAudio) {
+      questionData.audio_src_en = enAudio;
+      if (questionData.meta) questionData.meta.audio_src_en = enAudio;
+    } else {
+      delete questionData.audio_src_en;
+      delete questionData.audio_src;
+      if (questionData.meta) delete questionData.meta.audio_src_en;
+    }
     const enProps = {
       question: questionData,
       lang: 'en',
-      showAudio: true,
+      showAudio: Boolean(enAudio),
       audioSrc: enAudio,
     };
     await renderVideoWithRemotion(enOutputFile, enProps, options.concurrency, 'ApCalculusMCQ-Demo-EN', 'ApCalculusMCQ');
