@@ -1528,17 +1528,27 @@ async function claimNextTask(
   }
 }
 
+let lastSuccessfulModule: VideoModule = 'ap-calculus-frq';
+
 async function claimNextTaskAnyModule(
   baseUrl: string,
   token: string = CURRENT_AUTH_TOKEN,
   scope: 'current_user' | 'all_users' = (IS_ELECTRON_CLIENT ? 'current_user' : 'all_users')
 ): Promise<any | null> {
-  const cewTask = await claimNextTask(baseUrl, token, scope, 'compare-english-word');
-  if (cewTask) return cewTask;
-  const mcqTask = await claimNextTask(baseUrl, token, scope, 'ap-calculus-mcq');
-  if (mcqTask) return mcqTask;
-  const frqTask = await claimNextTask(baseUrl, token, scope, 'ap-calculus-frq');
-  if (frqTask) return frqTask;
+  const allModules: VideoModule[] = ['compare-english-word', 'ap-calculus-mcq', 'ap-calculus-frq'];
+  // 智能记忆亲和性：优先探测最近成功抢单的模块，避免每次批量任务都产生 2 次冗余无效 HTTP 与 D1 请求
+  const orderedModules = [
+    lastSuccessfulModule,
+    ...allModules.filter((m) => m !== lastSuccessfulModule),
+  ];
+
+  for (const mod of orderedModules) {
+    const task = await claimNextTask(baseUrl, token, scope, mod);
+    if (task) {
+      lastSuccessfulModule = mod;
+      return task;
+    }
+  }
   return null;
 }
 
@@ -3774,7 +3784,8 @@ async function main() {
     });
   }
 
-  // 主轮询循环：补偿 SSE 丢包/重连空档，每隔 POLL_INTERVAL_MS 向服务端原子抢单
+  // 主轮询循环：补偿 SSE 丢包/重连空档，每隔 POLL_INTERVAL_MS 向服务端原子抢单 (支持空闲智能自适应退避)
+  let idlePollCount = 0;
   while (true) {
     if (isCircuitBreakerTripped) {
       log(localizeScriptLog(`🛑 渲染器已触发同类错误 3 次熔断机制并停止，请排查原因修复后重新启动。`), 'red');
@@ -3786,6 +3797,7 @@ async function main() {
       if (!isProcessingQueue && pendingQueue.length === 0 && currentRunningTaskId == null) {
         const claimedTask = await claimNextTaskAnyModule(baseUrl, CURRENT_AUTH_TOKEN, clientScope);
         if (claimedTask) {
+          idlePollCount = 0;
           const modName = claimedTask.__module === 'ap-calculus-frq' ? '[微积分 FRQ]' : claimedTask.__module === 'ap-calculus-mcq' ? '[微积分 MCQ]' : '[对比学单词]';
           const taskDesc = claimedTask.__module === 'ap-calculus-frq' || claimedTask.__module === 'ap-calculus-mcq'
             ? `${claimedTask.title || claimedTask.folderPath || claimedTask.id}`
@@ -3793,6 +3805,7 @@ async function main() {
           log(localizeScriptLog(`\n⚡ [轮询抢单] 成功锁定待渲染任务: ${modName} [${claimedTask.videoId || claimedTask.id}] ${taskDesc}`), 'green');
           enqueueRenderTask(claimedTask, baseUrl, options);
         } else if (!isProcessingQueue && currentRunningTaskId == null) {
+          idlePollCount++;
           process.stdout.write(localizeScriptLog(`\r渲染调度服务端连接正常，当前队列中没有视频任务，等待中...\n`));
         }
       }
@@ -3809,7 +3822,8 @@ async function main() {
         break;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+      const adaptiveInterval = Math.min(60000, POLL_INTERVAL_MS + Math.min(idlePollCount, 6) * 5000);
+      await new Promise((resolve) => setTimeout(resolve, adaptiveInterval));
     } catch (e: any) {
       if (isCircuitBreakerTripped) {
         log(localizeScriptLog(`🛑 渲染器已触发同类错误 3 次熔断机制并停止，请排查原因修复后重新启动。`), 'red');
