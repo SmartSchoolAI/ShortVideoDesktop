@@ -135,13 +135,24 @@ for (let i = 0; i < targetTasks.length; i++) {
   console.log(`\n[${i + 1}/${targetTasks.length}] 正在渲染: ${item.id}`);
   console.log(`输出目标: ${outPath}`);
 
+  // 优先探测已编译就绪的 Bundle 缓存，大幅缩短首帧与避免重复 webpack 编译
+  const localBundleDir = path.resolve('BundledCodeCache/ApCalculusMCQ');
+  const desktopBundleDir = path.resolve('build/remotion-bundle/ApCalculusMCQ');
+  const entryPoint = (fs.existsSync(localBundleDir) && fs.existsSync(path.join(localBundleDir, 'index.html')))
+    ? localBundleDir
+    : (fs.existsSync(desktopBundleDir) && fs.existsSync(path.join(desktopBundleDir, 'index.html')))
+      ? desktopBundleDir
+      : 'src/index.ts';
+
   const args = [
     'remotion',
     'render',
-    'src/index.ts',
+    entryPoint,
     item.id,
     outPath,
     '--gl=angle',
+    '--disable-web-security',
+    '--concurrency=2',
   ];
 
   const result = spawnSync(npxCmd, args, {
