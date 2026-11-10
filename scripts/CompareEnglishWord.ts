@@ -3,6 +3,8 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
+import http from 'http';
+import https from 'https';
 import { spawn, execSync, spawnSync } from 'child_process';
 import { uploadToR2, CDN_BASE_DOMAIN } from '../src/functions/r2-client';
 
@@ -1303,6 +1305,25 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
       "ru": "Повторный рендеринг успешно завершен после снижения параллелизма до 1x!",
       "tr": "Eşzamanlılık 1x'e düşürüldükten sonra yeniden işleme başarılı!",
     }
+  },
+  {
+    regex: /⏳ 上传进度: ([\d.]+)% \(([\d.]+)\/([\d.]+) MB, ([\d.]+) MB\/s\)/g,
+    translations: {
+      "zh": "⏳ 上传进度: $1% ($2/$3 MB, $4 MB/s)",
+      "en": "⏳ Upload progress: $1% ($2/$3 MB, $4 MB/s)",
+      "ja": "⏳ アップロード進捗: $1% ($2/$3 MB, $4 MB/s)",
+      "ko": "⏳ 업로드 진행률: $1% ($2/$3 MB, $4 MB/s)",
+      "vi": "⏳ Tiến độ tải lên: $1% ($2/$3 MB, $4 MB/s)",
+      "th": "⏳ ความคืบหน้าการอัปโหลด: $1% ($2/$3 MB, $4 MB/s)",
+      "id": "⏳ Kemajuan unggahan: $1% ($2/$3 MB, $4 MB/s)",
+      "es": "⏳ Progreso de subida: $1% ($2/$3 MB, $4 MB/s)",
+      "fr": "⏳ Progression du téléversement: $1% ($2/$3 MB, $4 MB/s)",
+      "pt": "⏳ Progresso do upload: $1% ($2/$3 MB, $4 MB/s)",
+      "de": "⏳ Upload-Fortschritt: $1% ($2/$3 MB, $4 MB/s)",
+      "it": "⏳ Avanzamento caricamento: $1% ($2/$3 MB, $4 MB/s)",
+      "ru": "⏳ Прогресс загрузки: $1% ($2/$3 MB, $4 MB/s)",
+      "tr": "⏳ Yükleme ilerlemesi: %$1 ($2/$3 MB, $4 MB/s)",
+    }
   }
 ];
 
@@ -1350,9 +1371,14 @@ async function retryOperation<T>(
       return await operation();
     } catch (err: any) {
       lastError = err;
+      if (err?.isFatal || (err?.statusCode && [400, 401, 403, 404, 405].includes(err.statusCode))) {
+        throw err;
+      }
+      const detail = err?.cause?.message ? `${err.message} (${err.cause.message})` : (err.message || String(err));
       if (attempt < maxRetries) {
-        log(localizeScriptLog(`[重试 ${attempt}/${maxRetries}] ${operationName} 发生异常: ${err.message}，${delayMs / 1000}秒后重试...`), 'yellow');
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        const waitTime = delayMs * Math.min(attempt, 3);
+        log(localizeScriptLog(`[重试 ${attempt}/${maxRetries}] ${operationName} 发生异常: ${detail}，${(waitTime / 1000).toFixed(1)}秒后重试...`), 'yellow');
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
       }
     }
   }
@@ -1554,6 +1580,131 @@ async function updateTaskStatus(
   }
 }
 
+/**
+ * 健壮的 HTTP/HTTPS 二进制大文件上传，专为视频大文件设计：
+ * 1. 基于 Node.js 原生 https/http 模块，零第三方依赖，彻底规避 Node 18+ undici fetch 默认 30 秒 bodyTimeout / headersTimeout 截断问题
+ * 2. 显式设置 Content-Length，防止反向代理和 CDN 按 Chunked 方式处理大文件引发网络重置
+ * 3. 超长 TCP/Socket 超时保护 (10分钟 / 600000ms)，支持 Keep-Alive
+ * 4. 流式管道上传 (fs.createReadStream)，不占用大量内存 Buffer
+ * 5. 详细捕获底层 Socket / DNS / TLS / HTTP 状态错误
+ */
+async function uploadFileViaNativeHttp(
+  targetUrl: URL,
+  filePath: string,
+  customHeaders: Record<string, string>,
+  timeoutMs = 600000
+): Promise<{ success: boolean; cdnUrl?: string; error?: string }> {
+  return new Promise((resolve, reject) => {
+    let isSettled = false;
+    const safeResolve = (val: { success: boolean; cdnUrl?: string; error?: string }) => {
+      if (!isSettled) {
+        isSettled = true;
+        resolve(val);
+      }
+    };
+    const safeReject = (err: any) => {
+      if (!isSettled) {
+        isSettled = true;
+        reject(err);
+      }
+    };
+
+    if (!fs.existsSync(filePath)) {
+      return safeReject(new Error(`Local video file not found: ${filePath}`));
+    }
+    const stat = fs.statSync(filePath);
+    const fileSize = stat.size;
+
+    const isHttps = targetUrl.protocol === 'https:';
+    const client = isHttps ? https : http;
+
+    const headers: Record<string, string | number> = {
+      ...customHeaders,
+      'Content-Type': customHeaders['Content-Type'] || 'video/mp4',
+      'Content-Length': fileSize,
+      'Connection': 'keep-alive',
+    };
+
+    const options: https.RequestOptions = {
+      protocol: targetUrl.protocol,
+      hostname: targetUrl.hostname,
+      port: targetUrl.port ? Number(targetUrl.port) : (isHttps ? 443 : 80),
+      path: targetUrl.pathname + targetUrl.search,
+      method: 'POST',
+      headers,
+      timeout: timeoutMs,
+    };
+
+    const startTime = Date.now();
+    let uploadedBytes = 0;
+    let lastLogTime = Date.now();
+
+    const req = client.request(options, (res) => {
+      let responseBody = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk) => {
+        responseBody += chunk;
+      });
+      res.on('end', () => {
+        let json: any = {};
+        try {
+          json = responseBody ? JSON.parse(responseBody) : {};
+        } catch (_) {
+          json = {};
+        }
+
+        const statusCode = res.statusCode || 0;
+        if (statusCode >= 200 && statusCode < 300 && (json.success || !responseBody.includes('error'))) {
+          safeResolve({ success: true, cdnUrl: json.cdnUrl });
+        } else {
+          const errMsg = json.error || `HTTP ${statusCode} ${res.statusMessage || ''}`.trim() || responseBody.slice(0, 200);
+          const err: any = new Error(errMsg);
+          err.statusCode = statusCode;
+          if ([400, 401, 403, 404, 405].includes(statusCode)) {
+            err.isFatal = true;
+          }
+          safeReject(err);
+        }
+      });
+    });
+
+    req.on('timeout', () => {
+      const err: any = new Error(`Upload timed out after ${timeoutMs / 1000} seconds`);
+      err.code = 'ETIMEDOUT';
+      req.destroy(err);
+      safeReject(err);
+    });
+
+    req.on('error', (err: any) => {
+      const code = err.code ? `[${err.code}] ` : '';
+      safeReject(new Error(`${code}${err.message || 'Network error during video upload'}`));
+    });
+
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.on('data', (chunk: Buffer | string) => {
+      uploadedBytes += typeof chunk === 'string' ? Buffer.byteLength(chunk) : chunk.length;
+      const now = Date.now();
+      // 达到 3 秒且有实际体积时，在终端实时输出上传百分比与瞬时速度
+      if (now - lastLogTime >= 3000 && fileSize > 0) {
+        lastLogTime = now;
+        const pct = Math.min(99.9, (uploadedBytes / fileSize) * 100).toFixed(1);
+        const upMb = (uploadedBytes / 1024 / 1024).toFixed(1);
+        const totMb = (fileSize / 1024 / 1024).toFixed(1);
+        const sec = Math.max(0.1, (now - startTime) / 1000);
+        const speed = (uploadedBytes / 1024 / 1024 / sec).toFixed(2);
+        log(localizeScriptLog(`  ⏳ 上传进度: ${pct}% (${upMb}/${totMb} MB, ${speed} MB/s)`), 'gray');
+      }
+    });
+
+    fileStream.on('error', (err) => {
+      req.destroy(err);
+      safeReject(err);
+    });
+
+    fileStream.pipe(req);
+  });
+}
+
 // ── 2.1 服务端代理上传 MP4 产物至 Cloudflare R2 ─────────────────────────
 async function uploadVideoViaServerProxy(
   baseUrl: string,
@@ -1588,9 +1739,12 @@ async function uploadVideoViaServerProxy(
     targetUrl.searchParams.set('isFinished', 'true');
   }
 
-  const fileBytes = fs.readFileSync(filePath);
+  const stat = fs.existsSync(filePath) ? fs.statSync(filePath) : null;
+  const fileSize = stat ? stat.size : 0;
+
   const headers: Record<string, string> = {
     'Content-Type': 'video/mp4',
+    'Content-Length': String(fileSize),
     'x-task-id': encodeURIComponent(String(taskId)),
     'x-lang': encodeURIComponent(lang),
     'x-filename': encodeURIComponent(filename),
@@ -1609,21 +1763,30 @@ async function uploadVideoViaServerProxy(
 
   return await retryOperation(
     async () => {
-      const res = await fetch(targetUrl.toString(), {
-        method: 'POST',
-        headers,
-        body: new Uint8Array(fileBytes),
-        signal: AbortSignal.timeout(180000), // 3分钟超时
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || `HTTP ${res.status} ${res.statusText}`);
+      try {
+        return await uploadFileViaNativeHttp(targetUrl, filePath, headers, 600000);
+      } catch (nativeErr: any) {
+        try {
+          const fileBytes = fs.readFileSync(filePath);
+          const res = await fetch(targetUrl.toString(), {
+            method: 'POST',
+            headers,
+            body: new Uint8Array(fileBytes),
+            signal: AbortSignal.timeout(300000),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.success) {
+            throw new Error(data.error || `HTTP ${res.status} ${res.statusText}`);
+          }
+          return { success: true, cdnUrl: data.cdnUrl };
+        } catch (fetchErr: any) {
+          const combined = nativeErr?.message ? `${nativeErr.message} (fallback: ${fetchErr?.message})` : fetchErr?.message;
+          throw new Error(combined);
+        }
       }
-      return { success: true, cdnUrl: data.cdnUrl };
     },
-    3,
-    2500,
+    5,
+    3000,
     localizeScriptLog(`服务端代理上传视频 (${lang})`)
   );
 }
@@ -2350,7 +2513,7 @@ async function processApCalculusFRQTask(
   // 确保获取云端最新最完整的微积分 FRQ 题目结构与时间戳数据
   try {
     const summaryCdnUrl = `${getCdnDomain()}/ApCalculusFRQ/${cleanFolder}/summary.json?_t=${Date.now()}`;
-    const sRes = await fetch(summaryCdnUrl);
+    const sRes = await fetch(summaryCdnUrl, { signal: AbortSignal.timeout(10000) });
     if (sRes.ok) {
       const remoteData = await sRes.json();
       if (remoteData && typeof remoteData === 'object') {
@@ -2367,7 +2530,7 @@ async function processApCalculusFRQTask(
       }
     } else {
       const origCdnUrl = `${getCdnDomain()}/ApCalculusFRQ/${cleanFolder}/original.json?_t=${Date.now()}`;
-      const oRes = await fetch(origCdnUrl);
+      const oRes = await fetch(origCdnUrl, { signal: AbortSignal.timeout(10000) });
       if (oRes.ok) {
         const oData = await oRes.json();
         if (oData && typeof oData === 'object') {
@@ -2626,7 +2789,7 @@ async function processApCalculusTask(
   // 确保获取云端最新最完整的微积分题目结构与声学逐词对齐结果
   try {
     const summaryCdnUrl = `${getCdnDomain()}/ApCalculusMCQ/${cleanFolder}/summary.json?_t=${Date.now()}`;
-    const sRes = await fetch(summaryCdnUrl);
+    const sRes = await fetch(summaryCdnUrl, { signal: AbortSignal.timeout(10000) });
     if (sRes.ok) {
       const remoteData = await sRes.json();
       if (remoteData && typeof remoteData === 'object') {
@@ -2926,7 +3089,7 @@ async function processSingleTask(
   if (!summaryData || !Array.isArray(summaryData.segments) || summaryData.segments.length === 0) {
     const summaryCdnUrl = `${cdnFolderUrl}/summary.json?_t=${Date.now()}`;
     try {
-      const sRes = await fetch(summaryCdnUrl);
+      const sRes = await fetch(summaryCdnUrl, { signal: AbortSignal.timeout(10000) });
       if (sRes.ok) summaryData = await sRes.json();
     } catch (e) {}
   }
