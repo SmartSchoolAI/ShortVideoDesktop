@@ -24,12 +24,12 @@ async function downloadFile(url: string, destPath: string, minSizeBytes = 1000):
       }
     }
 
-    // Attempt up to 2 downloads with a 10-second timeout
+    // Attempt up to 2 downloads with a 20-second timeout
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const res = await fetch(url, {
           headers: { 'User-Agent': 'Mozilla/5.0' },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(20000),
         });
         if (!res.ok) {
           if (attempt < 2) {
@@ -1666,11 +1666,25 @@ async function updateTaskStatus(
   }
 }
 
+// 专为长连接大文件上传维护的全局 TCP Agent，支持长超时与 Keep-Alive 握手复用
+const keepAliveHttpsAgent = new https.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 10000,
+  maxSockets: 10,
+  timeout: 600000,
+});
+const keepAliveHttpAgent = new http.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 10000,
+  maxSockets: 10,
+  timeout: 600000,
+});
+
 /**
  * 健壮的 HTTP/HTTPS 二进制大文件上传，专为视频大文件设计：
  * 1. 基于 Node.js 原生 https/http 模块，零第三方依赖，彻底规避 Node 18+ undici fetch 默认 30 秒 bodyTimeout / headersTimeout 截断问题
  * 2. 显式设置 Content-Length，防止反向代理和 CDN 按 Chunked 方式处理大文件引发网络重置
- * 3. 超长 TCP/Socket 超时保护 (10分钟 / 600000ms)，支持 Keep-Alive
+ * 3. 超长 TCP/Socket 超时保护 (10分钟 / 600000ms)，支持 Keep-Alive 连接复用
  * 4. 流式管道上传 (fs.createReadStream)，不占用大量内存 Buffer
  * 5. 详细捕获底层 Socket / DNS / TLS / HTTP 状态错误
  */
@@ -1719,6 +1733,7 @@ async function uploadFileViaNativeHttp(
       method: 'POST',
       headers,
       timeout: timeoutMs,
+      agent: isHttps ? keepAliveHttpsAgent : keepAliveHttpAgent,
     };
 
     const startTime = Date.now();
@@ -1853,6 +1868,10 @@ async function uploadVideoViaServerProxy(
         // 优先使用原生流式高抗超时 HTTP 请求通道
         return await uploadFileViaNativeHttp(targetUrl, filePath, headers, 600000);
       } catch (nativeErr: any) {
+        // 若已是明确的不可重试错误（如 401 凭证失效、404 任务不存在等），直接抛出，无需无谓回退
+        if (nativeErr?.isFatal || (nativeErr?.statusCode && [400, 401, 403, 404, 405].includes(nativeErr.statusCode))) {
+          throw nativeErr;
+        }
         // 若原生通道异常，回退尝试显式 Content-Length 的 fetch 上传
         try {
           const fileBytes = fs.readFileSync(filePath);

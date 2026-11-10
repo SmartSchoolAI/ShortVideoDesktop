@@ -24,12 +24,12 @@ async function downloadFile(url: string, destPath: string, minSizeBytes = 1000):
       }
     }
 
-    // Attempt up to 2 downloads with a 10-second timeout
+    // Attempt up to 2 downloads with a 20-second timeout
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const res = await fetch(url, {
           headers: { 'User-Agent': 'Mozilla/5.0' },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(20000),
         });
         if (!res.ok) {
           if (attempt < 2) {
@@ -1580,6 +1580,20 @@ async function updateTaskStatus(
   }
 }
 
+// 专为长连接大文件上传维护的全局 TCP Agent，支持长超时与 Keep-Alive 握手复用
+const keepAliveHttpsAgent = new https.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 10000,
+  maxSockets: 10,
+  timeout: 600000,
+});
+const keepAliveHttpAgent = new http.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 10000,
+  maxSockets: 10,
+  timeout: 600000,
+});
+
 /**
  * 健壮的 HTTP/HTTPS 二进制大文件上传，专为视频大文件设计：
  * 1. 基于 Node.js 原生 https/http 模块，零第三方依赖，彻底规避 Node 18+ undici fetch 默认 30 秒 bodyTimeout / headersTimeout 截断问题
@@ -1633,6 +1647,7 @@ async function uploadFileViaNativeHttp(
       method: 'POST',
       headers,
       timeout: timeoutMs,
+      agent: isHttps ? keepAliveHttpsAgent : keepAliveHttpAgent,
     };
 
     const startTime = Date.now();
@@ -1766,6 +1781,10 @@ async function uploadVideoViaServerProxy(
       try {
         return await uploadFileViaNativeHttp(targetUrl, filePath, headers, 600000);
       } catch (nativeErr: any) {
+        // 若已是明确的不可重试错误（如 401 凭证失效、404 任务不存在等），直接抛出，无需无谓回退
+        if (nativeErr?.isFatal || (nativeErr?.statusCode && [400, 401, 403, 404, 405].includes(nativeErr.statusCode))) {
+          throw nativeErr;
+        }
         try {
           const fileBytes = fs.readFileSync(filePath);
           const res = await fetch(targetUrl.toString(), {
