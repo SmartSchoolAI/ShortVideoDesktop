@@ -1581,13 +1581,16 @@ async function updateTaskStatus(
 }
 
 // 专为长连接大文件上传维护的全局 TCP Agent，支持长超时与 Keep-Alive 握手复用
-const keepAliveHttpsAgent = new https.Agent({
+const HttpsAgentClass = (https as any).Agent || (https as any).default?.Agent || https.Agent;
+const HttpAgentClass = (http as any).Agent || (http as any).default?.Agent || http.Agent;
+
+const keepAliveHttpsAgent = new HttpsAgentClass({
   keepAlive: true,
   keepAliveMsecs: 10000,
   maxSockets: 10,
   timeout: 600000,
 });
-const keepAliveHttpAgent = new http.Agent({
+const keepAliveHttpAgent = new HttpAgentClass({
   keepAlive: true,
   keepAliveMsecs: 10000,
   maxSockets: 10,
@@ -1630,7 +1633,17 @@ async function uploadFileViaNativeHttp(
     const fileSize = stat.size;
 
     const isHttps = targetUrl.protocol === 'https:';
-    const client = isHttps ? https : http;
+    const client: any = isHttps ? https : http;
+    const requestFn =
+      typeof client.request === 'function'
+        ? client.request.bind(client)
+        : typeof client.default?.request === 'function'
+        ? client.default.request.bind(client.default)
+        : null;
+
+    if (!requestFn) {
+      return safeReject(new Error(`HTTP client request function not found for protocol: ${targetUrl.protocol}`));
+    }
 
     const headers: Record<string, string | number> = {
       ...customHeaders,
@@ -1654,7 +1667,7 @@ async function uploadFileViaNativeHttp(
     let uploadedBytes = 0;
     let lastLogTime = Date.now();
 
-    const req = client.request(options, (res) => {
+    const req = requestFn(options, (res: any) => {
       let responseBody = '';
       res.setEncoding('utf8');
       res.on('data', (chunk) => {
