@@ -130,8 +130,8 @@ async function applyAudioPitchShift(mp4Path: string, pitchCents: number): Promis
 }
 
 // Load multi-tier environment variables
-// 1.  ：  .env   .env.desktop
-// 2.  ：  .env，  .env.desktop
+// 1. 开发模式：支持 .env 与 .env.desktop
+// 2. 打包模式：严格禁止 .env，仅允许读取 .env.desktop
 function loadEnv() {
   const procResourcesPath = (process as any).resourcesPath || '';
   const isPackaged = Boolean(
@@ -181,7 +181,7 @@ function loadEnv() {
 }
 loadEnv();
 
-// 、  Token
+// 提取命令行、环境变量或本地会话中的 Token
 function extractAuthToken(): string {
   const args = process.argv.slice(2);
   for (const a of args) {
@@ -226,14 +226,17 @@ function extractAuthToken(): string {
 function decryptStoredToken(raw: string): string {
   if (!raw || typeof raw !== 'string') return '';
   const trimmed = raw.trim();
-  // 1.   JWT Token (xxx.yyy.zzz)，
+  // 1. 若本身即为标准 JWT Token (xxx.yyy.zzz)，直接返回
   if (/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(trimmed)) {
     return trimmed;
   }
-  // 2.   AES-256-CBC   JWT Token
+  // 2. 仅在环境变量显式配置了 AES 密钥时尝试解密 AES-256-CBC Token
   try {
-    const keyHex = process.env.NEXT_PUBLIC_AESKEY || '68656c6c6f20776f726c64203132333435363738';
-    const ivHex = process.env.NEXT_PUBLIC_AESIV || '31323334353637383930313233343536';
+    const keyHex = (process.env.NEXT_PUBLIC_AESKEY || '').trim();
+    const ivHex = (process.env.NEXT_PUBLIC_AESIV || '').trim();
+    if (!keyHex || !ivHex) {
+      return '';
+    }
     const key = Buffer.from(keyHex.padEnd(64, '0'), 'hex');
     const iv = Buffer.from(ivHex, 'hex');
     const decipher = crypto.createDecipheriv('aes-256-cbc', key as any, iv as any);
@@ -259,7 +262,7 @@ const DEFAULT_API_BASE =
   process.env.SHORTVIDEO_API_BASE ||
   process.env.NEXT_PUBLIC_APP_SITE_URL ||
   process.env.NEXT_PUBLIC_SITE_ORIGIN ||
-  'https://app.shortvideo.ca';
+  '';
 const getCdnDomain = () => (process.env.NEXT_PUBLIC_DOWNLOAD_BASE_URL || CDN_BASE_DOMAIN || '').trim().replace(/\/+$/, '');
 const POLL_INTERVAL_MS = 30000; // 30
 function resolveSafeRootDir(): string {
@@ -361,291 +364,6 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
     }
   },
   {
-    regex: /网络操作/g,
-    translations: {
-      "zh": "网络操作",
-      "en": "Network operation",
-      "ja": "ネットワーク操作",
-      "ko": "네트워크 작업",
-      "vi": "Thao tác mạng",
-      "th": "การดำเนินการเครือข่าย",
-      "id": "Operasi jaringan",
-      "es": "Operación de red",
-      "fr": "Opération réseau",
-      "pt": "Operação de rede",
-      "de": "Netzwerkoperation",
-      "it": "Operazione di rete",
-      "ru": "Сетевая операция",
-      "tr": "Ağ işlemi",
-    }
-  },
-  {
-    regex: /中文字幕/g,
-    translations: {
-      "zh": "中文字幕",
-      "en": "Chinese Subtitles",
-      "ja": "中国語字幕",
-      "ko": "중국어 자막",
-      "vi": "Phụ đề tiếng Trung",
-      "th": "ซับไตเติลภาษาจีน",
-      "id": "Subtitel Bahasa Mandarin",
-      "es": "Subtítulos en chino",
-      "fr": "Sous-titres chinois",
-      "pt": "Legendas em chinês",
-      "de": "Chinesische Untertitel",
-      "it": "Sottotitoli in cinese",
-      "ru": "Китайские субтитры",
-      "tr": "Çince Altyazı",
-    }
-  },
-  {
-    regex: /纯英文/g,
-    translations: {
-      "zh": "纯英文",
-      "en": "English Only",
-      "ja": "英語のみ",
-      "ko": "영어 전용",
-      "vi": "Chỉ tiếng Anh",
-      "th": "ภาษาอังกฤษเท่านั้น",
-      "id": "Hanya Bahasa Inggris",
-      "es": "Solo inglés",
-      "fr": "Anglais uniquement",
-      "pt": "Apenas inglês",
-      "de": "Nur Englisch",
-      "it": "Solo inglese",
-      "ru": "Только английский",
-      "tr": "Sadece İngilizce",
-    }
-  },
-  {
-    regex: /日文字幕/g,
-    translations: {
-      "zh": "日文字幕",
-      "en": "Japanese Subtitles",
-      "ja": "日本語字幕",
-      "ko": "일본어 자막",
-      "vi": "Phụ đề tiếng Nhật",
-      "th": "ซับไตเติลภาษาญี่ปุ่น",
-      "id": "Subtitel Bahasa Jepang",
-      "es": "Subtítulos en japonés",
-      "fr": "Sous-titres japonais",
-      "pt": "Legendas em japonês",
-      "de": "Japanische Untertitel",
-      "it": "Sottotitoli in giapponese",
-      "ru": "Японские субтитры",
-      "tr": "Japonca Altyazı",
-    }
-  },
-  {
-    regex: /韩文字幕/g,
-    translations: {
-      "zh": "韩文字幕",
-      "en": "Korean Subtitles",
-      "ja": "韓国語字幕",
-      "ko": "한국어 자막",
-      "vi": "Phụ đề tiếng Hàn",
-      "th": "ซับไตเติลเกาหลี",
-      "id": "Subtitel Bahasa Korea",
-      "es": "Subtítulos en coreano",
-      "fr": "Sous-titres coréens",
-      "pt": "Legendas em coreano",
-      "de": "Koreanische Untertitel",
-      "it": "Sottotitoli in coreano",
-      "ru": "Корейские субтитры",
-      "tr": "Korece Altyazı",
-    }
-  },
-  {
-    regex: /越南文字幕/g,
-    translations: {
-      "zh": "越南文字幕",
-      "en": "Vietnamese Subtitles",
-      "ja": "ベトナム語字幕",
-      "ko": "베트남어 자막",
-      "vi": "Phụ đề tiếng Việt",
-      "th": "ซับไตเติลเวียดนาม",
-      "id": "Subtitel Bahasa Vietnam",
-      "es": "Subtítulos en vietnamita",
-      "fr": "Sous-titres vietnamiens",
-      "pt": "Legendas em vietnamita",
-      "de": "Vietnamesische Untertitel",
-      "it": "Sottotitoli in vietnamita",
-      "ru": "Вьетнамские субтитры",
-      "tr": "Vietnamca Altyazı",
-    }
-  },
-  {
-    regex: /泰文字幕/g,
-    translations: {
-      "zh": "泰文字幕",
-      "en": "Thai Subtitles",
-      "ja": "タイ語字幕",
-      "ko": "태국어 자막",
-      "vi": "Phụ đề tiếng Thái",
-      "th": "ซับไตเติลไทย",
-      "id": "Subtitel Bahasa Thailand",
-      "es": "Subtítulos en tailandés",
-      "fr": "Sous-titres thaïlandais",
-      "pt": "Legendas em tailandês",
-      "de": "Thailändische Untertitel",
-      "it": "Sottotitoli in tailandese",
-      "ru": "Тайские субтитры",
-      "tr": "Tayca Altyazı",
-    }
-  },
-  {
-    regex: /印尼文字幕/g,
-    translations: {
-      "zh": "印尼文字幕",
-      "en": "Indonesian Subtitles",
-      "ja": "インドネシア語字幕",
-      "ko": "인도네시아어 자막",
-      "vi": "Phụ đề tiếng Indonesia",
-      "th": "ซับไตเติลอินโดนีเซีย",
-      "id": "Subtitel Bahasa Indonesia",
-      "es": "Subtítulos en indonesio",
-      "fr": "Sous-titres indonésiens",
-      "pt": "Legendas em indonésio",
-      "de": "Indonesische Untertitel",
-      "it": "Sottotitoli in indonesiano",
-      "ru": "Индонезийские субтитры",
-      "tr": "Endonezce Altyazı",
-    }
-  },
-  {
-    regex: /西班牙文字幕/g,
-    translations: {
-      "zh": "西班牙文字幕",
-      "en": "Spanish Subtitles",
-      "ja": "スペイン語字幕",
-      "ko": "스페인어 자막",
-      "vi": "Phụ đề tiếng Tây Ban Nha",
-      "th": "ซับไตเติลสเปน",
-      "id": "Subtitel Bahasa Spanyol",
-      "es": "Subtítulos en español",
-      "fr": "Sous-titres espagnols",
-      "pt": "Legendas em espanhol",
-      "de": "Spanische Untertitel",
-      "it": "Sottotitoli in spagnolo",
-      "ru": "Испанские субтитры",
-      "tr": "İspanyolca Altyazı",
-    }
-  },
-  {
-    regex: /法文字幕/g,
-    translations: {
-      "zh": "法文字幕",
-      "en": "French Subtitles",
-      "ja": "フランス語字幕",
-      "ko": "프랑스어 자막",
-      "vi": "Phụ đề tiếng Pháp",
-      "th": "ซับไตเติลฝรั่งเศส",
-      "id": "Subtitel Bahasa Prancis",
-      "es": "Subtítulos en francés",
-      "fr": "Sous-titres français",
-      "pt": "Legendas em francês",
-      "de": "Französische Untertitel",
-      "it": "Sottotitoli in francese",
-      "ru": "Французские субтитры",
-      "tr": "Fransızca Altyazı",
-    }
-  },
-  {
-    regex: /葡萄牙文字幕/g,
-    translations: {
-      "zh": "葡萄牙文字幕",
-      "en": "Portuguese Subtitles",
-      "ja": "ポルトガル語字幕",
-      "ko": "포르투갈어 자막",
-      "vi": "Phụ đề tiếng Bồ Đào Nha",
-      "th": "ซับไตเติลโปรตุเกส",
-      "id": "Subtitel Bahasa Portugis",
-      "es": "Subtítulos en portugués",
-      "fr": "Sous-titres portugais",
-      "pt": "Legendas em português",
-      "de": "Portugiesische Untertitel",
-      "it": "Sottotitoli in portoghese",
-      "ru": "Португальские субтитры",
-      "tr": "Portekizce Altyazı",
-    }
-  },
-  {
-    regex: /德文字幕/g,
-    translations: {
-      "zh": "德文字幕",
-      "en": "German Subtitles",
-      "ja": "ドイツ語字幕",
-      "ko": "독일어 자막",
-      "vi": "Phụ đề tiếng Đức",
-      "th": "ซับไตเติลเยอรมัน",
-      "id": "Subtitel Bahasa Jerman",
-      "es": "Subtítulos en alemán",
-      "fr": "Sous-titres allemands",
-      "pt": "Legendas em alemão",
-      "de": "Deutsche Untertitel",
-      "it": "Sottotitoli in tedesco",
-      "ru": "Немецкие субтитры",
-      "tr": "Almanca Altyazı",
-    }
-  },
-  {
-    regex: /意大利文字幕/g,
-    translations: {
-      "zh": "意大利文字幕",
-      "en": "Italian Subtitles",
-      "ja": "イタリア語字幕",
-      "ko": "이탈리아어 자막",
-      "vi": "Phụ đề tiếng Ý",
-      "th": "ซับไตเติลอิตาลี",
-      "id": "Subtitel Bahasa Italia",
-      "es": "Subtítulos en italiano",
-      "fr": "Sous-titres italiens",
-      "pt": "Legendas em italiano",
-      "de": "Italienische Untertitel",
-      "it": "Sottotitoli in italiano",
-      "ru": "Итальянские субтитры",
-      "tr": "İtalyanca Altyazı",
-    }
-  },
-  {
-    regex: /俄文字幕/g,
-    translations: {
-      "zh": "俄文字幕",
-      "en": "Russian Subtitles",
-      "ja": "ロシア語字幕",
-      "ko": "러시아어 자막",
-      "vi": "Phụ đề tiếng Nga",
-      "th": "ซับไตเติลรัสเซีย",
-      "id": "Subtitel Bahasa Rusia",
-      "es": "Subtítulos en ruso",
-      "fr": "Sous-titres russes",
-      "pt": "Legendas em russo",
-      "de": "Russische Untertitel",
-      "it": "Sottotitoli in russo",
-      "ru": "Русские субтитры",
-      "tr": "Rusça Altyazı",
-    }
-  },
-  {
-    regex: /土耳其文字幕/g,
-    translations: {
-      "zh": "土耳其文字幕",
-      "en": "Turkish Subtitles",
-      "ja": "トルコ語字幕",
-      "ko": "터키어 자막",
-      "vi": "Phụ đề tiếng Thổ Nhĩ Kỳ",
-      "th": "ซับไตเติลตุรกี",
-      "id": "Subtitel Bahasa Turki",
-      "es": "Subtítulos en turco",
-      "fr": "Sous-titres turcs",
-      "pt": "Legendas em turco",
-      "de": "Türkische Untertitel",
-      "it": "Sottotitoli in turco",
-      "ru": "Турецкие субтитры",
-      "tr": "Türkçe Altyazı",
-    }
-  },
-  {
     regex: /根据任务语言设定检测到 (\d+) 种渲染版本，即将开始渲染[:：]/g,
     translations: {
       "zh": "根据任务语言设定检测到 $1 种渲染版本，即将开始渲染:",
@@ -703,9 +421,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
     }
   },
   {
-    regex: /正在对音频轨做微小变调 \((.*?) 音分\)，人耳无感知但指纹辛辣差异化\.\.\./g,
+    regex: /正在对音频轨做微小变调 \((.*?) 音分\)，人耳无感知但声学指纹差异化\.\.\./g,
     translations: {
-      "zh": "正在对音频轨做微小变调 ($1 音分)，人耳无感知但指纹辛辣差异化...",
+      "zh": "正在对音频轨做微小变调 ($1 音分)，人耳无感知但声学指纹差异化...",
       "en": "Applying subtle pitch shift ($1 cents) to audio track to differentiate fingerprint...",
       "ja": "音声トラックに微細なピッチシフト ($1 セント) を適用中...",
       "ko": "오디오 트랙에 미세 피치 시프트 ($1 센트) 적용 중...",
@@ -760,41 +478,41 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
     }
   },
   {
-    regex: /任务 \[(.*?)\] (\d+) 个多语言视频全部处理并发布完成!/g,
+    regex: /(?:🏆\s*)?任务 \[(.*?)\] (\d+) 个多语言视频全部处理并发布完成!/g,
     translations: {
-      "zh": "任务 [$1] $2 个多语言视频全部处理并发布完成!",
-      "en": "Task [$1] all $2 multilingual videos processed and published!",
-      "ja": "タスク [$1] 全 $2 本の多言語動画の処理と公開が完了しました!",
-      "ko": "작업 [$1] 총 $2개 다국어 동영상 처리 및 게시 완료!",
-      "vi": "Nhiệm vụ [$1] tất cả $2 video đa ngôn ngữ đã xử lý và xuất bản xong!",
-      "th": "งาน [$1] ทั้งหมด $2 วิดีโอหลายภาษาประมวลผลและเผยแพร่เสร็จสมบูรณ์!",
-      "id": "Tugas [$1] semua $2 video multibahasa telah diproses dan dipublikasikan!",
-      "es": "¡Tarea [$1] procesada y publicada para los $2 videos multilingües!",
-      "fr": "Tâche [$1] : les $2 vidéos multilingues ont été traitées et publiées !",
-      "pt": "Tarefa [$1]: todos os $2 vídeos multilíngues processados e publicados!",
-      "de": "Aufgabe [$1]: Alle $2 mehrsprachigen Videos verarbeitet und veröffentlicht!",
-      "it": "Attività [$1]: tutti i $2 video multilingue elaborati e pubblicati!",
-      "ru": "Задача [$1]: все $2 мультиязычных видео успешно обработаны и опубликованы!",
-      "tr": "Görev [$1] tüm $2 çok dilli video işlendi ve yayınlandı!",
+      "zh": "🏆 任务 [$1] $2 个多语言视频全部处理并发布完成!",
+      "en": "🏆 Task [$1] all $2 multilingual videos processed and published!",
+      "ja": "🏆 タスク [$1] 全 $2 本の多言語動画の処理と公開が完了しました!",
+      "ko": "🏆 작업 [$1] 총 $2개 다국어 동영상 처리 및 게시 완료!",
+      "vi": "🏆 Nhiệm vụ [$1] tất cả $2 video đa ngôn ngữ đã xử lý và xuất bản xong!",
+      "th": "🏆 งาน [$1] ทั้งหมด $2 วิดีโอหลายภาษาประมวลผลและเผยแพร่เสร็จสมบูรณ์!",
+      "id": "🏆 Tugas [$1] semua $2 video multibahasa telah diproses dan dipublikasikan!",
+      "es": "🏆 ¡Tarea [$1] procesada y publicada para los $2 videos multilingües!",
+      "fr": "🏆 Tâche [$1] : les $2 vidéos multilingues ont été traitées et publiées !",
+      "pt": "🏆 Tarefa [$1]: todos os $2 vídeos multilíngues processados e publicados!",
+      "de": "🏆 Aufgabe [$1]: Alle $2 mehrsprachigen Videos verarbeitet und veröffentlicht!",
+      "it": "🏆 Attività [$1]: tutti i $2 video multilingue elaborati e pubblicati!",
+      "ru": "🏆 Задача [$1]: все $2 мультиязычных видео успешно обработаны и опубликованы!",
+      "tr": "🏆 Görev [$1] tüm $2 çok dilli video işlendi ve yayınlandı!",
     }
   },
   {
-    regex: /正在向服务端同步状态为「渲染完成 \(video_finished\)」\.\.\./g,
+    regex: /(?:📝\s*)?正在向服务端同步状态为「渲染完成 \(video_finished\)」\.\.\./g,
     translations: {
-      "zh": "正在向服务端同步状态为「渲染完成 (video_finished)」...",
-      "en": "Syncing status [video_finished] to server...",
-      "ja": "サーバーにステータス「レンダリング完了 (video_finished)」を同期中...",
-      "ko": "서버로 상태 [video_finished] 동기화 중...",
-      "vi": "Đang đồng bộ trạng thái [video_finished] với máy chủ...",
-      "th": "กำลังซิงค์สถานะ [video_finished] ไปยังเซิร์ฟเวอร์...",
-      "id": "Menyinkronkan status [video_finished] ke server...",
-      "es": "Sincronizando estado [video_finished] con el servidor...",
-      "fr": "Synchronisation du statut [video_finished] avec le serveur...",
-      "pt": "Sincronizando status [video_finished] com o servidor...",
-      "de": "Status [video_finished] wird mit dem Server synchronisiert...",
-      "it": "Sincronizzazione dello stato [video_finished] con il server...",
-      "ru": "Синхронизация статуса [video_finished] с сервером...",
-      "tr": "[video_finished] durumu sunucuya senkronize ediliyor...",
+      "zh": "📝 正在向服务端同步状态为「渲染完成 (video_finished)」...",
+      "en": "📝 Syncing status [video_finished] to server...",
+      "ja": "📝 サーバーにステータス「レンダリング完了 (video_finished)」を同期中...",
+      "ko": "📝 서버로 상태 [video_finished] 동기화 중...",
+      "vi": "📝 Đang đồng bộ trạng thái [video_finished] với máy chủ...",
+      "th": "📝 กำลังซิงค์สถานะ [video_finished] ไปยังเซิร์ฟเวอร์...",
+      "id": "📝 Menyinkronkan status [video_finished] ke server...",
+      "es": "📝 Sincronizando estado [video_finished] con el servidor...",
+      "fr": "📝 Synchronisation du statut [video_finished] avec le serveur...",
+      "pt": "📝 Sincronizando status [video_finished] com o servidor...",
+      "de": "📝 Status [video_finished] wird mit dem Server synchronisiert...",
+      "it": "📝 Sincronizzazione dello stato [video_finished] con il server...",
+      "ru": "📝 Синхронизация статуса [video_finished] с сервером...",
+      "tr": "📝 [video_finished] durumu sunucuya senkronize ediliyor...",
     }
   },
   {
@@ -1197,98 +915,79 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
     }
   },
   {
-    regex: /流水线接续抢单/g,
+    regex: /(?:🔍\s*)?检测到当前目录缺少图片素材，正在检查是否为共享视频并自动溯源查找原专辑图片\.\.\./g,
     translations: {
-      "zh": "流水线接续抢单",
-      "en": "Pipeline Continuous Claiming",
-      "ja": "パイプライン継続タスク取得",
-      "ko": "파이프라인 연속 작업 잠금",
-      "vi": "Nhận tác vụ liên tục dạng đường ống",
-      "th": "การรับงานต่อเนื่องแบบไปป์ไลน์",
-      "id": "Pengambilan tugas berkelanjutan pipeline",
-      "es": "Reclamación continua de tareas en canalización",
-      "fr": "Réclamation continue des tâches en pipeline",
-      "pt": "Reivindicação contínua de tarefas em pipeline",
-      "de": "Kontinuierliche Pipeline-Aufgabenübernahme",
-      "it": "Acquisizione continua di attività in pipeline",
-      "ru": "Непрерывный захват задач конвейера",
-      "tr": "Ardışık düzen sürekli görev alma",
+      "zh": "🔍 检测到当前目录缺少图片素材，正在检查是否为共享视频并自动溯源查找原专辑图片...",
+      "en": "🔍 Missing image assets in current directory, checking if shared video to trace source album images...",
+      "ja": "🔍 現在のディレクトリに画像素材が見つかりません。共有アルバムの元画像を追跡確認中...",
+      "ko": "🔍 현재 디렉터리에 이미지 에셋이 없습니다. 공유 비디오인지 확인하고 원본 앨범 이미지를 추적 중...",
+      "vi": "🔍 Thiếu tài nguyên hình ảnh trong thư mục hiện tại, đang kiểm tra video chia sẻ để tìm hình ảnh gốc...",
+      "th": "🔍 ไม่พบรูปภาพในไดเรกทอรีปัจจุบัน กำลังตรวจสอบว่าเป็นวิดีโอที่แชร์และค้นหารูปภาพต้นฉบับ...",
+      "id": "🔍 Aset gambar tidak ditemukan di direktori saat ini, memeriksa apakah video bersama untuk melacak gambar asli...",
+      "es": "🔍 Faltan recursos de imagen en el directorio actual, verificando si es compartido para rastrear imágenes originales...",
+      "fr": "🔍 Images manquantes dans le répertoire actuel, vérification du partage pour récupérer les images sources...",
+      "pt": "🔍 Imagens ausentes no diretório atual, verificando compartilhamento para obter imagens originais...",
+      "de": "🔍 Bildmaterial im aktuellen Verzeichnis fehlt, prüfe Freigabequelle zum Auffinden der Originalbilder...",
+      "it": "🔍 Immagini mancanti nella directory corrente, verifica condivisione per tracciare le immagini sorgente...",
+      "ru": "🔍 Изображения отсутствуют в текущем каталоге, проверка общего доступа для поиска исходных изображений...",
+      "tr": "🔍 Mevcut dizinde resim materyali eksik, paylaşılan video olup olmadığı kontrol ediliyor ve kaynak albüm resimleri aranıyor...",
     }
   },
   {
-    regex: /检测到当前目录缺少图片素材，正在检查是否为共享视频并自动溯源查找原专辑图片\.\.\./g,
+    regex: /(?:📂\s*)?成功定位到共享来源专辑: 用户 \[(.*?)\], 路径 \[(.*?)\]/g,
     translations: {
-      "zh": "检测到当前目录缺少图片素材，正在检查是否为共享视频并自动溯源查找原专辑图片...",
-      "en": "Missing image assets in current directory, checking if shared video to trace source album images...",
-      "ja": "現在のディレクトリに画像素材が見つかりません。共有アルバムの元画像を追跡確認中...",
-      "ko": "현재 디렉터리에 이미지 에셋이 없습니다. 공유 비디오인지 확인하고 원본 앨범 이미지를 추적 중...",
-      "vi": "Thiếu tài nguyên hình ảnh trong thư mục hiện tại, đang kiểm tra video chia sẻ để tìm hình ảnh gốc...",
-      "th": "ไม่พบรูปภาพในไดเรกทอรีปัจจุบัน กำลังตรวจสอบว่าเป็นวิดีโอที่แชร์และค้นหารูปภาพต้นฉบับ...",
-      "id": "Aset gambar tidak ditemukan di direktori saat ini, memeriksa apakah video bersama untuk melacak gambar asli...",
-      "es": "Faltan recursos de imagen en el directorio actual, verificando si es compartido para rastrear imágenes originales...",
-      "fr": "Images manquantes dans le répertoire actuel, vérification du partage pour récupérer les images sources...",
-      "pt": "Imagens ausentes no diretório atual, verificando compartilhamento para obter imagens originais...",
-      "de": "Bildmaterial im aktuellen Verzeichnis fehlt, prüfe Freigabequelle zum Auffinden der Originalbilder...",
-      "it": "Immagini mancanti nella directory corrente, verifica condivisione per tracciare le immagini sorgente...",
-      "ru": "Изображения отсутствуют в текущем каталоге, проверка общего доступа для поиска исходных изображений...",
-      "tr": "Mevcut dizinde resim materyali eksik, paylaşılan video olup olmadığı kontrol ediliyor ve kaynak albüm resimleri aranıyor...",
+      "zh": "📂 成功定位到共享来源专辑: 用户 [$1], 路径 [$2]",
+      "en": "📂 Successfully located source shared album: User [$1], Path [$2]",
+      "ja": "📂 共有元アルバムを特定しました: ユーザー [$1], パス [$2]",
+      "ko": "📂 공유 원본 앨범 확인 완료: 사용자 [$1], 경로 [$2]",
+      "vi": "📂 Đã định vị album nguồn được chia sẻ: Người dùng [$1], Đường dẫn [$2]",
+      "th": "📂 ระบุอัลบั้มต้นทางที่แชร์สำเร็จ: ผู้ใช้ [$1], เส้นทาง [$2]",
+      "id": "📂 Berhasil menemukan album sumber bersama: Pengguna [$1], Jalur [$2]",
+      "es": "📂 Álbum compartido de origen localizado: Usuario [$1], Ruta [$2]",
+      "fr": "📂 Album source partagé localisé avec succès : Utilisateur [$1], Chemin [$2]",
+      "pt": "📂 Álbum de origem compartilhado localizado: Usuário [$1], Caminho [$2]",
+      "de": "📂 Geteiltes Quellalbum erfolgreich ermittelt: Benutzer [$1], Pfad [$2]",
+      "it": "📂 Album sorgente condiviso individuato: Utente [$1], Percorso [$2]",
+      "ru": "📂 Успешно найден исходный общий альбом: Пользователь [$1], Путь [$2]",
+      "tr": "📂 Paylaşılan kaynak albüm başarıyla belirlendi: Kullanıcı [$1], Yol [$2]",
     }
   },
   {
-    regex: /成功定位到共享来源专辑: 用户 \[(.*?)\], 路径 \[(.*?)\]/g,
+    regex: /(?:📥\s*)?正在从原共享专辑路径下载 01\.png 与 02\.png\.\.\./g,
     translations: {
-      "zh": "成功定位到共享来源专辑: 用户 [$1], 路径 [$2]",
-      "en": "Successfully located source shared album: User [$1], Path [$2]",
-      "ja": "共有元アルバムを特定しました: ユーザー [$1], パス [$2]",
-      "ko": "공유 원본 앨범 확인 완료: 사용자 [$1], 경로 [$2]",
-      "vi": "Đã định vị album nguồn được chia sẻ: Người dùng [$1], Đường dẫn [$2]",
-      "th": "ระบุอัลบั้มต้นทางที่แชร์สำเร็จ: ผู้ใช้ [$1], เส้นทาง [$2]",
-      "id": "Berhasil menemukan album sumber bersama: Pengguna [$1], Jalur [$2]",
-      "es": "Álbum compartido de origen localizado: Usuario [$1], Ruta [$2]",
-      "fr": "Album source partagé localisé avec succès : Utilisateur [$1], Chemin [$2]",
-      "pt": "Álbum de origem compartilhado localizado: Usuário [$1], Caminho [$2]",
-      "de": "Geteiltes Quellalbum erfolgreich ermittelt: Benutzer [$1], Pfad [$2]",
-      "it": "Album sorgente condiviso individuato: Utente [$1], Percorso [$2]",
-      "ru": "Успешно найден исходный общий альбом: Пользователь [$1], Путь [$2]",
-      "tr": "Paylaşılan kaynak albüm başarıyla belirlendi: Kullanıcı [$1], Yol [$2]",
+      "zh": "📥 正在从原共享专辑路径下载 01.png 与 02.png...",
+      "en": "📥 Downloading 01.png and 02.png from source shared album path...",
+      "ja": "📥 共有元のアルバムパスから 01.png と 02.png をダウンロード中...",
+      "ko": "📥 원본 공유 앨범 경로에서 01.png 및 02.png 다운로드 중...",
+      "vi": "📥 Đang tải xuống 01.png và 02.png từ đường dẫn album chia sẻ gốc...",
+      "th": "📥 กำลังดาวน์โหลด 01.png และ 02.png จากพาธของอัลบั้มที่แชร์...",
+      "id": "📥 Mengunduh 01.png dan 02.png dari jalur album sumber bersama...",
+      "es": "📥 Descargando 01.png y 02.png desde la ruta del álbum compartido original...",
+      "fr": "📥 Téléchargement de 01.png et 02.png depuis le chemin de l'album source...",
+      "pt": "📥 Baixando 01.png e 02.png do caminho do álbum compartilhado de origem...",
+      "de": "📥 01.png und 02.png aus dem Pfad des geteilten Quellalbums herunterladen...",
+      "it": "📥 Download di 01.png e 02.png dal percorso dell'album condiviso sorgente...",
+      "ru": "📥 Загрузка 01.png и 02.png из исходного каталога общего альбома...",
+      "tr": "📥 Kaynak paylaşılan albüm yolundan 01.png ve 02.png indiriliyor...",
     }
   },
   {
-    regex: /正在从原共享专辑路径下载 01\.png 与 02\.png\.\.\./g,
+    regex: /(?:✅\s*)?溯源下载成功！已自动获取原共享专辑的 01\.png 与 02\.png 图片素材。/g,
     translations: {
-      "zh": "正在从原共享专辑路径下载 01.png 与 02.png...",
-      "en": "Downloading 01.png and 02.png from source shared album path...",
-      "ja": "共有元のアルバムパスから 01.png と 02.png をダウンロード中...",
-      "ko": "원본 공유 앨범 경로에서 01.png 및 02.png 다운로드 중...",
-      "vi": "Đang tải xuống 01.png và 02.png từ đường dẫn album chia sẻ gốc...",
-      "th": "กำลังดาวน์โหลด 01.png และ 02.png จากพาธของอัลบั้มที่แชร์...",
-      "id": "Mengunduh 01.png dan 02.png dari jalur album sumber bersama...",
-      "es": "Descargando 01.png y 02.png desde la ruta del álbum compartido original...",
-      "fr": "Téléchargement de 01.png et 02.png depuis le chemin de l'album source...",
-      "pt": "Baixando 01.png e 02.png do caminho do álbum compartilhado de origem...",
-      "de": "01.png und 02.png aus dem Pfad des geteilten Quellalbums herunterladen...",
-      "it": "Download di 01.png e 02.png dal percorso dell'album condiviso sorgente...",
-      "ru": "Загрузка 01.png и 02.png из исходного каталога общего альбома...",
-      "tr": "Kaynak paylaşılan albüm yolundan 01.png ve 02.png indiriliyor...",
-    }
-  },
-  {
-    regex: /溯源下载成功！已自动获取原共享专辑的 01\.png 与 02\.png 图片素材。/g,
-    translations: {
-      "zh": "溯源下载成功！已自动获取原共享专辑的 01.png 与 02.png 图片素材。",
-      "en": "Source fallback download successful! Acquired 01.png and 02.png from original shared album.",
-      "ja": "追跡ダウンロード成功！元の共有アルバムから 01.png と 02.png を取得しました。",
-      "ko": "추적 다운로드 성공! 원본 공유 앨범의 01.png 및 02.png 이미지 에셋을 가져왔습니다.",
-      "vi": "Tải xuống nguồn thành công! Đã tự động lấy ảnh 01.png và 02.png từ album gốc.",
-      "th": "ดาวน์โหลดจากต้นฉบับสำเร็จ! รับรูปภาพ 01.png และ 02.png จากอัลบั้มแชร์เรียบร้อยแล้ว",
-      "id": "Unduh sumber berhasil! Mengambil gambar 01.png dan 02.png dari album asli.",
-      "es": "¡Descarga de origen exitosa! Se obtuvieron 01.png y 02.png del álbum compartido original.",
-      "fr": "Téléchargement source réussi ! 01.png et 02.png récupérés depuis l'album partagé d'origine.",
-      "pt": "Download de origem bem-sucedido! Imagens 01.png e 02.png obtidas do álbum original.",
-      "de": "Quell-Download erfolgreich! 01.png und 02.png aus Original-Freigabealbum bezogen.",
-      "it": "Download sorgente riuscito! 01.png e 02.png recuperati dall'album originale condiviso.",
-      "ru": "Успешная загрузка из источника! Автоматически получены изображения 01.png и 02.png из общего альбома.",
-      "tr": "Kaynak indirme başarılı! Orijinal paylaşılan albümden 01.png ve 02.png resimleri alındı.",
+      "zh": "✅ 溯源下载成功！已自动获取原共享专辑的 01.png 与 02.png 图片素材。",
+      "en": "✅ Source fallback download successful! Acquired 01.png and 02.png from original shared album.",
+      "ja": "✅ 追跡ダウンロード成功！元の共有アルバムから 01.png と 02.png を取得しました。",
+      "ko": "✅ 추적 다운로드 성공! 원본 공유 앨범의 01.png 및 02.png 이미지 에셋을 가져왔습니다.",
+      "vi": "✅ Tải xuống nguồn thành công! Đã tự động lấy ảnh 01.png và 02.png từ album gốc.",
+      "th": "✅ ดาวน์โหลดจากต้นฉบับสำเร็จ! รับรูปภาพ 01.png และ 02.png จากอัลบั้มแชร์เรียบร้อยแล้ว",
+      "id": "✅ Unduh sumber berhasil! Mengambil gambar 01.png dan 02.png dari album asli.",
+      "es": "✅ ¡Descarga de origen exitosa! Se obtuvieron 01.png y 02.png del álbum compartido original.",
+      "fr": "✅ Téléchargement source réussi ! 01.png et 02.png récupérés depuis l'album partagé d'origine.",
+      "pt": "✅ Download de origem bem-sucedido! Imagens 01.png e 02.png obtidas do álbum original.",
+      "de": "✅ Quell-Download erfolgreich! 01.png und 02.png aus Original-Freigabealbum bezogen.",
+      "it": "✅ Download sorgente riuscito! 01.png e 02.png recuperati dall'album originale condiviso.",
+      "ru": "✅ Успешная загрузка из источника! Автоматически получены изображения 01.png и 02.png из общего альбома.",
+      "tr": "✅ Kaynak indirme başarılı! Orijinal paylaşılan albümden 01.png ve 02.png resimleri alındı.",
     }
   },
   {
@@ -1558,44 +1257,6 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
     }
   },
   {
-    regex: /更新状态为 (.*)/g,
-    translations: {
-      "zh": "更新状态为 $1",
-      "en": "update status to $1",
-      "ja": "ステータスを $1 に更新",
-      "ko": "상태를 $1(으)로 업데이트",
-      "vi": "cập nhật trạng thái thành $1",
-      "th": "อัปเดตสถานะเป็น $1",
-      "id": "perbarui status ke $1",
-      "es": "actualizar estado a $1",
-      "fr": "mettre à jour le statut vers $1",
-      "pt": "atualizar status para $1",
-      "de": "Status auf $1 aktualisieren",
-      "it": "aggiorna stato a $1",
-      "ru": "обновление статуса до $1",
-      "tr": "durumu $1 olarak güncelle",
-    }
-  },
-  {
-    regex: /服务端代理上传视频 \((.*?)\)/g,
-    translations: {
-      "zh": "服务端代理上传视频 ($1)",
-      "en": "server proxy upload video ($1)",
-      "ja": "サーバープロキシ動画アップロード ($1)",
-      "ko": "서버 프록시 비디오 업로드 ($1)",
-      "vi": "tải video qua proxy máy chủ ($1)",
-      "th": "อัปโหลดวิดีโอผ่านพร็อกซีเซิร์ฟเวอร์ ($1)",
-      "id": "unggah video proksi server ($1)",
-      "es": "subida proxy de video ($1)",
-      "fr": "téléversement vidéo via proxy ($1)",
-      "pt": "upload proxy de vídeo ($1)",
-      "de": "Server-Proxy-Video-Upload ($1)",
-      "it": "caricamento proxy video ($1)",
-      "ru": "загрузка видео через прокси сервера ($1)",
-      "tr": "sunucu proxy video yükleme ($1)",
-    }
-  },
-  {
     regex: /☁️\s*正在上传中文视频\.\.\./g,
     translations: {
       "zh": "☁️ 正在上传中文视频...",
@@ -1862,7 +1523,7 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
     }
   },
   {
-    regex: /📝\s*正在更新微积分(?: FRQ)? 视频任务状态为已完成 \(video_finished\)\.\.\./g,
+    regex: /📝\s*正在更新微积分(?:\s*FRQ)?\s*视频任务状态为已完成\s*\(video_finished\)\.\.\./g,
     translations: {
       "zh": "📝 正在更新微积分视频任务状态为已完成 (video_finished)...",
       "en": "📝 Updating AP Calculus video task status to completed (video_finished)...",
@@ -2242,6 +1903,1698 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
     }
   },
   {
+    regex: /拉取待渲染任务失败\s*\(HTTP\s*(\d+)\):\s*(.*)/g,
+    translations: {
+      "zh": "拉取待渲染任务失败 (HTTP $1): $2",
+      "en": "Failed to fetch pending render tasks (HTTP $1): $2",
+      "ja": "待機中レンダリングタスクの取得に失敗しました (HTTP $1): $2",
+      "ko": "대기 중인 렌더링 작업 가져오기 실패 (HTTP $1): $2",
+      "vi": "Lấy danh sách tác vụ kết xuất thất bại (HTTP $1): $2",
+      "th": "ดึงงานเรนเดอร์ที่รอดำเนินการล้มเหลว (HTTP $1): $2",
+      "id": "Gagal mengambil tugas render tertunda (HTTP $1): $2",
+      "es": "Error al obtener tareas de renderizado pendientes (HTTP $1): $2",
+      "fr": "Échec de récupération des tâches de rendu en attente (HTTP $1) : $2",
+      "pt": "Falha ao buscar tarefas de renderização pendentes (HTTP $1): $2",
+      "de": "Abrufen ausstehender Render-Aufgaben fehlgeschlagen (HTTP $1): $2",
+      "it": "Impossibile recuperare le attività di rendering in sospeso (HTTP $1): $2",
+      "ru": "Не удалось получить ожидающие задачи рендеринга (HTTP $1): $2",
+      "tr": "Bekleyen işleme görevleri alınamadı (HTTP $1): $2",
+    }
+  },
+  {
+    regex: /拉取待渲染任务失败:\s*服务端响应格式不符合预期/g,
+    translations: {
+      "zh": "拉取待渲染任务失败: 服务端响应格式不符合预期",
+      "en": "Failed to fetch pending render tasks: unexpected server response format",
+      "ja": "待機タスク取得失敗: サーバー応答形式が不正です",
+      "ko": "대기 작업 가져오기 실패: 서버 응답 형식이 예상과 다릅니다",
+      "vi": "Lấy tác vụ thất bại: định dạng phản hồi máy chủ không hợp lệ",
+      "th": "ดึงงานล้มเหลว: รูปแบบการตอบกลับของเซิร์ฟเวอร์ไม่ถูกต้อง",
+      "id": "Gagal mengambil tugas: format respons server tidak sesuai",
+      "es": "Error al obtener tareas: formato de respuesta del servidor inesperado",
+      "fr": "Échec de récupération des tâches : format de réponse serveur inattendu",
+      "pt": "Falha ao buscar tarefas: formato de resposta do servidor inesperado",
+      "de": "Aufgabenabruf fehlgeschlagen: unerwartetes Server-Antwortformat",
+      "it": "Recupero attività non riuscito: formato risposta server imprevisto",
+      "ru": "Ошибка получения задач: неожиданный формат ответа сервера",
+      "tr": "Görevler alınamadı: beklenmeyen sunucu yanıt biçimi",
+    }
+  },
+  {
+    regex: /连接渲染调度服务端失败\s*\((.*?)\):\s*(.*)/g,
+    translations: {
+      "zh": "连接渲染调度服务端失败 ($1): $2",
+      "en": "Failed to connect to render scheduler server ($1): $2",
+      "ja": "レンダースケジューラーサーバーへの接続に失敗しました ($1): $2",
+      "ko": "렌더 스케줄러 서버 연결 실패 ($1): $2",
+      "vi": "Kết nối máy chủ lập lịch kết xuất thất bại ($1): $2",
+      "th": "เชื่อมต่อเซิร์ฟเวอร์จัดคิวเรนเดอร์ล้มเหลว ($1): $2",
+      "id": "Gagal terhubung ke server penjadwal render ($1): $2",
+      "es": "Error al conectar con el servidor de programación ($1): $2",
+      "fr": "Échec de connexion au serveur de planification ($1) : $2",
+      "pt": "Falha ao conectar ao servidor de agendamento ($1): $2",
+      "de": "Verbindung zum Render-Planer-Server fehlgeschlagen ($1): $2",
+      "it": "Connessione al server di pianificazione non riuscita ($1): $2",
+      "ru": "Не удалось подключиться к серверу планировщика ($1): $2",
+      "tr": "İşleme zamanlayıcı sunucusuna bağlanılamadı ($1): $2",
+    }
+  },
+  {
+    regex: /(?:⚠️\s*)?\[鉴权警告\]\s*当前未传入登录 Token \(CURRENT_AUTH_TOKEN 为空\)，代理上传将被服务端拒绝 \(401\)/g,
+    translations: {
+      "zh": "⚠️ [鉴权警告] 当前未传入登录 Token (CURRENT_AUTH_TOKEN 为空)，代理上传将被服务端拒绝 (401)",
+      "en": "⚠️ [Auth Warning] No login token provided (CURRENT_AUTH_TOKEN is empty); proxy upload will be rejected (401)",
+      "ja": "⚠️ [認証警告] ログイントークンが指定されていません (CURRENT_AUTH_TOKEN が空)。プロキシアップロードは拒否されます (401)",
+      "ko": "⚠️ [인증 경고] 로그인 토큰이 없습니다 (CURRENT_AUTH_TOKEN 비어 있음). 프록시 업로드가 거부됩니다 (401)",
+      "vi": "⚠️ [Cảnh báo xác thực] Chưa truyền Token đăng nhập (CURRENT_AUTH_TOKEN trống); tải qua proxy sẽ bị từ chối (401)",
+      "th": "⚠️ [คำเตือนการยืนยันตัวตน] ไม่มีโทเค็นเข้าสู่ระบบ (CURRENT_AUTH_TOKEN ว่าง) การอัปโหลดผ่านพร็อกซีจะถูกปฏิเสธ (401)",
+      "id": "⚠️ [Peringatan Autentikasi] Token login kosong; unggahan proksi akan ditolak server (401)",
+      "es": "⚠️ [Advertencia de autenticación] No se proporcionó token de inicio de sesión; la carga proxy será rechazada (401)",
+      "fr": "⚠️ [Avertissement Auth] Aucun jeton de connexion fourni ; le téléversement proxy sera rejeté (401)",
+      "pt": "⚠️ [Aviso de Autenticação] Token de login não fornecido; o upload por proxy será rejeitado (401)",
+      "de": "⚠️ [Auth-Warnung] Kein Login-Token angegeben; Proxy-Upload wird abgelehnt (401)",
+      "it": "⚠️ [Avviso Auth] Nessun token di accesso fornito; il caricamento proxy verrà rifiutato (401)",
+      "ru": "⚠️ [Предупреждение авторизации] Токен входа не передан; загрузка через прокси будет отклонена (401)",
+      "tr": "⚠️ [Yetki Uyarısı] Oturum belirteci sağlanmadı (CURRENT_AUTH_TOKEN boş); proxy yüklemesi reddedilecek (401)",
+    }
+  },
+  {
+    regex: /📦\s*检测到客户端内置预编译 Remotion 渲染核心 \((.*?)\)，正在注入 \[(.*?)\] 运行缓存\.\.\./g,
+    translations: {
+      "zh": "📦 检测到客户端内置预编译 Remotion 渲染核心 ($1)，正在注入 [$2] 运行缓存...",
+      "en": "📦 Detected built-in precompiled Remotion bundle ($1), hydrating [$2] runtime cache...",
+      "ja": "📦 内蔵の事前コンパイル済み Remotion バンドル ($1) を検出、[$2] ランタイムキャッシュに展開中...",
+      "ko": "📦 내장 사전 컴파일된 Remotion 번들 ($1) 감지, [$2] 런타임 캐시 구성 중...",
+      "vi": "📦 Phát hiện gói Remotion biên dịch sẵn ($1), đang nạp vào bộ nhớ đệm [$2]...",
+      "th": "📦 พบชุดแกนเรนเดอร์ Remotion สำเร็จรูปในตัว ($1) กำลังติดตั้งลงแคช [$2]...",
+      "id": "📦 Paket inti Remotion bawaan terdeteksi ($1), menyiapkan cache [$2]...",
+      "es": "📦 Núcleo Remotion precompilado detectado ($1), preparando caché de ejecución [$2]...",
+      "fr": "📦 Bundle Remotion précompilé détecté ($1), préparation du cache [$2]...",
+      "pt": "📦 Núcleo Remotion pré-compilado detectado ($1), preparando cache [$2]...",
+      "de": "📦 Vorkompiliertes Remotion-Bundle erkannt ($1), befülle [$2] Laufzeit-Cache...",
+      "it": "📦 Bundle Remotion precompilato rilevato ($1), preparazione cache [$2]...",
+      "ru": "📦 Обнаружен встроенный бандл Remotion ($1), подготовка кэша [$2]...",
+      "tr": "📦 Yerleşik önceden derlenmiş Remotion paketi algılandı ($1), [$2] önbelleği hazırlanıyor...",
+    }
+  },
+  {
+    regex: /✅\s*\[(.*?)\]\s*内置 Remotion 渲染核心固化就绪:\s*(.*?)，免源码秒级执行！/g,
+    translations: {
+      "zh": "✅ [$1] 内置 Remotion 渲染核心固化就绪: $2，免源码秒级执行！",
+      "en": "✅ [$1] Built-in Remotion bundle ready: $2 (instant execution without source rebuild!)",
+      "ja": "✅ [$1] 内蔵 Remotion バンドルの準備完了: $2（ソース不要で即時実行！）",
+      "ko": "✅ [$1] 내장 Remotion 번들 준비 완료: $2 (소스 없이 즉시 실행!)",
+      "vi": "✅ [$1] Lõi kết xuất Remotion tích hợp sẵn sàng: $2 (chạy tức thì không cần mã nguồn!)",
+      "th": "✅ [$1] แกนเรนเดอร์ Remotion ในตัวพร้อมใช้งาน: $2 (ทำงานทันทีไม่ต้องสร้างใหม่!)",
+      "id": "✅ [$1] Inti render Remotion bawaan siap: $2 (eksekusi instan tanpa kompilasi!)",
+      "es": "✅ [$1] Núcleo Remotion integrado listo: $2 (¡ejecución instantánea sin recompilar!)",
+      "fr": "✅ [$1] Bundle Remotion intégré prêt : $2 (exécution instantanée sans code source !)",
+      "pt": "✅ [$1] Núcleo Remotion integrado pronto: $2 (execução instantânea sem recompilar!)",
+      "de": "✅ [$1] Integriertes Remotion-Bundle bereit: $2 (Sofortstart ohne Quellcode!)",
+      "it": "✅ [$1] Bundle Remotion integrato pronto: $2 (esecuzione istantanea senza sorgenti!)",
+      "ru": "✅ [$1] Встроенный бандл Remotion готов: $2 (мгновенный запуск без исходников!)",
+      "tr": "✅ [$1] Yerleşik Remotion paketi hazır: $2 (kaynak kod olmadan anında yürütme!)",
+    }
+  },
+  {
+    regex: /⚠️\s*复制内置资源警告:\s*(.*?)，直接挂载内置核心路径使用/g,
+    translations: {
+      "zh": "⚠️ 复制内置资源警告: $1，直接挂载内置核心路径使用",
+      "en": "⚠️ Built-in bundle copy warning: $1; mounting built-in path directly",
+      "ja": "⚠️ 内蔵リソースのコピー警告: $1。内蔵パスを直接マウントして使用します",
+      "ko": "⚠️ 내장 리소스 복사 경고: $1. 내장 경로를 직접 마운트하여 사용합니다",
+      "vi": "⚠️ Cảnh báo sao chép tài nguyên sẵn có: $1; gắn trực tiếp đường dẫn gốc",
+      "th": "⚠️ คำเตือนการคัดลอกทรัพยากรในตัว: $1 จะใช้เส้นทางแกนหลักในตัวโดยตรง",
+      "id": "⚠️ Peringatan salin sumber bawaan: $1; memasang jalur inti bawaan langsung",
+      "es": "⚠️ Aviso al copiar núcleo integrado: $1; usando la ruta integrada directamente",
+      "fr": "⚠️ Avertissement de copie du bundle intégré : $1 ; montage direct du chemin intégré",
+      "pt": "⚠️ Aviso ao copiar núcleo integrado: $1; usando caminho integrado diretamente",
+      "de": "⚠️ Warnung beim Kopieren des Bundles: $1; binde integrierten Pfad direkt ein",
+      "it": "⚠️ Avviso copia risorse integrate: $1; utilizzo diretto del percorso integrato",
+      "ru": "⚠️ Предупреждение копирования ресурсов: $1; прямое подключение встроенного пути",
+      "tr": "⚠️ Yerleşik kaynak kopyalama uyarısı: $1; yerleşik yol doğrudan kullanılıyor",
+    }
+  },
+  {
+    regex: /⚙️\s*正在通过 Remotion CLI 编译 \[(.*?)\] 专属渲染核心:\s*(.*?)\.\.\./g,
+    translations: {
+      "zh": "⚙️ 正在通过 Remotion CLI 编译 [$1] 专属渲染核心: $2...",
+      "en": "⚙️ Bundling [$1] Remotion core via Remotion CLI: $2...",
+      "ja": "⚙️ Remotion CLI で [$1] 専用コアをバンドル中: $2...",
+      "ko": "⚙️ Remotion CLI로 [$1] 전용 렌더 코어 번들링 중: $2...",
+      "vi": "⚙️ Đang biên dịch lõi Remotion [$1] qua Remotion CLI: $2...",
+      "th": "⚙️ กำลังคอมไพล์แกนเรนเดอร์ [$1] ผ่าน Remotion CLI: $2...",
+      "id": "⚙️ Mengompilasi inti Remotion [$1] via Remotion CLI: $2...",
+      "es": "⚙️ Compilando núcleo Remotion [$1] mediante Remotion CLI: $2...",
+      "fr": "⚙️ Compilation du cœur Remotion [$1] via Remotion CLI : $2...",
+      "pt": "⚙️ Compilando núcleo Remotion [$1] via Remotion CLI: $2...",
+      "de": "⚙️ Kompiliere [$1] Remotion-Kern über Remotion CLI: $2...",
+      "it": "⚙️ Compilazione core Remotion [$1] tramite Remotion CLI: $2...",
+      "ru": "⚙️ Сборка ядра Remotion [$1] через Remotion CLI: $2...",
+      "tr": "⚙️ Remotion CLI üzerinden [$1] işleme çekirdeği derleniyor: $2...",
+    }
+  },
+  {
+    regex: /✅\s*\[(.*?)\]\s*Remotion 渲染核心编译成功:\s*(.*)/g,
+    translations: {
+      "zh": "✅ [$1] Remotion 渲染核心编译成功: $2",
+      "en": "✅ [$1] Remotion bundle compiled successfully: $2",
+      "ja": "✅ [$1] Remotion バンドルのコンパイルに成功しました: $2",
+      "ko": "✅ [$1] Remotion 렌더 코어 컴파일 성공: $2",
+      "vi": "✅ [$1] Biên dịch lõi Remotion thành công: $2",
+      "th": "✅ [$1] คอมไพล์แกนเรนเดอร์ Remotion สำเร็จ: $2",
+      "id": "✅ [$1] Kompilasi inti Remotion berhasil: $2",
+      "es": "✅ [$1] Núcleo Remotion compilado con éxito: $2",
+      "fr": "✅ [$1] Compilation du cœur Remotion réussie : $2",
+      "pt": "✅ [$1] Núcleo Remotion compilado com sucesso: $2",
+      "de": "✅ [$1] Remotion-Kern erfolgreich kompiliert: $2",
+      "it": "✅ [$1] Compilazione core Remotion riuscita: $2",
+      "ru": "✅ [$1] Сборка ядра Remotion успешна: $2",
+      "tr": "✅ [$1] Remotion çekirdeği başarıyla derlendi: $2",
+    }
+  },
+  {
+    regex: /⚠️\s*动态编译 Remotion 核心失败:\s*(.*)/g,
+    translations: {
+      "zh": "⚠️ 动态编译 Remotion 核心失败: $1",
+      "en": "⚠️ Dynamic Remotion core bundling failed: $1",
+      "ja": "⚠️ Remotion コアの動的コンパイルに失敗しました: $1",
+      "ko": "⚠️ 동적 Remotion 코어 번들링 실패: $1",
+      "vi": "⚠️ Biên dịch động lõi Remotion thất bại: $1",
+      "th": "⚠️ การคอมไพล์แกน Remotion แบบไดนามิกล้มเหลว: $1",
+      "id": "⚠️ Kompilasi dinamis inti Remotion gagal: $1",
+      "es": "⚠️ Falló la compilación dinámica de Remotion: $1",
+      "fr": "⚠️ Échec de la compilation dynamique de Remotion : $1",
+      "pt": "⚠️ Falha na compilação dinâmica do Remotion: $1",
+      "de": "⚠️ Dynamische Kompilierung des Remotion-Kerns fehlgeschlagen: $1",
+      "it": "⚠️ Compilazione dinamica core Remotion non riuscita: $1",
+      "ru": "⚠️ Ошибка динамической сборки Remotion: $1",
+      "tr": "⚠️ Dinamik Remotion çekirdeği derlemesi başarısız: $1",
+    }
+  },
+  {
+    regex: /📦\s*正在从已有核心包派生 \[(.*?)\] 专属缓存目录:\s*(.*?)\.\.\./g,
+    translations: {
+      "zh": "📦 正在从已有核心包派生 [$1] 专属缓存目录: $2...",
+      "en": "📦 Deriving [$1] cache directory from existing base bundle: $2...",
+      "ja": "📦 既存のコアバンドルから [$1] 専用キャッシュを派生中: $2...",
+      "ko": "📦 기존 코어 번들에서 [$1] 전용 캐시 디렉터리 파생 중: $2...",
+      "vi": "📦 Đang tạo thư mục cache riêng [$1] từ gói lõi sẵn có: $2...",
+      "th": "📦 กำลังสร้างไดเรกทอรีแคชเฉพาะ [$1] จากแพ็กเกจหลักที่มีอยู่: $2...",
+      "id": "📦 Menurunkan direktori cache [$1] dari paket inti yang ada: $2...",
+      "es": "📦 Derivando directorio de caché [$1] desde el paquete base: $2...",
+      "fr": "📦 Dérivation du cache dédié [$1] depuis le bundle existant : $2...",
+      "pt": "📦 Derivando diretório de cache [$1] do pacote base existente: $2...",
+      "de": "📦 Leite [$1] Cache-Verzeichnis vom Basis-Bundle ab: $2...",
+      "it": "📦 Derivazione directory cache [$1] dal bundle esistente: $2...",
+      "ru": "📦 Создание кэша [$1] из существующего базового бандла: $2...",
+      "tr": "📦 Mevcut çekirdek paketten [$1] özel önbellek dizini türetiliyor: $2...",
+    }
+  },
+  {
+    regex: /✅\s*成功就绪 \[(.*?)\] 专属渲染核心缓存:\s*(.*)/g,
+    translations: {
+      "zh": "✅ 成功就绪 [$1] 专属渲染核心缓存: $2",
+      "en": "✅ Dedicated [$1] Remotion cache ready: $2",
+      "ja": "✅ [$1] 専用レンダーキャッシュの準備完了: $2",
+      "ko": "✅ [$1] 전용 렌더 캐시 준비 완료: $2",
+      "vi": "✅ Bộ nhớ đệm riêng [$1] đã sẵn sàng: $2",
+      "th": "✅ แคชแกนเรนเดอร์เฉพาะ [$1] พร้อมใช้งานแล้ว: $2",
+      "id": "✅ Cache inti render [$1] siap: $2",
+      "es": "✅ Caché dedicada [$1] lista: $2",
+      "fr": "✅ Cache dédié [$1] prêt : $2",
+      "pt": "✅ Cache dedicado [$1] pronto: $2",
+      "de": "✅ Dedizierter [$1] Cache bereit: $2",
+      "it": "✅ Cache dedicata [$1] pronta: $2",
+      "ru": "✅ Выделенный кэш [$1] готов: $2",
+      "tr": "✅ [$1] özel işleme çekirdeği önbelleği hazır: $2",
+    }
+  },
+  {
+    regex: /⚠️\s*派生专属缓存跳过:\s*(.*)/g,
+    translations: {
+      "zh": "⚠️ 派生专属缓存跳过: $1",
+      "en": "⚠️ Skipped deriving dedicated cache: $1",
+      "ja": "⚠️ 専用キャッシュの派生をスキップしました: $1",
+      "ko": "⚠️ 전용 캐시 파생 건너뜀: $1",
+      "vi": "⚠️ Bỏ qua tạo cache riêng: $1",
+      "th": "⚠️ ข้ามการสร้างแคชเฉพาะ: $1",
+      "id": "⚠️ Penurunan cache khusus dilewati: $1",
+      "es": "⚠️ Derivación de caché dedicada omitida: $1",
+      "fr": "⚠️ Dérivation du cache dédié ignorée : $1",
+      "pt": "⚠️ Derivação de cache dedicado ignorada: $1",
+      "de": "⚠️ Ableitung des dedizierten Cache übersprungen: $1",
+      "it": "⚠️ Derivazione cache dedicata saltata: $1",
+      "ru": "⚠️ Пропуск создания выделенного кэша: $1",
+      "tr": "⚠️ Özel önbellek türetme atlandı: $1",
+    }
+  },
+  {
+    regex: /❌\s*客户端视频渲染核心组件缺失，未检测到 \[(.*?)\] 预编译包。请重新安装客户端以恢复渲染功能。/g,
+    translations: {
+      "zh": "❌ 客户端视频渲染核心组件缺失，未检测到 [$1] 预编译包。请重新安装客户端以恢复渲染功能。",
+      "en": "❌ Missing client video render core component: precompiled bundle [$1] not found. Please reinstall the app to restore rendering.",
+      "ja": "❌ クライアントのレンダリングコアが見つかりません ([$1])。再インストールしてください。",
+      "ko": "❌ 클라이언트 렌더링 코어 구성 요소 누락: 사전 컴파일 패키지 [$1]을(를) 찾을 수 없습니다. 앱을 다시 설치해 주세요.",
+      "vi": "❌ Thiếu lõi kết xuất video: không tìm thấy gói biên dịch sẵn [$1]. Vui lòng cài đặt lại ứng dụng.",
+      "th": "❌ ขาดคอมโพเนนต์หลักในการเรนเดอร์วิดีโอ ไม่พบแพ็กเกจ [$1] กรุณาติดตั้งแอปพลิเคชันใหม่",
+      "id": "❌ Komponen inti render video hilang: paket [$1] tidak ditemukan. Harap instal ulang aplikasi.",
+      "es": "❌ Falta el componente principal de renderizado: no se encontró [$1]. Reinstale la aplicación.",
+      "fr": "❌ Composant de rendu manquant : bundle précompilé [$1] introuvable. Veuillez réinstaller l'application.",
+      "pt": "❌ Componente principal de renderização ausente: pacote [$1] não encontrado. Reinstale o aplicativo.",
+      "de": "❌ Render-Kernkomponente fehlt: Bundle [$1] nicht gefunden. Bitte App neu installieren.",
+      "it": "❌ Componente di rendering mancante: pacchetto [$1] non trovato. Reinstalla l'applicazione.",
+      "ru": "❌ Отсутствует компонент рендеринга: пакет [$1] не найден. Переустановите приложение.",
+      "tr": "❌ İstemci video işleme çekirdeği eksik: [$1] paketi bulunamadı. Lütfen uygulamayı yeniden yükleyin.",
+    }
+  },
+  {
+    regex: /📥\s*正在同步 Remotion 本地静态素材 \((.*?)\)\.\.\./g,
+    translations: {
+      "zh": "📥 正在同步 Remotion 本地静态素材 ($1)...",
+      "en": "📥 Syncing Remotion local static assets ($1)...",
+      "ja": "📥 Remotion ローカル静的アセットを同期中 ($1)...",
+      "ko": "📥 Remotion 로컬 정적 에셋 동기화 중 ($1)...",
+      "vi": "📥 Đang đồng bộ tài nguyên tĩnh cục bộ Remotion ($1)...",
+      "th": "📥 กำลังซิงค์ไฟล์ทรัพยากร Remotion ในเครื่อง ($1)...",
+      "id": "📥 Menyinkronkan aset statis lokal Remotion ($1)...",
+      "es": "📥 Sincronizando recursos estáticos locales de Remotion ($1)...",
+      "fr": "📥 Synchronisation des ressources statiques Remotion ($1)...",
+      "pt": "📥 Sincronizando recursos estáticos locais do Remotion ($1)...",
+      "de": "📥 Synchronisiere lokale statische Remotion-Assets ($1)...",
+      "it": "📥 Sincronizzazione asset statici locali Remotion ($1)...",
+      "ru": "📥 Синхронизация локальных ресурсов Remotion ($1)...",
+      "tr": "📥 Remotion yerel statik kaynakları senkronize ediliyor ($1)...",
+    }
+  },
+  {
+    regex: /🚀\s*执行渲染命令\s*\(并发:\s*(.*?)\):\s*(.*)/g,
+    translations: {
+      "zh": "🚀 执行渲染命令 (并发: $1): $2",
+      "en": "🚀 Running render command (Concurrency: $1): $2",
+      "ja": "🚀 レンダーコマンド実行中 (並列度: $1): $2",
+      "ko": "🚀 렌더링 명령 실행 중 (동시성: $1): $2",
+      "vi": "🚀 Chạy lệnh kết xuất (Đồng thời: $1): $2",
+      "th": "🚀 กำลังเรียกคำสั่งเรนเดอร์ (พร้อมกัน: $1): $2",
+      "id": "🚀 Menjalankan perintah render (Konkurensi: $1): $2",
+      "es": "🚀 Ejecutando comando de renderizado (Concurrencia: $1): $2",
+      "fr": "🚀 Exécution de la commande de rendu (Concurrence : $1) : $2",
+      "pt": "🚀 Executando comando de renderização (Concorrência: $1): $2",
+      "de": "🚀 Führe Render-Befehl aus (Parallelität: $1): $2",
+      "it": "🚀 Esecuzione comando di rendering (Concorrenza: $1): $2",
+      "ru": "🚀 Запуск команды рендеринга (Параллелизм: $1): $2",
+      "tr": "🚀 İşleme komutu çalıştırılıyor (Eşzamanlılık: $1): $2",
+    }
+  },
+  {
+    regex: /⚡\s*检测到本地历史 Chromium 缓存，正在提升至全局共享目录:\s*(.*)/g,
+    translations: {
+      "zh": "⚡ 检测到本地历史 Chromium 缓存，正在提升至全局共享目录: $1",
+      "en": "⚡ Detected local Chromium cache, promoting to shared global directory: $1",
+      "ja": "⚡ ローカルの Chromium キャッシュを検出し、共有ディレクトリへ移行中: $1",
+      "ko": "⚡ 로컬 Chromium 캐시 감지됨, 공유 전역 디렉터리로 승격 중: $1",
+      "vi": "⚡ Phát hiện bộ nhớ đệm Chromium cục bộ, đang chuyển lên thư mục dùng chung: $1",
+      "th": "⚡ พบแคช Chromium ในเครื่อง กำลังย้ายไปยังไดเรกทอรีที่ใช้ร่วมกัน: $1",
+      "id": "⚡ Cache Chromium lokal terdeteksi, memindahkan ke direktori bersama: $1",
+      "es": "⚡ Caché local de Chromium detectada, promoviendo a directorio global compartido: $1",
+      "fr": "⚡ Cache Chromium local détecté, promotion vers le répertoire partagé : $1",
+      "pt": "⚡ Cache local do Chromium detectado, movendo para o diretório global compartilhado: $1",
+      "de": "⚡ Lokaler Chromium-Cache erkannt, verschiebe in globales Verzeichnis: $1",
+      "it": "⚡ Cache Chromium locale rilevata, spostamento nella directory condivisa: $1",
+      "ru": "⚡ Обнаружен локальный кэш Chromium, перенос в общий каталог: $1",
+      "tr": "⚡ Yerel Chromium önbelleği algılandı, paylaşılan genel dizine taşınıyor: $1",
+    }
+  },
+  {
+    regex: /R2\s*微积分\s*FRQ\s*中文视频上传/g,
+    translations: {
+      "zh": "R2 微积分 FRQ 中文视频上传",
+      "en": "R2 AP Calculus FRQ Chinese video upload",
+      "ja": "R2 AP 微積分 FRQ 中国語動画アップロード",
+      "ko": "R2 AP 미적분 FRQ 중국어 동영상 업로드",
+      "vi": "Tải lên video tiếng Trung AP Calculus FRQ lên R2",
+      "th": "อัปโหลดวิดีโอภาษาจีน AP Calculus FRQ ไปยัง R2",
+      "id": "Unggah video Mandarin AP Calculus FRQ ke R2",
+      "es": "Subida a R2 de video en chino AP Calculus FRQ",
+      "fr": "Téléversement R2 vidéo chinoise AP Calculus FRQ",
+      "pt": "Upload R2 do vídeo em chinês AP Calculus FRQ",
+      "de": "R2-Upload chinesisches Video AP Calculus FRQ",
+      "it": "Caricamento R2 video cinese AP Calculus FRQ",
+      "ru": "Загрузка в R2 китайского видео AP Calculus FRQ",
+      "tr": "R2 AP Calculus FRQ Çince video yükleme",
+    }
+  },
+  {
+    regex: /R2\s*微积分\s*FRQ\s*英文视频上传/g,
+    translations: {
+      "zh": "R2 微积分 FRQ 英文视频上传",
+      "en": "R2 AP Calculus FRQ English video upload",
+      "ja": "R2 AP 微積分 FRQ 英語動画アップロード",
+      "ko": "R2 AP 미적분 FRQ 영어 동영상 업로드",
+      "vi": "Tải lên video tiếng Anh AP Calculus FRQ lên R2",
+      "th": "อัปโหลดวิดีโอภาษาอังกฤษ AP Calculus FRQ ไปยัง R2",
+      "id": "Unggah video Inggris AP Calculus FRQ ke R2",
+      "es": "Subida a R2 de video en inglés AP Calculus FRQ",
+      "fr": "Téléversement R2 vidéo anglaise AP Calculus FRQ",
+      "pt": "Upload R2 do vídeo em inglês AP Calculus FRQ",
+      "de": "R2-Upload englisches Video AP Calculus FRQ",
+      "it": "Caricamento R2 video inglese AP Calculus FRQ",
+      "ru": "Загрузка в R2 английского видео AP Calculus FRQ",
+      "tr": "R2 AP Calculus FRQ İngilizce video yükleme",
+    }
+  },
+  {
+    regex: /R2\s*微积分中文视频上传/g,
+    translations: {
+      "zh": "R2 微积分中文视频上传",
+      "en": "R2 AP Calculus Chinese video upload",
+      "ja": "R2 AP 微積分中国語動画アップロード",
+      "ko": "R2 AP 미적분 중국어 동영상 업로드",
+      "vi": "Tải lên video tiếng Trung AP Calculus lên R2",
+      "th": "อัปโหลดวิดีโอภาษาจีน AP Calculus ไปยัง R2",
+      "id": "Unggah video Mandarin AP Calculus ke R2",
+      "es": "Subida a R2 de video en chino AP Calculus",
+      "fr": "Téléversement R2 vidéo chinoise AP Calculus",
+      "pt": "Upload R2 do vídeo em chinês AP Calculus",
+      "de": "R2-Upload chinesisches Video AP Calculus",
+      "it": "Caricamento R2 video cinese AP Calculus",
+      "ru": "Загрузка в R2 китайского видео AP Calculus",
+      "tr": "R2 AP Calculus Çince video yükleme",
+    }
+  },
+  {
+    regex: /R2\s*微积分英文视频上传/g,
+    translations: {
+      "zh": "R2 微积分英文视频上传",
+      "en": "R2 AP Calculus English video upload",
+      "ja": "R2 AP 微積分英語動画アップロード",
+      "ko": "R2 AP 미적분 영어 동영상 업로드",
+      "vi": "Tải lên video tiếng Anh AP Calculus lên R2",
+      "th": "อัปโหลดวิดีโอภาษาอังกฤษ AP Calculus ไปยัง R2",
+      "id": "Unggah video Inggris AP Calculus ke R2",
+      "es": "Subida a R2 de video en inglés AP Calculus",
+      "fr": "Téléversement R2 vidéo anglaise AP Calculus",
+      "pt": "Upload R2 do vídeo em inglês AP Calculus",
+      "de": "R2-Upload englisches Video AP Calculus",
+      "it": "Caricamento R2 video inglese AP Calculus",
+      "ru": "Загрузка в R2 английского видео AP Calculus",
+      "tr": "R2 AP Calculus İngilizce video yükleme",
+    }
+  },
+  {
+    regex: /微积分 FRQ 视频渲染产物未能成功生成或上传/g,
+    translations: {
+      "zh": "微积分 FRQ 视频渲染产物未能成功生成或上传",
+      "en": "AP Calculus FRQ video output failed to render or upload",
+      "ja": "AP 微積分 FRQ 動画の生成またはアップロードに失敗しました",
+      "ko": "AP 미적분 FRQ 비디오 생성 또는 업로드에 실패했습니다",
+      "vi": "Không thể kết xuất hoặc tải lên sản phẩm video AP Calculus FRQ",
+      "th": "สร้างหรืออัปโหลดวิดีโอ AP Calculus FRQ ไม่สำเร็จ",
+      "id": "Gagal merender atau mengunggah video AP Calculus FRQ",
+      "es": "Error al generar o subir el video de AP Calculus FRQ",
+      "fr": "Échec de génération ou de téléversement de la vidéo AP Calculus FRQ",
+      "pt": "Falha ao renderizar ou enviar o vídeo AP Calculus FRQ",
+      "de": "AP Calculus FRQ-Video konnte nicht gerendert oder hochgeladen werden",
+      "it": "Rendering o caricamento del video AP Calculus FRQ non riuscito",
+      "ru": "Не удалось отрендерить или загрузить видео AP Calculus FRQ",
+      "tr": "AP Calculus FRQ video çıktısı oluşturulamadı veya yüklenemedi",
+    }
+  },
+  {
+    regex: /微积分视频渲染产物未能成功生成或上传/g,
+    translations: {
+      "zh": "微积分视频渲染产物未能成功生成或上传",
+      "en": "AP Calculus video output failed to render or upload",
+      "ja": "AP 微積分動画の生成またはアップロードに失敗しました",
+      "ko": "AP 미적분 비디오 생성 또는 업로드에 실패했습니다",
+      "vi": "Không thể kết xuất hoặc tải lên sản phẩm video AP Calculus",
+      "th": "สร้างหรืออัปโหลดวิดีโอ AP Calculus ไม่สำเร็จ",
+      "id": "Gagal merender atau mengunggah video AP Calculus",
+      "es": "Error al generar o subir el video de AP Calculus",
+      "fr": "Échec de génération ou de téléversement de la vidéo AP Calculus",
+      "pt": "Falha ao renderizar ou enviar o vídeo AP Calculus",
+      "de": "AP Calculus-Video konnte nicht gerendert oder hochgeladen werden",
+      "it": "Rendering o caricamento del video AP Calculus non riuscito",
+      "ru": "Не удалось отрендерить или загрузить видео AP Calculus",
+      "tr": "AP Calculus video çıktısı oluşturulamadı veya yüklenemedi",
+    }
+  },
+  {
+    regex: /🎯\s*拾取待渲染任务:\s*\[(.*?)\]\s*(.*)/g,
+    translations: {
+      "zh": "🎯 拾取待渲染任务: [$1] $2",
+      "en": "🎯 Picked up pending render task: [$1] $2",
+      "ja": "🎯 レンダリング待ちタスクを取得: [$1] $2",
+      "ko": "🎯 대기 중인 렌더링 작업 선택: [$1] $2",
+      "vi": "🎯 Đã nhận tác vụ chờ kết xuất: [$1] $2",
+      "th": "🎯 รับงานเรนเดอร์ที่รอดำเนินการ: [$1] $2",
+      "id": "🎯 Mengambil tugas render tertunda: [$1] $2",
+      "es": "🎯 Tarea de renderizado pendiente obtenida: [$1] $2",
+      "fr": "🎯 Tâche de rendu en attente récupérée : [$1] $2",
+      "pt": "🎯 Tarefa de renderização pendente obtida: [$1] $2",
+      "de": "🎯 Ausstehende Render-Aufgabe übernommen: [$1] $2",
+      "it": "🎯 Attività di rendering in sospeso acquisita: [$1] $2",
+      "ru": "🎯 Взята задача на рендеринг: [$1] $2",
+      "tr": "🎯 Bekleyen işleme görevi alındı: [$1] $2",
+    }
+  },
+  {
+    regex: /📂\s*存储目录路径:\s*(.*)/g,
+    translations: {
+      "zh": "📂 存储目录路径: $1",
+      "en": "📂 Storage directory path: $1",
+      "ja": "📂 ストレージディレクトリパス: $1",
+      "ko": "📂 저장 디렉터리 경로: $1",
+      "vi": "📂 Đường dẫn thư mục lưu trữ: $1",
+      "th": "📂 เส้นทางไดเรกทอรีจัดเก็บ: $1",
+      "id": "📂 Jalur direktori penyimpanan: $1",
+      "es": "📂 Ruta del directorio de almacenamiento: $1",
+      "fr": "📂 Chemin du répertoire de stockage : $1",
+      "pt": "📂 Caminho do diretório de armazenamento: $1",
+      "de": "📂 Speicherverzeichnispfad: $1",
+      "it": "📂 Percorso directory di archiviazione: $1",
+      "ru": "📂 Путь к каталогу хранения: $1",
+      "tr": "📂 Depolama dizini yolu: $1",
+    }
+  },
+  {
+    regex: /💾\s*本地存储位置:\s*(.*)/g,
+    translations: {
+      "zh": "💾 本地存储位置: $1",
+      "en": "💾 Local save location: $1",
+      "ja": "💾 ローカル保存先: $1",
+      "ko": "💾 로컬 저장 위치: $1",
+      "vi": "💾 Vị trí lưu cục bộ: $1",
+      "th": "💾 ตำแหน่งบันทึกในเครื่อง: $1",
+      "id": "💾 Lokasi penyimpanan lokal: $1",
+      "es": "💾 Ubicación de guardado local: $1",
+      "fr": "💾 Emplacement de sauvegarde local : $1",
+      "pt": "💾 Local de salvamento local: $1",
+      "de": "💾 Lokaler Speicherort: $1",
+      "it": "💾 Posizione salvataggio locale: $1",
+      "ru": "💾 Локальный путь сохранения: $1",
+      "tr": "💾 Yerel kayıt konumu: $1",
+    }
+  },
+  {
+    regex: /🔑\s*携带用户鉴权凭据:\s*(.*)/g,
+    translations: {
+      "zh": "🔑 携带用户鉴权凭据: $1",
+      "en": "🔑 Using user auth credentials: $1",
+      "ja": "🔑 ユーザー認証資格情報を使用中: $1",
+      "ko": "🔑 사용자 인증 자격 증명 사용 중: $1",
+      "vi": "🔑 Đang sử dụng thông tin xác thực người dùng: $1",
+      "th": "🔑 ใช้ข้อมูลยืนยันตัวตนผู้ใช้: $1",
+      "id": "🔑 Menggunakan kredensial autentikasi pengguna: $1",
+      "es": "🔑 Usando credenciales de usuario: $1",
+      "fr": "🔑 Utilisation des identifiants utilisateur : $1",
+      "pt": "🔑 Usando credenciais do usuário: $1",
+      "de": "🔑 Verwende Benutzer-Anmeldedaten: $1",
+      "it": "🔑 Uso credenziali utente: $1",
+      "ru": "🔑 Используются учетные данные пользователя: $1",
+      "tr": "🔑 Kullanıcı kimlik doğrulama bilgisi kullanılıyor: $1",
+    }
+  },
+  {
+    regex: /⚠️\s*提示:\s*当前未检测到登录 Token，若需服务端代理上传，请先在桌面客户端登录账号/g,
+    translations: {
+      "zh": "⚠️ 提示: 当前未检测到登录 Token，若需服务端代理上传，请先在桌面客户端登录账号",
+      "en": "⚠️ Tip: No login token detected; please sign in on the desktop app first for server proxy uploads",
+      "ja": "⚠️ ヒント: ログイントークンがありません。サーバープロキシアップロードを行うには先にログインしてください",
+      "ko": "⚠️ 팁: 로그인 토큰이 감지되지 않았습니다. 서버 프록시 업로드를 위해 먼저 데스크톱 앱에서 로그인하세요",
+      "vi": "⚠️ Mẹo: Chưa phát hiện Token đăng nhập; vui lòng đăng nhập trên ứng dụng máy tính để tải qua proxy máy chủ",
+      "th": "⚠️ คำแนะนำ: ไม่พบโทเค็นเข้าสู่ระบบ กรุณาเข้าสู่ระบบในแอปเดสก์ท็อปก่อนเพื่ออัปโหลดผ่านพร็อกซี",
+      "id": "⚠️ Tips: Token login tidak terdeteksi; silakan masuk di aplikasi desktop terlebih dahulu untuk unggahan proksi",
+      "es": "⚠️ Consejo: No se detectó token; inicie sesión primero en la app de escritorio para subidas por proxy",
+      "fr": "⚠️ Astuce : Aucun jeton détecté ; connectez-vous d'abord sur l'application bureau pour le téléversement proxy",
+      "pt": "⚠️ Dica: Nenhum token detectado; faça login no app desktop primeiro para uploads via proxy",
+      "de": "⚠️ Hinweis: Kein Login-Token erkannt; bitte zuerst in der Desktop-App anmelden",
+      "it": "⚠️ Suggerimento: Nessun token rilevato; accedi prima nell'app desktop per il caricamento proxy",
+      "ru": "⚠️ Совет: Токен не найден; войдите в настольном приложении для загрузки через прокси",
+      "tr": "⚠️ İpucu: Giriş belirteci bulunamadı; sunucu proxy yüklemesi için önce masaüstü uygulamasında oturum açın",
+    }
+  },
+  {
+    regex: /✅\s*任务 \[(.*?)\] 已由服务端原子锁定为「正在渲染」，开始本地渲染\.\.\./g,
+    translations: {
+      "zh": "✅ 任务 [$1] 已由服务端原子锁定为「正在渲染」，开始本地渲染...",
+      "en": "✅ Task [$1] atomically locked as \"rendering\" by server, starting local render...",
+      "ja": "✅ タスク [$1] がサーバーにより「レンダリング中」としてロックされました。ローカルレンダリングを開始...",
+      "ko": "✅ 작업 [$1]이(가) 서버에 의해 '렌더링 중'으로 원자적 잠금됨, 로컬 렌더링 시작...",
+      "vi": "✅ Tác vụ [$1] đã được máy chủ khóa sang \"đang kết xuất\", bắt đầu kết xuất cục bộ...",
+      "th": "✅ งาน [$1] ถูกล็อกสถานะเป็น \"กำลังเรนเดอร์\" โดยเซิร์ฟเวอร์แล้ว กำลังเริ่มเรนเดอร์ในเครื่อง...",
+      "id": "✅ Tugas [$1] dikunci secara atomik sebagai \"rendering\" oleh server, memulai render lokal...",
+      "es": "✅ Tarea [$1] bloqueada como \"renderizando\" por el servidor, iniciando renderizado local...",
+      "fr": "✅ Tâche [$1] verrouillée comme « rendu en cours » par le serveur, démarrage du rendu local...",
+      "pt": "✅ Tarefa [$1] bloqueada atomicamente como \"renderizando\" pelo servidor, iniciando render local...",
+      "de": "✅ Aufgabe [$1] atomar als \"rendering\" vom Server gesperrt, starte lokales Rendering...",
+      "it": "✅ Attività [$1] bloccata come \"rendering\" dal server, avvio rendering locale...",
+      "ru": "✅ Задача [$1] атомарно переведена сервером в «рендеринг», запуск локального рендеринга...",
+      "tr": "✅ Görev [$1] sunucu tarafından atomik olarak \"işleniyor\" şeklinde kilitlendi, yerel işleme başlatılıyor...",
+    }
+  },
+  {
+    regex: /📥\s*正在预下载并校验核心素材 \(音频\/图片\/文字\)\.\.\./g,
+    translations: {
+      "zh": "📥 正在预下载并校验核心素材 (音频/图片/文字)...",
+      "en": "📥 Pre-downloading and verifying core assets (audio/images/text)...",
+      "ja": "📥 コア素材 (音声/画像/テキスト) を事前ダウンロード・検証中...",
+      "ko": "📥 핵심 에셋(오디오/이미지/텍스트) 사전 다운로드 및 검증 중...",
+      "vi": "📥 Đang tải trước và xác minh tài nguyên cốt lõi (âm thanh/hình ảnh/văn bản)...",
+      "th": "📥 กำลังดาวน์โหลดล่วงหน้าและตรวจสอบทรัพยากรหลัก (เสียง/รูปภาพ/ข้อความ)...",
+      "id": "📥 Mengunduh awal dan memverifikasi aset inti (audio/gambar/teks)...",
+      "es": "📥 Predescargando y verificando recursos principales (audio/imágenes/texto)...",
+      "fr": "📥 Pré-téléchargement et vérification des ressources principales (audio/images/texte)...",
+      "pt": "📥 Pré-baixando e verificando recursos principais (áudio/imagens/texto)...",
+      "de": "📥 Lade Kern-Assets (Audio/Bilder/Text) vorab herunter und prüfe sie...",
+      "it": "📥 Pre-download e verifica delle risorse principali (audio/immagini/testo)...",
+      "ru": "📥 Предзагрузка и проверка основных ресурсов (аудио/изображения/текст)...",
+      "tr": "📥 Temel varlıklar (ses/görsel/metin) önceden indiriliyor ve doğrulanıyor...",
+    }
+  },
+  {
+    regex: /❌\s*素材缺失:\s*未能获取到有效的文字段落数据 \(segments 为空\)，拦截渲染以保护质量。/g,
+    translations: {
+      "zh": "❌ 素材缺失: 未能获取到有效的文字段落数据 (segments 为空)，拦截渲染以保护质量。",
+      "en": "❌ Missing assets: unable to obtain valid transcript segments (segments is empty), render aborted to protect quality.",
+      "ja": "❌ 素材不足: 有効な字幕セグメントを取得できません (segments が空)。品質保護のためレンダリングを中止します。",
+      "ko": "❌ 에셋 누락: 유효한 텍스트 세그먼트를 가져오지 못했습니다 (segments 비어 있음). 품질 보호를 위해 렌더링을 중단합니다.",
+      "vi": "❌ Thiếu tài nguyên: không lấy được dữ liệu phân đoạn chữ hợp lệ (segments trống), hủy kết xuất để bảo vệ chất lượng.",
+      "th": "❌ ขาดทรัพยากร: ไม่พบข้อมูลช่วงข้อความที่ถูกต้อง (segments ว่าง) ยกเลิกการเรนเดอร์เพื่อรักษาคุณภาพ",
+      "id": "❌ Aset hilang: gagal mendapatkan segmen teks yang valid (segments kosong), render dibatalkan.",
+      "es": "❌ Faltan recursos: no se obtuvieron segmentos de texto válidos (segments vacío), renderizado cancelado.",
+      "fr": "❌ Ressources manquantes : impossible d'obtenir les segments de texte valides (segments vide), rendu annulé.",
+      "pt": "❌ Recursos ausentes: falha ao obter segmentos de texto válidos (segments vazio), renderização cancelada.",
+      "de": "❌ Fehlende Assets: keine gültigen Textsegmente erhalten (segments leer), Rendering abgebrochen.",
+      "it": "❌ Risorse mancanti: impossibile ottenere segmenti di testo validi (segments vuoto), rendering annullato.",
+      "ru": "❌ Отсутствуют ресурсы: нет корректных текстовых сегментов (segments пуст), рендеринг отменен.",
+      "tr": "❌ Eksik varlık: geçerli metin bölümleri alınamadı (segments boş), kaliteyi korumak için işleme durduruldu.",
+    }
+  },
+  {
+    regex: /❌\s*音频素材准备失败:\s*无法下载或音频文件无效 \((.*?)\)/g,
+    translations: {
+      "zh": "❌ 音频素材准备失败: 无法下载或音频文件无效 ($1)",
+      "en": "❌ Audio asset preparation failed: unable to download or invalid audio file ($1)",
+      "ja": "❌ 音声素材の準備に失敗しました: ダウンロード不可または無効なファイル ($1)",
+      "ko": "❌ 오디오 에셋 준비 실패: 다운로드 실패 또는 잘못된 오디오 파일 ($1)",
+      "vi": "❌ Chuẩn bị tệp âm thanh thất bại: không thể tải xuống hoặc tệp không hợp lệ ($1)",
+      "th": "❌ เตรียมไฟล์เสียงล้มเหลว: ไม่สามารถดาวน์โหลดหรือไฟล์ไม่ถูกต้อง ($1)",
+      "id": "❌ Persiapan aset audio gagal: tidak dapat diunduh atau berkas tidak valid ($1)",
+      "es": "❌ Error al preparar audio: no se pudo descargar o archivo no válido ($1)",
+      "fr": "❌ Échec de préparation audio : téléchargement impossible ou fichier invalide ($1)",
+      "pt": "❌ Falha ao preparar áudio: erro ao baixar ou arquivo inválido ($1)",
+      "de": "❌ Vorbereitung der Audiodatei fehlgeschlagen: ungültig oder Download-Fehler ($1)",
+      "it": "❌ Preparazione audio non riuscita: download fallito o file non valido ($1)",
+      "ru": "❌ Ошибка подготовки аудио: не удалось скачать или файл поврежден ($1)",
+      "tr": "❌ Ses varlığı hazırlama başarısız: indirilemedi veya geçersiz dosya ($1)",
+    }
+  },
+  {
+    regex: /溯源共享来源专辑接口请求异常:\s*(.*)/g,
+    translations: {
+      "zh": "溯源共享来源专辑接口请求异常: $1",
+      "en": "Failed to query shared source album API: $1",
+      "ja": "共有元アルバム照会 API リクエストエラー: $1",
+      "ko": "공유 원본 앨범 조회 API 요청 오류: $1",
+      "vi": "Lỗi yêu cầu API truy tìm album chia sẻ gốc: $1",
+      "th": "เกิดข้อผิดพลาดในการเรียก API ค้นหาอัลบั้มต้นฉบับที่แชร์: $1",
+      "id": "Kesalahan permintaan API pelacakan album sumber bersama: $1",
+      "es": "Error en la solicitud de API del álbum compartido de origen: $1",
+      "fr": "Erreur de requête API vers l'album partagé source : $1",
+      "pt": "Erro na requisição à API do álbum compartilhado de origem: $1",
+      "de": "Fehler bei der API-Anfrage für geteiltes Quellalbum: $1",
+      "it": "Errore nella richiesta API per l'album condiviso sorgente: $1",
+      "ru": "Ошибка запроса API исходного общего альбома: $1",
+      "tr": "Paylaşılan kaynak albüm API isteği hatası: $1",
+    }
+  },
+  {
+    regex: /❌\s*图片素材准备失败:\s*01\.png 或 02\.png 无法下载或损坏，拦截渲染。/g,
+    translations: {
+      "zh": "❌ 图片素材准备失败: 01.png 或 02.png 无法下载或损坏，拦截渲染。",
+      "en": "❌ Image asset preparation failed: 01.png or 02.png missing/corrupted, aborting render.",
+      "ja": "❌ 画像素材の準備に失敗しました: 01.png または 02.png が取得できないか破損しています。",
+      "ko": "❌ 이미지 에셋 준비 실패: 01.png 또는 02.png를 다운로드할 수 없거나 손상되어 렌더링을 중단합니다.",
+      "vi": "❌ Chuẩn bị hình ảnh thất bại: 01.png hoặc 02.png không tải được hoặc bị hỏng, hủy kết xuất.",
+      "th": "❌ เตรียมไฟล์รูปภาพล้มเหลว: 01.png หรือ 02.png ดาวน์โหลดไม่ได้หรือเสียหาย ยกเลิกการเรนเดอร์",
+      "id": "❌ Persiapan gambar gagal: 01.png atau 02.png gagal diunduh atau rusak, render dibatalkan.",
+      "es": "❌ Error al preparar imágenes: no se pudo descargar 01.png o 02.png, renderizado cancelado.",
+      "fr": "❌ Échec de préparation des images : 01.png ou 02.png introuvable ou corrompu, rendu annulé.",
+      "pt": "❌ Falha ao preparar imagens: 01.png ou 02.png indisponível ou corrompido, render cancelado.",
+      "de": "❌ Bildvorbereitung fehlgeschlagen: 01.png oder 02.png defekt, Rendering abgebrochen.",
+      "it": "❌ Preparazione immagini non riuscita: 01.png o 02.png danneggiato, rendering annullato.",
+      "ru": "❌ Ошибка подготовки изображений: 01.png или 02.png недоступны, рендеринг отменен.",
+      "tr": "❌ Görsel varlık hazırlama başarısız: 01.png veya 02.png indirilemedi/bozuk, işleme durduruldu.",
+    }
+  },
+  {
+    regex: /⚠️\s*本地图片转 Base64 失败，降级使用远程 URL:\s*(.*)/g,
+    translations: {
+      "zh": "⚠️ 本地图片转 Base64 失败，降级使用远程 URL: $1",
+      "en": "⚠️ Local image Base64 conversion failed, falling back to remote URL: $1",
+      "ja": "⚠️ ローカル画像の Base64 変換に失敗しました。リモート URL にフォールバックします: $1",
+      "ko": "⚠️ 로컬 이미지 Base64 변환 실패, 원격 URL로 대체합니다: $1",
+      "vi": "⚠️ Chuyển ảnh cục bộ sang Base64 thất bại, dùng lại URL từ xa: $1",
+      "th": "⚠️ แปลงรูปภาพเป็น Base64 ล้มเหลว เปลี่ยนไปใช้ URL ระยะไกลแทน: $1",
+      "id": "⚠️ Konversi Base64 gambar lokal gagal, beralih ke URL jarak jauh: $1",
+      "es": "⚠️ Error al convertir imagen local a Base64, usando URL remota: $1",
+      "fr": "⚠️ Échec de conversion Base64 de l'image locale, repli sur l'URL distante : $1",
+      "pt": "⚠️ Falha ao converter imagem local para Base64, usando URL remota: $1",
+      "de": "⚠️ Lokale Base64-Bildkonvertierung fehlgeschlagen, weiche auf Remote-URL aus: $1",
+      "it": "⚠️ Conversione Base64 immagine locale non riuscita, uso URL remoto: $1",
+      "ru": "⚠️ Ошибка конвертации локального фото в Base64, возврат к URL: $1",
+      "tr": "⚠️ Yerel görsel Base64 dönüştürme başarısız, uzak URL kullanılıyor: $1",
+    }
+  },
+  {
+    regex: /✅\s*核心素材全部就绪:\s*采用 meta\.duration_en 视频时长 ([\d.]+)s \((\d+) 帧\)/g,
+    translations: {
+      "zh": "✅ 核心素材全部就绪: 采用 meta.duration_en 视频时长 $1s ($2 帧)",
+      "en": "✅ Core assets ready: video duration from meta.duration_en is $1s ($2 frames)",
+      "ja": "✅ コア素材の準備完了: 動画長 $1s ($2 フレーム, meta.duration_en 基準)",
+      "ko": "✅ 핵심 에셋 준비 완료: 비디오 길이 $1s ($2 프레임, meta.duration_en)",
+      "vi": "✅ Tài nguyên cốt lõi đã sẵn sàng: thời lượng $1s ($2 khung hình)",
+      "th": "✅ ทรัพยากรหลักพร้อมทั้งหมด: ความยาววิดีโอ $1 วินาที ($2 เฟรม)",
+      "id": "✅ Aset inti siap: durasi video $1s ($2 bingkai)",
+      "es": "✅ Recursos listos: duración del video $1s ($2 cuadros)",
+      "fr": "✅ Ressources prêtes : durée de la vidéo $1s ($2 images)",
+      "pt": "✅ Recursos prontos: duração do vídeo $1s ($2 quadros)",
+      "de": "✅ Kern-Assets bereit: Videodauer $1s ($2 Frames)",
+      "it": "✅ Risorse pronte: durata video $1s ($2 fotogrammi)",
+      "ru": "✅ Основные ресурсы готовы: длительность $1с ($2 кадров)",
+      "tr": "✅ Temel varlıklar hazır: video süresi $1sn ($2 kare)",
+    }
+  },
+  {
+    regex: /❌\s*【(.*?)】渲染失败:\s*(.*)/g,
+    translations: {
+      "zh": "❌ 【$1】渲染失败: $2",
+      "en": "❌ [$1] render failed: $2",
+      "ja": "❌ 【$1】レンダリング失敗: $2",
+      "ko": "❌ 【$1】 렌더링 실패: $2",
+      "vi": "❌ [$1] kết xuất thất bại: $2",
+      "th": "❌ [$1] การเรนเดอร์ล้มเหลว: $2",
+      "id": "❌ [$1] render gagal: $2",
+      "es": "❌ [$1] error al renderizar: $2",
+      "fr": "❌ [$1] échec du rendu : $2",
+      "pt": "❌ [$1] falha na renderização: $2",
+      "de": "❌ [$1] Rendering fehlgeschlagen: $2",
+      "it": "❌ [$1] rendering non riuscito: $2",
+      "ru": "❌ [$1] ошибка рендеринга: $2",
+      "tr": "❌ [$1] işleme başarısız: $2",
+    }
+  },
+  {
+    regex: /❌\s*【(.*?)】渲染流程完成但未在本地找到目标 MP4 文件:\s*(.*)/g,
+    translations: {
+      "zh": "❌ 【$1】渲染流程完成但未在本地找到目标 MP4 文件: $2",
+      "en": "❌ [$1] render finished but local output MP4 not found: $2",
+      "ja": "❌ 【$1】レンダリングは完了しましたが MP4 ファイルが見つかりません: $2",
+      "ko": "❌ 【$1】 렌더링이 완료되었으나 로컬 MP4 파일을 찾을 수 없습니다: $2",
+      "vi": "❌ [$1] kết xuất xong nhưng không tìm thấy tệp MP4 cục bộ: $2",
+      "th": "❌ [$1] เรนเดอร์เสร็จแล้วแต่ไม่พบไฟล์ MP4 ในเครื่อง: $2",
+      "id": "❌ [$1] render selesai tetapi berkas MP4 lokal tidak ditemukan: $2",
+      "es": "❌ [$1] renderizado finalizado pero no se encontró el MP4 local: $2",
+      "fr": "❌ [$1] rendu terminé mais fichier MP4 local introuvable : $2",
+      "pt": "❌ [$1] renderização concluída, mas MP4 local não encontrado: $2",
+      "de": "❌ [$1] Rendering fertig, aber lokale MP4-Datei fehlt: $2",
+      "it": "❌ [$1] rendering completato ma file MP4 locale non trovato: $2",
+      "ru": "❌ [$1] рендеринг завершен, но локальный MP4 не найден: $2",
+      "tr": "❌ [$1] işleme tamamlandı ancak yerel MP4 dosyası bulunamadı: $2",
+    }
+  },
+  {
+    regex: /🎵\s*【(.*?)】正在对音频轨做微小变调 \((.*?) 音分\)，人耳无感知但声学指纹差异化\.\.\./g,
+    translations: {
+      "zh": "🎵 【$1】正在对音频轨做微小变调 ($2 音分)，人耳无感知但声学指纹差异化...",
+      "en": "🎵 [$1] Applying subtle pitch shift ($2 cents) to audio track for unique fingerprint...",
+      "ja": "🎵 【$1】音声トラックに微細なピッチシフト ($2 セント) を適用中...",
+      "ko": "🎵 【$1】 오디오 트랙에 미세 피치 시프트 ($2 센트) 적용 중...",
+      "vi": "🎵 [$1] Đang điều chỉnh cao độ ($2 cents) cho dải âm thanh...",
+      "th": "🎵 [$1] กำลังปรับระดับเสียงแทร็กเสียง ($2 เซนต์)...",
+      "id": "🎵 [$1] Menerapkan pitch shift halus ($2 sen) pada trek audio...",
+      "es": "🎵 [$1] Aplicando cambio sutil de tono ($2 cents) a la pista de audio...",
+      "fr": "🎵 [$1] Application d'un léger changement de hauteur ($2 cents) à la piste audio...",
+      "pt": "🎵 [$1] Aplicando alteração sutil de tom ($2 cents) na faixa de áudio...",
+      "de": "🎵 [$1] Subtile Tonhöhenänderung ($2 Cents) auf die Tonspur anwenden...",
+      "it": "🎵 [$1] Applicazione cambio tonalità ($2 cents) alla traccia audio...",
+      "ru": "🎵 [$1] Применение питч-шифта ($2 центов) к аудиодорожке...",
+      "tr": "🎵 [$1] Ses parçasına ince ton kaydırma ($2 cent) uygulanıyor...",
+    }
+  },
+  {
+    regex: /✅\s*【(.*?)】音频变调处理完成 \((.*?) 音分\)/g,
+    translations: {
+      "zh": "✅ 【$1】音频变调处理完成 ($2 音分)",
+      "en": "✅ [$1] Audio pitch shift completed ($2 cents)",
+      "ja": "✅ 【$1】音声ピッチシフト完了 ($2 セント)",
+      "ko": "✅ 【$1】 오디오 피치 시프트 완료 ($2 센트)",
+      "vi": "✅ [$1] Điều chỉnh cao độ âm thanh hoàn tất ($2 cents)",
+      "th": "✅ [$1] ปรับระดับเสียงเสร็จสมบูรณ์ ($2 เซนต์)",
+      "id": "✅ [$1] Pitch shift audio selesai ($2 sen)",
+      "es": "✅ [$1] Cambio de tono completado ($2 cents)",
+      "fr": "✅ [$1] Changement de hauteur audio terminé ($2 cents)",
+      "pt": "✅ [$1] Alteração de tom concluída ($2 cents)",
+      "de": "✅ [$1] Tonhöhenänderung abgeschlossen ($2 Cents)",
+      "it": "✅ [$1] Cambio tonalità audio completato ($2 cents)",
+      "ru": "✅ [$1] Питч-шифт аудио выполнен ($2 центов)",
+      "tr": "✅ [$1] Ses ton kaydırma tamamlandı ($2 cent)",
+    }
+  },
+  {
+    regex: /⚠️\s*【(.*?)】音频变调处理失败，将使用未变调版本继续上传/g,
+    translations: {
+      "zh": "⚠️ 【$1】音频变调处理失败，将使用未变调版本继续上传",
+      "en": "⚠️ [$1] Audio pitch shift failed, continuing upload with original audio",
+      "ja": "⚠️ 【$1】音声ピッチシフトに失敗しました。元の音声でアップロードを続行します",
+      "ko": "⚠️ 【$1】 오디오 피치 시프트 실패, 원본 오디오로 계속 업로드합니다",
+      "vi": "⚠️ [$1] Điều chỉnh cao độ thất bại, tiếp tục tải lên bản gốc",
+      "th": "⚠️ [$1] ปรับระดับเสียงล้มเหลว จะอัปโหลดเวอร์ชันต้นฉบับแทน",
+      "id": "⚠️ [$1] Pitch shift gagal, melanjutkan unggahan dengan audio asli",
+      "es": "⚠️ [$1] Falló el cambio de tono, continuando con el audio original",
+      "fr": "⚠️ [$1] Échec du changement de hauteur, poursuite avec l'audio d'origine",
+      "pt": "⚠️ [$1] Falha na alteração de tom, continuando upload com áudio original",
+      "de": "⚠️ [$1] Tonhöhenänderung fehlgeschlagen, lade Original-Audio hoch",
+      "it": "⚠️ [$1] Cambio tonalità fallito, continuo con l'audio originale",
+      "ru": "⚠️ [$1] Ошибка питч-шифта, загрузка исходной дорожки",
+      "tr": "⚠️ [$1] Ses ton kaydırma başarısız, orijinal ses ile yüklemeye devam ediliyor",
+    }
+  },
+  {
+    regex: /📤\s*服务端代理上传【(.*?)】:\s*(.*?)\s*\((.*?) MB\)\.\.\./g,
+    translations: {
+      "zh": "📤 服务端代理上传【$1】: $2 ($3 MB)...",
+      "en": "📤 Server proxy upload [$1]: $2 ($3 MB)...",
+      "ja": "📤 サーバープロキシアップロード【$1】: $2 ($3 MB)...",
+      "ko": "📤 서버 프록시 업로드【$1】: $2 ($3 MB)...",
+      "vi": "📤 Tải lên qua proxy máy chủ [$1]: $2 ($3 MB)...",
+      "th": "📤 อัปโหลดผ่านพร็อกซีเซิร์ฟเวอร์ [$1]: $2 ($3 MB)...",
+      "id": "📤 Unggah proksi server [$1]: $2 ($3 MB)...",
+      "es": "📤 Subida proxy [$1]: $2 ($3 MB)...",
+      "fr": "📤 Téléversement proxy [$1] : $2 ($3 Mo)...",
+      "pt": "📤 Upload proxy [$1]: $2 ($3 MB)...",
+      "de": "📤 Server-Proxy-Upload [$1]: $2 ($3 MB)...",
+      "it": "📤 Caricamento proxy [$1]: $2 ($3 MB)...",
+      "ru": "📤 Загрузка через прокси [$1]: $2 ($3 МБ)...",
+      "tr": "📤 Sunucu proxy yüklemesi [$1]: $2 ($3 MB)...",
+    }
+  },
+  {
+    regex: /📤\s*本地直传上传【(.*?)】:\s*(.*?)\.\.\./g,
+    translations: {
+      "zh": "📤 本地直传上传【$1】: $2...",
+      "en": "📤 Local direct R2 upload [$1]: $2...",
+      "ja": "📤 ローカル R2 直接アップロード【$1】: $2...",
+      "ko": "📤 로컬 R2 직접 업로드【$1】: $2...",
+      "vi": "📤 Tải trực tiếp R2 [$1]: $2...",
+      "th": "📤 อัปโหลดตรงไปยัง R2 [$1]: $2...",
+      "id": "📤 Unggah langsung lokal R2 [$1]: $2...",
+      "es": "📤 Subida directa local R2 [$1]: $2...",
+      "fr": "📤 Téléversement direct R2 [$1] : $2...",
+      "pt": "📤 Upload direto R2 [$1]: $2...",
+      "de": "📤 Direkter R2-Upload [$1]: $2...",
+      "it": "📤 Caricamento diretto R2 [$1]: $2...",
+      "ru": "📤 Прямая загрузка в R2 [$1]: $2...",
+      "tr": "📤 Doğrudan yerel R2 yüklemesi [$1]: $2...",
+    }
+  },
+  {
+    regex: /⚠️\s*任务 \[(.*?)\] 视频已上传成功，但状态回写遇到网络波动，请人工核查/g,
+    translations: {
+      "zh": "⚠️ 任务 [$1] 视频已上传成功，但状态回写遇到网络波动，请人工核查",
+      "en": "⚠️ Task [$1] video uploaded successfully, but status update failed due to network fluctuation; please verify",
+      "ja": "⚠️ タスク [$1] 動画のアップロードは成功しましたが、ステータス同期に失敗しました。ご確認ください",
+      "ko": "⚠️ 작업 [$1] 비디오 업로드는 성공했으나 네트워크 오류로 상태 업데이트에 실패했습니다",
+      "vi": "⚠️ Tác vụ [$1] đã tải video lên thành công nhưng cập nhật trạng thái gặp lỗi mạng",
+      "th": "⚠️ งาน [$1] อัปโหลดวิดีโอสำเร็จแล้ว แต่อัปเดตสถานะไม่สำเร็จเนื่องจากปัญหาเครือข่าย",
+      "id": "⚠️ Tugas [$1] video berhasil diunggah, tetapi pembaruan status gagal karena gangguan jaringan",
+      "es": "⚠️ Tarea [$1] video subido, pero falló la actualización de estado por inestabilidad de red",
+      "fr": "⚠️ Tâche [$1] vidéo téléversée, mais échec de mise à jour du statut suite à une erreur réseau",
+      "pt": "⚠️ Tarefa [$1] vídeo enviado, mas falha ao atualizar status devido à rede",
+      "de": "⚠️ Aufgabe [$1] Video hochgeladen, aber Status-Update wegen Netzwerkfehler fehlgeschlagen",
+      "it": "⚠️ Attività [$1] video caricato, ma aggiornamento stato non riuscito per errore di rete",
+      "ru": "⚠️ Задача [$1] видео загружено, но обновление статуса не удалось из-за сбоя сети",
+      "tr": "⚠️ Görev [$1] video yüklendi ancak ağ sorunu nedeniyle durum güncellenemedi",
+    }
+  },
+  {
+    regex: /❌\s*视频上传或回写状态失败:\s*(.*)/g,
+    translations: {
+      "zh": "❌ 视频上传或回写状态失败: $1",
+      "en": "❌ Video upload or status sync failed: $1",
+      "ja": "❌ 動画のアップロードまたは状態更新に失敗しました: $1",
+      "ko": "❌ 비디오 업로드 또는 상태 업데이트 실패: $1",
+      "vi": "❌ Tải video lên hoặc cập nhật trạng thái thất bại: $1",
+      "th": "❌ อัปโหลดวิดีโอหรืออัปเดตสถานะล้มเหลว: $1",
+      "id": "❌ Gagal mengunggah video atau memperbarui status: $1",
+      "es": "❌ Error al subir video o actualizar estado: $1",
+      "fr": "❌ Échec du téléversement ou de la mise à jour du statut : $1",
+      "pt": "❌ Falha ao enviar vídeo ou atualizar status: $1",
+      "de": "❌ Video-Upload oder Status-Synchronisierung fehlgeschlagen: $1",
+      "it": "❌ Caricamento video o aggiornamento stato non riuscito: $1",
+      "ru": "❌ Ошибка загрузки видео или обновления статуса: $1",
+      "tr": "❌ Video yükleme veya durum güncelleme başarısız: $1",
+    }
+  },
+  {
+    regex: /无法建立 SSE 连接 \(HTTP (\d+)\)/g,
+    translations: {
+      "zh": "无法建立 SSE 连接 (HTTP $1)",
+      "en": "Failed to establish SSE connection (HTTP $1)",
+      "ja": "SSE 接続を確立できません (HTTP $1)",
+      "ko": "SSE 연결 수립 실패 (HTTP $1)",
+      "vi": "Không thể thiết lập kết nối SSE (HTTP $1)",
+      "th": "ไม่สามารถสร้างการเชื่อมต่อ SSE ได้ (HTTP $1)",
+      "id": "Gagal membuat koneksi SSE (HTTP $1)",
+      "es": "No se pudo establecer conexión SSE (HTTP $1)",
+      "fr": "Impossible d'établir la connexion SSE (HTTP $1)",
+      "pt": "Falha ao estabelecer conexão SSE (HTTP $1)",
+      "de": "SSE-Verbindung konnte nicht hergestellt werden (HTTP $1)",
+      "it": "Impossibile stabilire connessione SSE (HTTP $1)",
+      "ru": "Не удалось установить SSE-соединение (HTTP $1)",
+      "tr": "SSE bağlantısı kurulamadı (HTTP $1)",
+    }
+  },
+  {
+    regex: /解析或抢占 \[(.*?)\] SSE 任务异常:\s*(.*)/g,
+    translations: {
+      "zh": "解析或抢占 [$1] SSE 任务异常: $2",
+      "en": "Error parsing or claiming [$1] SSE task: $2",
+      "ja": "[$1] SSE タスクの解析または取得エラー: $2",
+      "ko": "[$1] SSE 작업 파싱 또는 선점 오류: $2",
+      "vi": "Lỗi phân tích hoặc nhận tác vụ SSE [$1]: $2",
+      "th": "เกิดข้อผิดพลาดในการแยกวิเคราะห์หรือรับงาน SSE [$1]: $2",
+      "id": "Kesalahan memproses atau mengklaim tugas SSE [$1]: $2",
+      "es": "Error al analizar o reclamar tarea SSE [$1]: $2",
+      "fr": "Erreur lors de l'analyse ou prise de la tâche SSE [$1] : $2",
+      "pt": "Erro ao processar ou reivindicar tarefa SSE [$1]: $2",
+      "de": "Fehler beim Verarbeiten oder Übernehmen der [$1] SSE-Aufgabe: $2",
+      "it": "Errore nell'analisi o acquisizione dell'attività SSE [$1]: $2",
+      "ru": "Ошибка разбора или захвата задачи SSE [$1]: $2",
+      "tr": "[$1] SSE görevini ayrıştırma veya alma hatası: $2",
+    }
+  },
+  {
+    regex: /\[(.*?)\]\s*SSE 线程异常:\s*(.*)/g,
+    translations: {
+      "zh": "[$1] SSE 线程异常: $2",
+      "en": "[$1] SSE thread error: $2",
+      "ja": "[$1] SSE スレッドエラー: $2",
+      "ko": "[$1] SSE 스레드 오류: $2",
+      "vi": "[$1] Lỗi luồng SSE: $2",
+      "th": "[$1] ข้อผิดพลาดเธรด SSE: $2",
+      "id": "[$1] Kesalahan utas SSE: $2",
+      "es": "[$1] Error en hilo SSE: $2",
+      "fr": "[$1] Erreur de thread SSE : $2",
+      "pt": "[$1] Erro na thread SSE: $2",
+      "de": "[$1] SSE-Thread-Fehler: $2",
+      "it": "[$1] Errore thread SSE: $2",
+      "ru": "[$1] Ошибка потока SSE: $2",
+      "tr": "[$1] SSE iş parçacığı hatası: $2",
+    }
+  },
+  {
+    regex: /☁️\s*视频上传通道:\s*(.*)/g,
+    translations: {
+      "zh": "☁️ 视频上传通道: $1",
+      "en": "☁️ Video Upload Channel: $1",
+      "ja": "☁️ 動画アップロード経路: $1",
+      "ko": "☁️ 비디오 업로드 채널: $1",
+      "vi": "☁️ Kênh tải video lên: $1",
+      "th": "☁️ ช่องทางอัปโหลดวิดีโอ: $1",
+      "id": "☁️ Saluran Unggah Video: $1",
+      "es": "☁️ Canal de carga de video: $1",
+      "fr": "☁️ Canal de téléversement vidéo : $1",
+      "pt": "☁️ Canal de upload de vídeo: $1",
+      "de": "☁️ Video-Upload-Kanal: $1",
+      "it": "☁️ Canale caricamento video: $1",
+      "ru": "☁️ Канал загрузки видео: $1",
+      "tr": "☁️ Video Yükleme Kanalı: $1",
+    }
+  },
+  {
+    regex: /🔑\s*用户会话鉴权:\s*(.*)/g,
+    translations: {
+      "zh": "🔑 用户会话鉴权: $1",
+      "en": "🔑 Session Auth: $1",
+      "ja": "🔑 セッション認証: $1",
+      "ko": "🔑 사용자 세션 인증: $1",
+      "vi": "🔑 Xác thực phiên: $1",
+      "th": "🔑 การยืนยันตัวตนเซสชัน: $1",
+      "id": "🔑 Autentikasi Sesi: $1",
+      "es": "🔑 Autenticación de sesión: $1",
+      "fr": "🔑 Authentification de session : $1",
+      "pt": "🔑 Autenticação de sessão: $1",
+      "de": "🔑 Sitzungsauthentifizierung: $1",
+      "it": "🔑 Autenticazione sessione: $1",
+      "ru": "🔑 Авторизация сеанса: $1",
+      "tr": "🔑 Oturum Kimlik Doğrulaması: $1",
+    }
+  },
+  {
+    regex: /⚡\s*Remotion 缓存 \((.*?)\):\s*(.*)/g,
+    translations: {
+      "zh": "⚡ Remotion 缓存 ($1): $2",
+      "en": "⚡ Remotion Cache ($1): $2",
+      "ja": "⚡ Remotion キャッシュ ($1): $2",
+      "ko": "⚡ Remotion 캐시 ($1): $2",
+      "vi": "⚡ Bộ đệm Remotion ($1): $2",
+      "th": "⚡ แคช Remotion ($1): $2",
+      "id": "⚡ Cache Remotion ($1): $2",
+      "es": "⚡ Caché Remotion ($1): $2",
+      "fr": "⚡ Cache Remotion ($1) : $2",
+      "pt": "⚡ Cache Remotion ($1): $2",
+      "de": "⚡ Remotion-Cache ($1): $2",
+      "it": "⚡ Cache Remotion ($1): $2",
+      "ru": "⚡ Кэш Remotion ($1): $2",
+      "tr": "⚡ Remotion Önbelleği ($1): $2",
+    }
+  },
+  {
+    regex: /🔁\s*运行模式:\s*(.*)/g,
+    translations: {
+      "zh": "🔁 运行模式: $1",
+      "en": "🔁 Run Mode: $1",
+      "ja": "🔁 実行モード: $1",
+      "ko": "🔁 실행 모드: $1",
+      "vi": "🔁 Chế độ chạy: $1",
+      "th": "🔁 โหมดการทำงาน: $1",
+      "id": "🔁 Mode Eksekusi: $1",
+      "es": "🔁 Modo de ejecución: $1",
+      "fr": "🔁 Mode d'exécution : $1",
+      "pt": "🔁 Modo de execução: $1",
+      "de": "🔁 Ausführungsmodus: $1",
+      "it": "🔁 Modalità di esecuzione: $1",
+      "ru": "🔁 Режим работы: $1",
+      "tr": "🔁 Çalışma Modu: $1",
+    }
+  },
+  // ── 短语、状态标签、模块名与服务端报错兜底规则（必须位于整句规则之后，确保 $1/$2 内部片段精确翻译）──
+  {
+    regex: /网络操作/g,
+    translations: {
+      "zh": "网络操作",
+      "en": "Network operation",
+      "ja": "ネットワーク操作",
+      "ko": "네트워크 작업",
+      "vi": "Thao tác mạng",
+      "th": "การดำเนินการเครือข่าย",
+      "id": "Operasi jaringan",
+      "es": "Operación de red",
+      "fr": "Opération réseau",
+      "pt": "Operação de rede",
+      "de": "Netzwerkoperation",
+      "it": "Operazione di rete",
+      "ru": "Сетевая операция",
+      "tr": "Ağ işlemi",
+    }
+  },
+  {
+    regex: /更新状态为 (\S+)/g,
+    translations: {
+      "zh": "更新状态为 $1",
+      "en": "update status to $1",
+      "ja": "ステータスを $1 に更新",
+      "ko": "상태를 $1(으)로 업데이트",
+      "vi": "cập nhật trạng thái thành $1",
+      "th": "อัปเดตสถานะเป็น $1",
+      "id": "perbarui status ke $1",
+      "es": "actualizar estado a $1",
+      "fr": "mettre à jour le statut vers $1",
+      "pt": "atualizar status para $1",
+      "de": "Status auf $1 aktualisieren",
+      "it": "aggiorna stato a $1",
+      "ru": "обновление статуса до $1",
+      "tr": "durumu $1 olarak güncelle",
+    }
+  },
+  {
+    regex: /服务端代理上传视频 \((.*?)\)/g,
+    translations: {
+      "zh": "服务端代理上传视频 ($1)",
+      "en": "server proxy upload video ($1)",
+      "ja": "サーバープロキシ動画アップロード ($1)",
+      "ko": "서버 프록시 비디오 업로드 ($1)",
+      "vi": "tải video qua proxy máy chủ ($1)",
+      "th": "อัปโหลดวิดีโอผ่านพร็อกซีเซิร์ฟเวอร์ ($1)",
+      "id": "unggah video proksi server ($1)",
+      "es": "subida proxy de video ($1)",
+      "fr": "téléversement vidéo via proxy ($1)",
+      "pt": "upload proxy de vídeo ($1)",
+      "de": "Server-Proxy-Video-Upload ($1)",
+      "it": "caricamento proxy video ($1)",
+      "ru": "загрузка видео через прокси сервера ($1)",
+      "tr": "sunucu proxy video yükleme ($1)",
+    }
+  },
+  {
+    regex: /流水线接续抢单/g,
+    translations: {
+      "zh": "流水线接续抢单",
+      "en": "Pipeline Continuous Claiming",
+      "ja": "パイプライン継続タスク取得",
+      "ko": "파이프라인 연속 작업 잠금",
+      "vi": "Nhận tác vụ liên tục dạng đường ống",
+      "th": "การรับงานต่อเนื่องแบบไปป์ไลน์",
+      "id": "Pengambilan tugas berkelanjutan pipeline",
+      "es": "Reclamación continua de tareas en canalización",
+      "fr": "Réclamation continue des tâches en pipeline",
+      "pt": "Reivindicação contínua de tarefas em pipeline",
+      "de": "Kontinuierliche Pipeline-Aufgabenübernahme",
+      "it": "Acquisizione continua di attività in pipeline",
+      "ru": "Непрерывный захват задач конвейера",
+      "tr": "Ardışık düzen sürekli görev alma",
+    }
+  },
+  {
+    regex: /⚡\s*本地直传模式 \(Local R2\)/g,
+    translations: {
+      "zh": "⚡ 本地直传模式 (Local R2)",
+      "en": "⚡ Local Direct Upload (Local R2)",
+      "ja": "⚡ ローカル直接アップロード (Local R2)",
+      "ko": "⚡ 로컬 직접 업로드 모드 (Local R2)",
+      "vi": "⚡ Tải trực tiếp cục bộ (Local R2)",
+      "th": "⚡ อัปโหลดตรงจากเครื่อง (Local R2)",
+      "id": "⚡ Unggah Langsung Lokal (Local R2)",
+      "es": "⚡ Subida directa local (Local R2)",
+      "fr": "⚡ Téléversement direct local (Local R2)",
+      "pt": "⚡ Upload direto local (Local R2)",
+      "de": "⚡ Direkter lokaler Upload (Local R2)",
+      "it": "⚡ Caricamento diretto locale (Local R2)",
+      "ru": "⚡ Прямая загрузка (Local R2)",
+      "tr": "⚡ Yerel Doğrudan Yükleme (Local R2)",
+    }
+  },
+  {
+    regex: /🌐\s*服务端安全代理模式 \(Server R2 Proxy\)/g,
+    translations: {
+      "zh": "🌐 服务端安全代理模式 (Server R2 Proxy)",
+      "en": "🌐 Server Secure Proxy Mode (Server R2 Proxy)",
+      "ja": "🌐 サーバーセキュアプロキシ (Server R2 Proxy)",
+      "ko": "🌐 서버 보안 프록시 모드 (Server R2 Proxy)",
+      "vi": "🌐 Chế độ Proxy bảo mật máy chủ (Server R2 Proxy)",
+      "th": "🌐 โหมดพร็อกซีเซิร์ฟเวอร์ปลอดภัย (Server R2 Proxy)",
+      "id": "🌐 Mode Proksi Aman Server (Server R2 Proxy)",
+      "es": "🌐 Modo Proxy Seguro del Servidor (Server R2 Proxy)",
+      "fr": "🌐 Mode Proxy Sécurisé Serveur (Server R2 Proxy)",
+      "pt": "🌐 Modo Proxy Seguro do Servidor (Server R2 Proxy)",
+      "de": "🌐 Sicherer Server-Proxy (Server R2 Proxy)",
+      "it": "🌐 Modalità Proxy Sicuro Server (Server R2 Proxy)",
+      "ru": "🌐 Защищенный прокси сервера (Server R2 Proxy)",
+      "tr": "🌐 Güvenli Sunucu Proxy Modu (Server R2 Proxy)",
+    }
+  },
+  {
+    regex: /✅\s*已绑定当前用户 Token \(安全会话\)/g,
+    translations: {
+      "zh": "✅ 已绑定当前用户 Token (安全会话)",
+      "en": "✅ Bound current user token (secure session)",
+      "ja": "✅ ユーザートークン連携済み (セキュアセッション)",
+      "ko": "✅ 현재 사용자 토큰 바인딩됨 (보안 세션)",
+      "vi": "✅ Đã gắn Token người dùng hiện tại (phiên bảo mật)",
+      "th": "✅ ผูกโทเค็นผู้ใช้ปัจจุบันแล้ว (เซสชันปลอดภัย)",
+      "id": "✅ Token pengguna saat ini terikat (sesi aman)",
+      "es": "✅ Token de usuario vinculado (sesión segura)",
+      "fr": "✅ Jeton utilisateur lié (session sécurisée)",
+      "pt": "✅ Token do usuário vinculado (sessão segura)",
+      "de": "✅ Benutzer-Token gebunden (sichere Sitzung)",
+      "it": "✅ Token utente associato (sessione sicura)",
+      "ru": "✅ Токен пользователя привязан (безопасный сеанс)",
+      "tr": "✅ Geçerli kullanıcı belirteci bağlandı (güvenli oturum)",
+    }
+  },
+  {
+    regex: /⚠️\s*未传入 Token \(公共无鉴权模式\)/g,
+    translations: {
+      "zh": "⚠️ 未传入 Token (公共无鉴权模式)",
+      "en": "⚠️ No token provided (unauthenticated public mode)",
+      "ja": "⚠️ トークン未指定 (パブリック非認証モード)",
+      "ko": "⚠️ 토큰 미입력 (공개 비인증 모드)",
+      "vi": "⚠️ Chưa truyền Token (chế độ công khai không xác thực)",
+      "th": "⚠️ ไม่ได้ส่งโทเค็น (โหมดสาธารณะไม่ยืนยันตัวตน)",
+      "id": "⚠️ Token tidak diberikan (mode publik tanpa autentikasi)",
+      "es": "⚠️ Sin token (modo público sin autenticar)",
+      "fr": "⚠️ Aucun jeton fourni (mode public sans authentification)",
+      "pt": "⚠️ Nenhum token fornecido (modo público não autenticado)",
+      "de": "⚠️ Kein Token übergeben (nicht authentifiziert)",
+      "it": "⚠️ Nessun token fornito (modalità pubblica non autenticata)",
+      "ru": "⚠️ Токен не передан (без авторизации)",
+      "tr": "⚠️ Belirteç verilmedi (kimlik doğrulamasız genel mod)",
+    }
+  },
+  {
+    regex: /✅\s*已就绪 \(秒级免打包\)/g,
+    translations: {
+      "zh": "✅ 已就绪 (秒级免打包)",
+      "en": "✅ Ready (instant, no rebundling)",
+      "ja": "✅ 準備完了 (再バンドル不要)",
+      "ko": "✅ 준비됨 (즉시 실행)",
+      "vi": "✅ Đã sẵn sàng (không cần đóng gói lại)",
+      "th": "✅ พร้อมใช้งาน (ไม่ต้องแพ็กใหม่)",
+      "id": "✅ Siap (instan tanpa bundling)",
+      "es": "✅ Listo (instantáneo)",
+      "fr": "✅ Prêt (instantané sans recompilation)",
+      "pt": "✅ Pronto (instantâneo)",
+      "de": "✅ Bereit (Sofortstart)",
+      "it": "✅ Pronto (istantaneo)",
+      "ru": "✅ Готово (без пересборки)",
+      "tr": "✅ Hazır (anında)",
+    }
+  },
+  {
+    regex: /⏳\s*首次任务自动固化/g,
+    translations: {
+      "zh": "⏳ 首次任务自动固化",
+      "en": "⏳ Auto-initialized on first task",
+      "ja": "⏳ 初回タスク時に自動構築",
+      "ko": "⏳ 첫 번째 작업 시 자동 초기화",
+      "vi": "⏳ Tự động khởi tạo ở tác vụ đầu tiên",
+      "th": "⏳ สร้างอัตโนมัติในงานแรก",
+      "id": "⏳ Inisialisasi otomatis pada tugas pertama",
+      "es": "⏳ Se inicializará en la primera tarea",
+      "fr": "⏳ Initialisation auto à la première tâche",
+      "pt": "⏳ Inicializado automaticamente na primeira tarefa",
+      "de": "⏳ Wird bei der ersten Aufgabe initialisiert",
+      "it": "⏳ Inizializzato alla prima attività",
+      "ru": "⏳ Инициализация при первой задаче",
+      "tr": "⏳ İlk görevde otomatik hazırlanır",
+    }
+  },
+  {
+    regex: /单次执行 \(--once\)/g,
+    translations: {
+      "zh": "单次执行 (--once)",
+      "en": "Single run (--once)",
+      "ja": "単一実行 (--once)",
+      "ko": "단일 실행 (--once)",
+      "vi": "Chạy một lần (--once)",
+      "th": "ทำงานครั้งเดียว (--once)",
+      "id": "Sekali jalan (--once)",
+      "es": "Ejecución única (--once)",
+      "fr": "Exécution unique (--once)",
+      "pt": "Execução única (--once)",
+      "de": "Einzellauf (--once)",
+      "it": "Esecuzione singola (--once)",
+      "ru": "Однократный запуск (--once)",
+      "tr": "Tek çalıştırma (--once)",
+    }
+  },
+  {
+    regex: /后台守护监听/g,
+    translations: {
+      "zh": "后台守护监听",
+      "en": "Background Daemon Listener",
+      "ja": "バックグラウンド常駐監視",
+      "ko": "백그라운드 데몬 리스너",
+      "vi": "Lắng nghe nền liên tục",
+      "th": "ตัวฟังเบื้องหลังต่อเนื่อง",
+      "id": "Daemon Latar Belakang",
+      "es": "Demonio en segundo plano",
+      "fr": "Démon d'écoute en arrière-plan",
+      "pt": "Daemon em segundo plano",
+      "de": "Hintergrund-Daemon-Listener",
+      "it": "Daemon in background",
+      "ru": "Фоновый демон",
+      "tr": "Arka Plan Dinleyicisi",
+    }
+  },
+  {
+    regex: /\[未知\]/g,
+    translations: {
+      "zh": "[未知]",
+      "en": "[Unknown]",
+      "ja": "[不明]",
+      "ko": "[알 수 없음]",
+      "vi": "[Không rõ]",
+      "th": "[ไม่ทราบ]",
+      "id": "[Tidak diketahui]",
+      "es": "[Desconocido]",
+      "fr": "[Inconnu]",
+      "pt": "[Desconhecido]",
+      "de": "[Unbekannt]",
+      "it": "[Sconosciuto]",
+      "ru": "[Неизвестно]",
+      "tr": "[Bilinmiyor]",
+    }
+  },
+  {
+    regex: /\[源目录\]/g,
+    translations: {
+      "zh": "[源目录]",
+      "en": "[Source Dir]",
+      "ja": "[元ディレクトリ]",
+      "ko": "[원본 디렉터리]",
+      "vi": "[Thư mục nguồn]",
+      "th": "[ไดเรกทอรีต้นทาง]",
+      "id": "[Direktori sumber]",
+      "es": "[Directorio origen]",
+      "fr": "[Répertoire source]",
+      "pt": "[Diretório de origem]",
+      "de": "[Quellverzeichnis]",
+      "it": "[Directory sorgente]",
+      "ru": "[Исходный каталог]",
+      "tr": "[Kaynak Dizin]",
+    }
+  },
+  {
+    regex: /中文字幕/g,
+    translations: {
+      "zh": "中文字幕",
+      "en": "Chinese Subtitles",
+      "ja": "中国語字幕",
+      "ko": "중국어 자막",
+      "vi": "Phụ đề tiếng Trung",
+      "th": "ซับไตเติลภาษาจีน",
+      "id": "Subtitel Bahasa Mandarin",
+      "es": "Subtítulos en chino",
+      "fr": "Sous-titres chinois",
+      "pt": "Legendas em chinês",
+      "de": "Chinesische Untertitel",
+      "it": "Sottotitoli in cinese",
+      "ru": "Китайские субтитры",
+      "tr": "Çince Altyazı",
+    }
+  },
+  {
+    regex: /纯英文/g,
+    translations: {
+      "zh": "纯英文",
+      "en": "English Only",
+      "ja": "英語のみ",
+      "ko": "영어 전용",
+      "vi": "Chỉ tiếng Anh",
+      "th": "ภาษาอังกฤษเท่านั้น",
+      "id": "Hanya Bahasa Inggris",
+      "es": "Solo inglés",
+      "fr": "Anglais uniquement",
+      "pt": "Apenas inglês",
+      "de": "Nur Englisch",
+      "it": "Solo inglese",
+      "ru": "Только английский",
+      "tr": "Sadece İngilizce",
+    }
+  },
+  {
+    regex: /日文字幕/g,
+    translations: {
+      "zh": "日文字幕",
+      "en": "Japanese Subtitles",
+      "ja": "日本語字幕",
+      "ko": "일본어 자막",
+      "vi": "Phụ đề tiếng Nhật",
+      "th": "ซับไตเติลภาษาญี่ปุ่น",
+      "id": "Subtitel Bahasa Jepang",
+      "es": "Subtítulos en japonés",
+      "fr": "Sous-titres japonais",
+      "pt": "Legendas em japonês",
+      "de": "Japanische Untertitel",
+      "it": "Sottotitoli in giapponese",
+      "ru": "Японские субтитры",
+      "tr": "Japonca Altyazı",
+    }
+  },
+  {
+    regex: /韩文字幕/g,
+    translations: {
+      "zh": "韩文字幕",
+      "en": "Korean Subtitles",
+      "ja": "韓国語字幕",
+      "ko": "한국어 자막",
+      "vi": "Phụ đề tiếng Hàn",
+      "th": "ซับไตเติลเกาหลี",
+      "id": "Subtitel Bahasa Korea",
+      "es": "Subtítulos en coreano",
+      "fr": "Sous-titres coréens",
+      "pt": "Legendas em coreano",
+      "de": "Koreanische Untertitel",
+      "it": "Sottotitoli in coreano",
+      "ru": "Корейские субтитры",
+      "tr": "Korece Altyazı",
+    }
+  },
+  {
+    regex: /越南文字幕/g,
+    translations: {
+      "zh": "越南文字幕",
+      "en": "Vietnamese Subtitles",
+      "ja": "ベトナム語字幕",
+      "ko": "베트남어 자막",
+      "vi": "Phụ đề tiếng Việt",
+      "th": "ซับไตเติลเวียดนาม",
+      "id": "Subtitel Bahasa Vietnam",
+      "es": "Subtítulos en vietnamita",
+      "fr": "Sous-titres vietnamiens",
+      "pt": "Legendas em vietnamita",
+      "de": "Vietnamesische Untertitel",
+      "it": "Sottotitoli in vietnamita",
+      "ru": "Вьетнамские субтитры",
+      "tr": "Vietnamca Altyazı",
+    }
+  },
+  {
+    regex: /泰文字幕/g,
+    translations: {
+      "zh": "泰文字幕",
+      "en": "Thai Subtitles",
+      "ja": "タイ語字幕",
+      "ko": "태국어 자막",
+      "vi": "Phụ đề tiếng Thái",
+      "th": "ซับไตเติลไทย",
+      "id": "Subtitel Bahasa Thailand",
+      "es": "Subtítulos en tailandés",
+      "fr": "Sous-titres thaïlandais",
+      "pt": "Legendas em tailandês",
+      "de": "Thailändische Untertitel",
+      "it": "Sottotitoli in tailandese",
+      "ru": "Тайские субтитры",
+      "tr": "Tayca Altyazı",
+    }
+  },
+  {
+    regex: /印尼文字幕/g,
+    translations: {
+      "zh": "印尼文字幕",
+      "en": "Indonesian Subtitles",
+      "ja": "インドネシア語字幕",
+      "ko": "인도네시아어 자막",
+      "vi": "Phụ đề tiếng Indonesia",
+      "th": "ซับไตเติลอินโดนีเซีย",
+      "id": "Subtitel Bahasa Indonesia",
+      "es": "Subtítulos en indonesio",
+      "fr": "Sous-titres indonésiens",
+      "pt": "Legendas em indonésio",
+      "de": "Indonesische Untertitel",
+      "it": "Sottotitoli in indonesiano",
+      "ru": "Индонезийские субтитры",
+      "tr": "Endonezce Altyazı",
+    }
+  },
+  {
+    regex: /西班牙文字幕/g,
+    translations: {
+      "zh": "西班牙文字幕",
+      "en": "Spanish Subtitles",
+      "ja": "スペイン語字幕",
+      "ko": "스페인어 자막",
+      "vi": "Phụ đề tiếng Tây Ban Nha",
+      "th": "ซับไตเติลสเปน",
+      "id": "Subtitel Bahasa Spanyol",
+      "es": "Subtítulos en español",
+      "fr": "Sous-titres espagnols",
+      "pt": "Legendas em espanhol",
+      "de": "Spanische Untertitel",
+      "it": "Sottotitoli in spagnolo",
+      "ru": "Испанские субтитры",
+      "tr": "İspanyolca Altyazı",
+    }
+  },
+  {
+    regex: /法文字幕/g,
+    translations: {
+      "zh": "法文字幕",
+      "en": "French Subtitles",
+      "ja": "フランス語字幕",
+      "ko": "프랑스어 자막",
+      "vi": "Phụ đề tiếng Pháp",
+      "th": "ซับไตเติลฝรั่งเศส",
+      "id": "Subtitel Bahasa Prancis",
+      "es": "Subtítulos en francés",
+      "fr": "Sous-titres français",
+      "pt": "Legendas em francês",
+      "de": "Französische Untertitel",
+      "it": "Sottotitoli in francese",
+      "ru": "Французские субтитры",
+      "tr": "Fransızca Altyazı",
+    }
+  },
+  {
+    regex: /葡萄牙文字幕/g,
+    translations: {
+      "zh": "葡萄牙文字幕",
+      "en": "Portuguese Subtitles",
+      "ja": "ポルトガル語字幕",
+      "ko": "포르투갈어 자막",
+      "vi": "Phụ đề tiếng Bồ Đào Nha",
+      "th": "ซับไตเติลโปรตุเกส",
+      "id": "Subtitel Bahasa Portugis",
+      "es": "Subtítulos en portugués",
+      "fr": "Sous-titres portugais",
+      "pt": "Legendas em português",
+      "de": "Portugiesische Untertitel",
+      "it": "Sottotitoli in portoghese",
+      "ru": "Португальские субтитры",
+      "tr": "Portekizce Altyazı",
+    }
+  },
+  {
+    regex: /德文字幕/g,
+    translations: {
+      "zh": "德文字幕",
+      "en": "German Subtitles",
+      "ja": "ドイツ語字幕",
+      "ko": "독일어 자막",
+      "vi": "Phụ đề tiếng Đức",
+      "th": "ซับไตเติลเยอรมัน",
+      "id": "Subtitel Bahasa Jerman",
+      "es": "Subtítulos en alemán",
+      "fr": "Sous-titres allemands",
+      "pt": "Legendas em alemão",
+      "de": "Deutsche Untertitel",
+      "it": "Sottotitoli in tedesco",
+      "ru": "Немецкие субтитры",
+      "tr": "Almanca Altyazı",
+    }
+  },
+  {
+    regex: /意大利文字幕/g,
+    translations: {
+      "zh": "意大利文字幕",
+      "en": "Italian Subtitles",
+      "ja": "イタリア語字幕",
+      "ko": "이탈리아어 자막",
+      "vi": "Phụ đề tiếng Ý",
+      "th": "ซับไตเติลอิตาลี",
+      "id": "Subtitel Bahasa Italia",
+      "es": "Subtítulos en italiano",
+      "fr": "Sous-titres italiens",
+      "pt": "Legendas em italiano",
+      "de": "Italienische Untertitel",
+      "it": "Sottotitoli in italiano",
+      "ru": "Итальянские субтитры",
+      "tr": "İtalyanca Altyazı",
+    }
+  },
+  {
+    regex: /俄文字幕/g,
+    translations: {
+      "zh": "俄文字幕",
+      "en": "Russian Subtitles",
+      "ja": "ロシア語字幕",
+      "ko": "러시아어 자막",
+      "vi": "Phụ đề tiếng Nga",
+      "th": "ซับไตเติลรัสเซีย",
+      "id": "Subtitel Bahasa Rusia",
+      "es": "Subtítulos en ruso",
+      "fr": "Sous-titres russes",
+      "pt": "Legendas em russo",
+      "de": "Russische Untertitel",
+      "it": "Sottotitoli in russo",
+      "ru": "Русские субтитры",
+      "tr": "Rusça Altyazı",
+    }
+  },
+  {
+    regex: /土耳其文字幕/g,
+    translations: {
+      "zh": "土耳其文字幕",
+      "en": "Turkish Subtitles",
+      "ja": "トルコ語字幕",
+      "ko": "터키어 자막",
+      "vi": "Phụ đề tiếng Thổ Nhĩ Kỳ",
+      "th": "ซับไตเติลตุรกี",
+      "id": "Subtitel Bahasa Turki",
+      "es": "Subtítulos en turco",
+      "fr": "Sous-titres turcs",
+      "pt": "Legendas em turco",
+      "de": "Türkische Untertitel",
+      "it": "Sottotitoli in turco",
+      "ru": "Турецкие субтитры",
+      "tr": "Türkçe Altyazı",
+    }
+  },
+  {
+    regex: /孟加拉文字幕/g,
+    translations: {
+      "zh": "孟加拉文字幕",
+      "en": "Bengali Subtitles",
+      "ja": "ベンガル語字幕",
+      "ko": "벵골어 자막",
+      "vi": "Phụ đề tiếng Bengal",
+      "th": "ซับไตเติลเบงกาลี",
+      "id": "Subtitel Bahasa Bengali",
+      "es": "Subtítulos en bengalí",
+      "fr": "Sous-titres bengalis",
+      "pt": "Legendas em bengali",
+      "de": "Bengalische Untertitel",
+      "it": "Sottotitoli in bengalese",
+      "ru": "Бенгальские субтитры",
+      "tr": "Bengalce Altyazı",
+    }
+  },
+  {
+    regex: /乌尔都文字幕/g,
+    translations: {
+      "zh": "乌尔都文字幕",
+      "en": "Urdu Subtitles",
+      "ja": "ウルドゥー語字幕",
+      "ko": "우르두어 자막",
+      "vi": "Phụ đề tiếng Urdu",
+      "th": "ซับไตเติลอูรดู",
+      "id": "Subtitel Bahasa Urdu",
+      "es": "Subtítulos en urdu",
+      "fr": "Sous-titres ourdous",
+      "pt": "Legendas em urdu",
+      "de": "Urdu-Untertitel",
+      "it": "Sottotitoli in urdu",
+      "ru": "Субтитры на урду",
+      "tr": "Urduca Altyazı",
+    }
+  },
+  {
+    regex: /视频任务不存在或无权访问/g,
+    translations: {
+      "zh": "视频任务不存在或无权访问",
+      "en": "Video task does not exist or access denied",
+      "ja": "動画タスクが存在しないかアクセス権がありません",
+      "ko": "비디오 작업이 없거나 접근 권한이 없습니다",
+      "vi": "Tác vụ video không tồn tại hoặc không có quyền truy cập",
+      "th": "ไม่มีงานวิดีโอหรือไม่มีสิทธิ์เข้าถึง",
+      "id": "Tugas video tidak ada atau akses ditolak",
+      "es": "La tarea de video no existe o acceso denegado",
+      "fr": "La tâche vidéo n'existe pas ou accès refusé",
+      "pt": "A tarefa de vídeo não existe ou acesso negado",
+      "de": "Videoaufgabe existiert nicht oder Zugriff verweigert",
+      "it": "L'attività video non esiste o accesso negato",
+      "ru": "Видеозадача не найдена или доступ запрещен",
+      "tr": "Video görevi mevcut değil veya erişim reddedildi",
+    }
+  },
+  {
+    regex: /任务不存在或无权访问/g,
+    translations: {
+      "zh": "任务不存在或无权访问",
+      "en": "Task does not exist or access denied",
+      "ja": "タスクが存在しないかアクセス権がありません",
+      "ko": "작업이 없거나 접근 권한이 없습니다",
+      "vi": "Tác vụ không tồn tại hoặc không có quyền truy cập",
+      "th": "ไม่มีงานหรือไม่มีสิทธิ์เข้าถึง",
+      "id": "Tugas tidak ada atau akses ditolak",
+      "es": "La tarea no existe o acceso denegado",
+      "fr": "La tâche n'existe pas ou accès refusé",
+      "pt": "A tarefa não existe ou acesso negado",
+      "de": "Aufgabe existiert nicht oder Zugriff verweigert",
+      "it": "L'attività non esiste o accesso negato",
+      "ru": "Задача не найдена или доступ запрещен",
+      "tr": "Görev mevcut değil veya erişim reddedildi",
+    }
+  },
+  {
+    regex: /未找到可更新状态的任务/g,
+    translations: {
+      "zh": "未找到可更新状态的任务",
+      "en": "Task not found for status update",
+      "ja": "ステータス更新対象のタスクが見つかりません",
+      "ko": "상태를 업데이트할 작업을 찾을 수 없습니다",
+      "vi": "Không tìm thấy tác vụ để cập nhật trạng thái",
+      "th": "ไม่พบงานสำหรับอัปเดตสถานะ",
+      "id": "Tugas tidak ditemukan untuk pembaruan status",
+      "es": "No se encontró tarea para actualizar estado",
+      "fr": "Tâche introuvable pour mise à jour du statut",
+      "pt": "Tarefa não encontrada para atualização de status",
+      "de": "Keine Aufgabe zum Status-Update gefunden",
+      "it": "Attività non trovata per l'aggiornamento stato",
+      "ru": "Задача для обновления статуса не найдена",
+      "tr": "Durum güncellemesi için görev bulunamadı",
+    }
+  },
+  {
+    regex: /未授权[：:]\s*请携带有效凭证登录/g,
+    translations: {
+      "zh": "未授权：请携带有效凭证登录",
+      "en": "Unauthorized: Please log in with valid credentials",
+      "ja": "未認証: 有効な資格情報でログインしてください",
+      "ko": "권한 없음: 유효한 자격 증명으로 로그인하세요",
+      "vi": "Chưa xác thực: Vui lòng đăng nhập bằng thông tin hợp lệ",
+      "th": "ไม่ได้รับอนุญาต: กรุณาเข้าสู่ระบบด้วยข้อมูลที่ถูกต้อง",
+      "id": "Tidak sah: Silakan masuk dengan kredensial yang valid",
+      "es": "No autorizado: Inicie sesión con credenciales válidas",
+      "fr": "Non autorisé : Veuillez vous connecter avec des identifiants valides",
+      "pt": "Não autorizado: Faça login com credenciais válidas",
+      "de": "Nicht autorisiert: Bitte mit gültigen Zugangsdaten anmelden",
+      "it": "Non autorizzato: Accedi con credenziali valide",
+      "ru": "Не авторизовано: Войдите с действительными данными",
+      "tr": "Yetkisiz: Lütfen geçerli kimlik bilgileriyle giriş yapın",
+    }
+  },
+  {
+    regex: /未授权[：:]\s*请先登录/g,
+    translations: {
+      "zh": "未授权：请先登录",
+      "en": "Unauthorized: Please log in first",
+      "ja": "未認証: 先にログインしてください",
+      "ko": "권한 없음: 먼저 로그인하세요",
+      "vi": "Chưa xác thực: Vui lòng đăng nhập trước",
+      "th": "ไม่ได้รับอนุญาต: กรุณาเข้าสู่ระบบก่อน",
+      "id": "Tidak sah: Silakan masuk terlebih dahulu",
+      "es": "No autorizado: Inicie sesión primero",
+      "fr": "Non autorisé : Veuillez vous connecter d'abord",
+      "pt": "Não autorizado: Faça login primeiro",
+      "de": "Nicht autorisiert: Bitte zuerst anmelden",
+      "it": "Non autorizzato: Accedi prima",
+      "ru": "Не авторизовано: Сначала войдите в систему",
+      "tr": "Yetkisiz: Lütfen önce giriş yapın",
+    }
+  },
+  {
+    regex: /未授权或无效的用户 Token/g,
+    translations: {
+      "zh": "未授权或无效的用户 Token",
+      "en": "Unauthorized or invalid user token",
+      "ja": "未認証または無効なユーザートークン",
+      "ko": "권한 없음 또는 유효하지 않은 사용자 토큰",
+      "vi": "Token người dùng không hợp lệ hoặc chưa xác thực",
+      "th": "ไม่ได้รับอนุญาตหรือโทเค็นผู้ใช้ไม่ถูกต้อง",
+      "id": "Token pengguna tidak valid atau tidak sah",
+      "es": "Token de usuario inválido o no autorizado",
+      "fr": "Jeton utilisateur invalide ou non autorisé",
+      "pt": "Token de usuário inválido ou não autorizado",
+      "de": "Ungültiges oder nicht autorisiertes Benutzer-Token",
+      "it": "Token utente non valido o non autorizzato",
+      "ru": "Недействительный токен или нет доступа",
+      "tr": "Yetkisiz veya geçersiz kullanıcı belirteci",
+    }
+  },
+  {
+    regex: /缺少必要参数或参数非法/g,
+    translations: {
+      "zh": "缺少必要参数或参数非法",
+      "en": "Missing required parameters or invalid parameters",
+      "ja": "必須パラメータが不足しているか不正です",
+      "ko": "필수 매개변수가 없거나 잘못되었습니다",
+      "vi": "Thiếu tham số bắt buộc hoặc tham số không hợp lệ",
+      "th": "ขาดพารามิเตอร์ที่จำเป็นหรือพารามิเตอร์ไม่ถูกต้อง",
+      "id": "Parameter wajib hilang atau tidak valid",
+      "es": "Faltan parámetros obligatorios o son inválidos",
+      "fr": "Paramètres requis manquants ou invalides",
+      "pt": "Parâmetros obrigatórios ausentes ou inválidos",
+      "de": "Erforderliche Parameter fehlen oder sind ungültig",
+      "it": "Parametri obbligatori mancanti o non validi",
+      "ru": "Отсутствуют или неверны обязательные параметры",
+      "tr": "Gerekli parametreler eksik veya geçersiz",
+    }
+  },
+  {
     regex: /微积分 FRQ/g,
     translations: {
       "zh": "微积分 FRQ",
@@ -2280,7 +3633,7 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
     }
   },
   {
-    regex: /对比学单词/g,
+    regex: /对比学单词|单词对比/g,
     translations: {
       "zh": "对比学单词",
       "en": "Compare English Word",
@@ -2438,10 +3791,10 @@ export function inferModuleFromHints(
   folderPath?: string,
   taskId?: string | number
 ): VideoModule {
-  const hint = String(moduleHint || '').trim().toLowerCase();
-  if (hint === 'ap-calculus-frq' || hint === 'apcalculusfrq') return 'ap-calculus-frq';
-  if (hint === 'ap-calculus-mcq' || hint === 'apcalculusmcq') return 'ap-calculus-mcq';
-  if (hint === 'compare-english-word' || hint === 'compareenglishword') return 'compare-english-word';
+  const hint = String(moduleHint || '').trim().toLowerCase().replace(/[-_\s]/g, '');
+  if (hint === 'apcalculusfrq') return 'ap-calculus-frq';
+  if (hint === 'apcalculusmcq') return 'ap-calculus-mcq';
+  if (hint === 'compareenglishword') return 'compare-english-word';
 
   const f = String(folderPath || '').trim().toLowerCase();
   const tid = String(taskId || '').trim().toLowerCase();
@@ -3185,7 +4538,7 @@ function ensureRemotionBundle(forceRebuild = false, moduleName: string = 'Compar
 
 /**
  *   Remotion   Web   (bundleTarget)   ( 、 、 )
- *   .env.desktop   NEXT_PUBLIC_DOWNLOAD_BASE_URL (  https://download.shortvideo.ca)
+ * 读取 .env / .env.desktop 中的 NEXT_PUBLIC_DOWNLOAD_BASE_URL
  *   bundleTarget/CompareEnglishWord/...，  (http:// localhost:3000)  404
  */
 async function ensureBundleStaticAssets(bundleTarget: string, cleanFolder?: string): Promise<void> {
@@ -3208,12 +4561,12 @@ async function ensureBundleStaticAssets(bundleTarget: string, cleanFolder?: stri
   const primaryDir = targetDirs[0];
   const downloads: Promise<boolean>[] = [];
 
-  // 1. 公共音频: https://download.shortvideo.ca/CompareEnglishWord/background.mp3
+  // 1. 公共音频: <NEXT_PUBLIC_DOWNLOAD_BASE_URL>/CompareEnglishWord/background.mp3
   const bgmDest = path.join(primaryDir, 'background.mp3');
   const bgmUrl = `${downloadBaseUrl}/CompareEnglishWord/background.mp3`;
   downloads.push(downloadFile(bgmUrl, bgmDest, 1000));
 
-  // 2. 底图素材: https://download.shortvideo.ca/CompareEnglishWord/style01/01.png ~ 06.png (以及 style02)
+  // 2. 底图素材: <NEXT_PUBLIC_DOWNLOAD_BASE_URL>/CompareEnglishWord/style01/01.png ~ 06.png (以及 style02)
   for (const style of ['style01', 'style02']) {
     const styleDir = path.join(primaryDir, style);
     if (!fs.existsSync(styleDir)) {
@@ -3361,8 +4714,8 @@ async function executeRemotionRender(
         Path: newPath,
         PUPPETEER_DISABLE_DEV_SHM_USAGE: 'true',
         // 确保 Remotion 渲染内 Chromium 使用绝对 CDN 地址加载图片，而非退化为 localhost:3000
-        NEXT_PUBLIC_DOWNLOAD_BASE_URL: process.env.NEXT_PUBLIC_DOWNLOAD_BASE_URL || getCdnDomain() || 'https://download.shortvideo.ca',
-        DOWNLOAD_BASE_URL: process.env.DOWNLOAD_BASE_URL || getCdnDomain() || 'https://download.shortvideo.ca',
+        NEXT_PUBLIC_DOWNLOAD_BASE_URL: process.env.NEXT_PUBLIC_DOWNLOAD_BASE_URL || getCdnDomain(),
+        DOWNLOAD_BASE_URL: process.env.DOWNLOAD_BASE_URL || getCdnDomain(),
       },
     });
 
@@ -4382,8 +5735,7 @@ async function processSingleTask(
     { lang: 'ru', label: localizeScriptLog('俄文字幕'), audioStartFrom: 12, audioVolumeTweak: 0.005, pitchCents: 5 },
     { lang: 'tr', label: localizeScriptLog('土耳其文字幕'), audioStartFrom: 13, audioVolumeTweak: 0.007, pitchCents: 7 },
     // Helper function note
-    { lang: 'bn', label: localizeScriptLog('孟加拉文字幕'), audioStartFrom: 14, audioVolumeTweak: 0.009, pitchCents: 9 },
-    { lang: 'ur', label: localizeScriptLog('乌尔都文字幕'), audioStartFrom: 15, audioVolumeTweak: -0.009, pitchCents: -9 },
+
   ];
 
   // /
@@ -4485,7 +5837,7 @@ async function processSingleTask(
     // ✨  ，  pitch shift，  YouTube
     const pitchCents = renderLangs[idx].pitchCents ?? 0;
     if (pitchCents !== 0) {
-      log(localizeScriptLog(`🎵 【${label}】正在对音频轨做微小变调 (${pitchCents > 0 ? '+' : ''}${pitchCents} 音分)，人耳无感知但指纹辛辣差异化...`), 'yellow');
+      log(localizeScriptLog(`🎵 【${label}】正在对音频轨做微小变调 (${pitchCents > 0 ? '+' : ''}${pitchCents} 音分)，人耳无感知但声学指纹差异化...`), 'yellow');
       const pitchOk = await applyAudioPitchShift(langOutputFile, pitchCents);
       if (pitchOk) {
         log(localizeScriptLog(`✅ 【${label}】音频变调处理完成 (${pitchCents > 0 ? '+' : ''}${pitchCents} 音分)`), 'green');
@@ -4732,7 +6084,9 @@ export async function handleTaskErrorWithCircuitBreaker(task: any, baseUrl: stri
   const taskLabel = currentRunningTaskId ?? task?.videoId ?? task?.id ?? 'unknown';
   let restored = false;
   if (taskLabel && taskLabel !== 'unknown') {
-    const mod: VideoModule = detectTaskModule(task);
+    const mod: VideoModule = task?.__module
+      ? inferModuleFromHints(task.__module, task?.folderPath, taskLabel)
+      : detectTaskModule(task);
     restored = await updateTaskStatus(
       baseUrl,
       taskLabel,
@@ -4811,7 +6165,7 @@ async function triggerQueue(
           const taskDesc = nextTask.__module === 'ap-calculus-frq' || nextTask.__module === 'ap-calculus-mcq'
             ? `${nextTask.title || nextTask.folderPath || nextTask.id}`
             : `${nextTask.wordA} vs ${nextTask.wordB}`;
-          log(localizeScriptLog(`\n⚡ [流水线接续抢单] 成功锁定待渲染任务: ${modName} [${nextTask.videoId || nextTask.id}] ${taskDesc}`), 'green');
+          log(`\n⚡ [流水线接续抢单] 成功锁定待渲染任务: ${modName} [${nextTask.videoId || nextTask.id}] ${taskDesc}`, 'green');
           task = nextTask;
         } else {
           break;
@@ -5000,6 +6354,11 @@ async function main() {
   log(localizeScriptLog(`⚡ Remotion 缓存 (微积分 FRQ): ${fs.existsSync(path.join(frqCache, 'index.html')) ? '✅ 已就绪 (秒级免打包)' : '⏳ 首次任务自动固化'} (${frqCache})`), 'blue');
   log(localizeScriptLog(`🔁 运行模式: ${isOnce ? '单次执行 (--once)' : '后台守护监听'}`), 'blue');
   log(`============================================================\n`, 'green');
+
+  if (!baseUrl) {
+    log(localizeScriptLog('❌ 缺少目标服务端地址，请配置 NEXT_PUBLIC_APP_SITE_URL 或通过 --url= 传入'), 'red');
+    process.exit(1);
+  }
 
   // 严格安全鉴权校验：
   if (!CURRENT_AUTH_TOKEN && !HAS_R2_CONFIG) {

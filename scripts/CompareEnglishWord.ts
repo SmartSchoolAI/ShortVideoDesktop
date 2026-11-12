@@ -130,8 +130,8 @@ async function applyAudioPitchShift(mp4Path: string, pitchCents: number): Promis
 }
 
 // Load multi-tier environment variables
-// 1.  ：  .env   .env.desktop
-// 2.  ：  .env，  .env.desktop
+// 1. 开发模式：支持 .env 与 .env.desktop
+// 2. 打包模式：严格禁止 .env，仅允许读取 .env.desktop
 function loadEnv() {
   const procResourcesPath = (process as any).resourcesPath || '';
   const isPackaged = Boolean(
@@ -181,7 +181,7 @@ function loadEnv() {
 }
 loadEnv();
 
-// 、  Token
+// 提取命令行、环境变量或本地会话中的 Token
 function extractAuthToken(): string {
   const args = process.argv.slice(2);
   for (const a of args) {
@@ -226,14 +226,17 @@ function extractAuthToken(): string {
 function decryptStoredToken(raw: string): string {
   if (!raw || typeof raw !== 'string') return '';
   const trimmed = raw.trim();
-  // 1.   JWT Token (xxx.yyy.zzz)，
+  // 1. 若本身即为标准 JWT Token (xxx.yyy.zzz)，直接返回
   if (/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(trimmed)) {
     return trimmed;
   }
-  // 2.   AES-256-CBC   JWT Token
+  // 2. 仅在环境变量显式配置了 AES 密钥时尝试解密 AES-256-CBC Token
   try {
-    const keyHex = process.env.NEXT_PUBLIC_AESKEY || '68656c6c6f20776f726c64203132333435363738';
-    const ivHex = process.env.NEXT_PUBLIC_AESIV || '31323334353637383930313233343536';
+    const keyHex = (process.env.NEXT_PUBLIC_AESKEY || '').trim();
+    const ivHex = (process.env.NEXT_PUBLIC_AESIV || '').trim();
+    if (!keyHex || !ivHex) {
+      return '';
+    }
     const key = Buffer.from(keyHex.padEnd(64, '0'), 'hex');
     const iv = Buffer.from(ivHex, 'hex');
     const decipher = crypto.createDecipheriv('aes-256-cbc', key as any, iv as any);
@@ -259,7 +262,7 @@ const DEFAULT_API_BASE =
   process.env.SHORTVIDEO_API_BASE ||
   process.env.NEXT_PUBLIC_APP_SITE_URL ||
   process.env.NEXT_PUBLIC_SITE_ORIGIN ||
-  'https://app.shortvideo.ca';
+  '';
 const getCdnDomain = () => (process.env.NEXT_PUBLIC_DOWNLOAD_BASE_URL || CDN_BASE_DOMAIN || '').trim().replace(/\/+$/, '');
 const POLL_INTERVAL_MS = 30000; // 30
 function resolveSafeRootDir(): string {
@@ -703,9 +706,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
     }
   },
   {
-    regex: /正在对音频轨做微小变调 \((.*?) 音分\)，人耳无感知但指纹辛辣差异化\.\.\./g,
+    regex: /正在对音频轨做微小变调 \((.*?) 音分\)，人耳无感知但声学指纹差异化\.\.\./g,
     translations: {
-      "zh": "正在对音频轨做微小变调 ($1 音分)，人耳无感知但指纹辛辣差异化...",
+      "zh": "正在对音频轨做微小变调 ($1 音分)，人耳无感知但声学指纹差异化...",
       "en": "Applying subtle pitch shift ($1 cents) to audio track to differentiate fingerprint...",
       "ja": "音声トラックに微細なピッチシフト ($1 セント) を適用中...",
       "ko": "오디오 트랙에 미세 피치 시프트 ($1 센트) 적용 중...",
@@ -3185,7 +3188,7 @@ function ensureRemotionBundle(forceRebuild = false, moduleName: string = 'Compar
 
 /**
  *   Remotion   Web   (bundleTarget)   ( 、 、 )
- *   .env.desktop   NEXT_PUBLIC_DOWNLOAD_BASE_URL (  https://download.shortvideo.ca)
+ * 读取 .env / .env.desktop 中的 NEXT_PUBLIC_DOWNLOAD_BASE_URL
  *   bundleTarget/CompareEnglishWord/...，  (http:// localhost:3000)  404
  */
 async function ensureBundleStaticAssets(bundleTarget: string, cleanFolder?: string): Promise<void> {
@@ -3208,12 +3211,12 @@ async function ensureBundleStaticAssets(bundleTarget: string, cleanFolder?: stri
   const primaryDir = targetDirs[0];
   const downloads: Promise<boolean>[] = [];
 
-  // 1. 公共音频: https://download.shortvideo.ca/CompareEnglishWord/background.mp3
+  // 1. 公共音频: <NEXT_PUBLIC_DOWNLOAD_BASE_URL>/CompareEnglishWord/background.mp3
   const bgmDest = path.join(primaryDir, 'background.mp3');
   const bgmUrl = `${downloadBaseUrl}/CompareEnglishWord/background.mp3`;
   downloads.push(downloadFile(bgmUrl, bgmDest, 1000));
 
-  // 2. 底图素材: https://download.shortvideo.ca/CompareEnglishWord/style01/01.png ~ 06.png (以及 style02)
+  // 2. 底图素材: <NEXT_PUBLIC_DOWNLOAD_BASE_URL>/CompareEnglishWord/style01/01.png ~ 06.png (以及 style02)
   for (const style of ['style01', 'style02']) {
     const styleDir = path.join(primaryDir, style);
     if (!fs.existsSync(styleDir)) {
@@ -3361,8 +3364,8 @@ async function executeRemotionRender(
         Path: newPath,
         PUPPETEER_DISABLE_DEV_SHM_USAGE: 'true',
         // 确保 Remotion 渲染内 Chromium 使用绝对 CDN 地址加载图片，而非退化为 localhost:3000
-        NEXT_PUBLIC_DOWNLOAD_BASE_URL: process.env.NEXT_PUBLIC_DOWNLOAD_BASE_URL || getCdnDomain() || 'https://download.shortvideo.ca',
-        DOWNLOAD_BASE_URL: process.env.DOWNLOAD_BASE_URL || getCdnDomain() || 'https://download.shortvideo.ca',
+        NEXT_PUBLIC_DOWNLOAD_BASE_URL: process.env.NEXT_PUBLIC_DOWNLOAD_BASE_URL || getCdnDomain(),
+        DOWNLOAD_BASE_URL: process.env.DOWNLOAD_BASE_URL || getCdnDomain(),
       },
     });
 
@@ -4382,8 +4385,7 @@ async function processSingleTask(
     { lang: 'ru', label: localizeScriptLog('俄文字幕'), audioStartFrom: 12, audioVolumeTweak: 0.005, pitchCents: 5 },
     { lang: 'tr', label: localizeScriptLog('土耳其文字幕'), audioStartFrom: 13, audioVolumeTweak: 0.007, pitchCents: 7 },
     // Helper function note
-    { lang: 'bn', label: localizeScriptLog('孟加拉文字幕'), audioStartFrom: 14, audioVolumeTweak: 0.009, pitchCents: 9 },
-    { lang: 'ur', label: localizeScriptLog('乌尔都文字幕'), audioStartFrom: 15, audioVolumeTweak: -0.009, pitchCents: -9 },
+
   ];
 
   // /
@@ -4485,7 +4487,7 @@ async function processSingleTask(
     // ✨  ，  pitch shift，  YouTube
     const pitchCents = renderLangs[idx].pitchCents ?? 0;
     if (pitchCents !== 0) {
-      log(localizeScriptLog(`🎵 【${label}】正在对音频轨做微小变调 (${pitchCents > 0 ? '+' : ''}${pitchCents} 音分)，人耳无感知但指纹辛辣差异化...`), 'yellow');
+      log(localizeScriptLog(`🎵 【${label}】正在对音频轨做微小变调 (${pitchCents > 0 ? '+' : ''}${pitchCents} 音分)，人耳无感知但声学指纹差异化...`), 'yellow');
       const pitchOk = await applyAudioPitchShift(langOutputFile, pitchCents);
       if (pitchOk) {
         log(localizeScriptLog(`✅ 【${label}】音频变调处理完成 (${pitchCents > 0 ? '+' : ''}${pitchCents} 音分)`), 'green');
@@ -4811,7 +4813,7 @@ async function triggerQueue(
           const taskDesc = nextTask.__module === 'ap-calculus-frq' || nextTask.__module === 'ap-calculus-mcq'
             ? `${nextTask.title || nextTask.folderPath || nextTask.id}`
             : `${nextTask.wordA} vs ${nextTask.wordB}`;
-          log(localizeScriptLog(`\n⚡ [流水线接续抢单] 成功锁定待渲染任务: ${modName} [${nextTask.videoId || nextTask.id}] ${taskDesc}`), 'green');
+          log(`\n⚡ [流水线接续抢单] 成功锁定待渲染任务: ${modName} [${nextTask.videoId || nextTask.id}] ${taskDesc}`, 'green');
           task = nextTask;
         } else {
           break;
@@ -5000,6 +5002,11 @@ async function main() {
   log(localizeScriptLog(`⚡ Remotion 缓存 (微积分 FRQ): ${fs.existsSync(path.join(frqCache, 'index.html')) ? '✅ 已就绪 (秒级免打包)' : '⏳ 首次任务自动固化'} (${frqCache})`), 'blue');
   log(localizeScriptLog(`🔁 运行模式: ${isOnce ? '单次执行 (--once)' : '后台守护监听'}`), 'blue');
   log(`============================================================\n`, 'green');
+
+  if (!baseUrl) {
+    log(localizeScriptLog('❌ 缺少目标服务端地址，请配置 NEXT_PUBLIC_APP_SITE_URL 或通过 --url= 传入'), 'red');
+    process.exit(1);
+  }
 
   // 严格安全鉴权校验：
   if (!CURRENT_AUTH_TOKEN && !HAS_R2_CONFIG) {
