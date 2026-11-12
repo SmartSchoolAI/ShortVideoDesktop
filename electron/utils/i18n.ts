@@ -116,6 +116,10 @@ export interface I18nDictionary {
     logFileFilter: string;
     selectProjectDirTitle: string;
     projectDirNotFound: string;
+    renderAlreadyRunning: string;
+    renderScriptNotFound: string;
+    renderAuthRequired: string;
+    renderNotRunning: string;
   };
   notifications: {
     updateDownloadedTitle: string;
@@ -215,6 +219,10 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       logFileFilter: "日志文件 (*.log)",
       selectProjectDirTitle: "选择 ShortVideo 项目源码根目录",
       projectDirNotFound: "未找到指定源码目录",
+      renderAlreadyRunning: "视频渲染任务已在运行中，请勿重复启动",
+      renderScriptNotFound: "渲染脚本不存在，请重新构建客户端",
+      renderAuthRequired: "未检测到登录凭据，请先在主站登录账号后再执行渲染",
+      renderNotRunning: "当前没有正在运行的渲染任务",
     },
     notifications: {
       updateDownloadedTitle: "新版本 v{version} 已下载完成",
@@ -312,6 +320,10 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       logFileFilter: "Log Files (*.log)",
       selectProjectDirTitle: "Select ShortVideo Project Root Directory",
       projectDirNotFound: "Specified directory not found",
+      renderAlreadyRunning: "Video rendering task is already running",
+      renderScriptNotFound: "Render script not found; please rebuild the desktop client",
+      renderAuthRequired: "No login credentials detected. Please sign in on the main tab before starting render",
+      renderNotRunning: "No rendering task is currently running",
     },
     notifications: {
       updateDownloadedTitle: "Update v{version} Downloaded",
@@ -409,6 +421,10 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       logFileFilter: "ログファイル (*.log)",
       selectProjectDirTitle: "プロジェクトディレクトリを選択",
       projectDirNotFound: "指定されたディレクトリが見つかりません",
+      renderAlreadyRunning: "動画レンダリングタスクは既に実行中です",
+      renderScriptNotFound: "レンダリングスクリプトが見つかりません。クライアントを再ビルドしてください",
+      renderAuthRequired: "ログイン認証情報が見つかりません。メインタブでログインしてからレンダリングを実行してください",
+      renderNotRunning: "現在実行中のレンダリングタスクはありません",
     },
     notifications: {
       updateDownloadedTitle: "バージョン v{version} のダウンロード完了",
@@ -506,6 +522,10 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       logFileFilter: "로그 파일 (*.log)",
       selectProjectDirTitle: "프로젝트 디렉터리 선택",
       projectDirNotFound: "지정된 디렉터리를 찾을 수 없습니다",
+      renderAlreadyRunning: "비디오 렌더링 작업이 이미 실행 중입니다",
+      renderScriptNotFound: "렌더링 스크립트를 찾을 수 없습니다. 클라이언트를 다시 빌드해 주세요",
+      renderAuthRequired: "로그인 자격 증명이 감지되지 않았습니다. 메인 탭에서 로그인한 후 렌더링을 시작하세요",
+      renderNotRunning: "현재 실행 중인 렌더링 작업이 없습니다",
     },
     notifications: {
       updateDownloadedTitle: "업데이트 v{version} 다운로드 완료",
@@ -603,6 +623,10 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       logFileFilter: "Tệp nhật ký (*.log)",
       selectProjectDirTitle: "Chọn thư mục mã nguồn ShortVideo",
       projectDirNotFound: "Không tìm thấy thư mục được chỉ định",
+      renderAlreadyRunning: "Tác vụ kết xuất video đang chạy",
+      renderScriptNotFound: "Không tìm thấy tập lệnh kết xuất, vui lòng đóng gói lại ứng dụng",
+      renderAuthRequired: "Chưa phát hiện thông tin đăng nhập. Vui lòng đăng nhập ở tab chính trước khi kết xuất",
+      renderNotRunning: "Hiện không có tác vụ kết xuất nào đang chạy",
     },
     notifications: {
       updateDownloadedTitle: "Đã tải xong bản cập nhật v{version}",
@@ -700,6 +724,10 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       logFileFilter: "ไฟล์บันทึก (*.log)",
       selectProjectDirTitle: "เลือกไดเรกทอรีโครงการ ShortVideo",
       projectDirNotFound: "ไม่พบไดเรกทอรีที่ระบุ",
+      renderAlreadyRunning: "งานเรนเดอร์วิดีโอกำลังทำงานอยู่แล้ว",
+      renderScriptNotFound: "ไม่พบสคริปต์เรนเดอร์ โปรดสร้างแพ็กเกจแอปพลิเคชันใหม่",
+      renderAuthRequired: "ไม่พบข้อมูลการเข้าสู่ระบบ โปรดเข้าสู่ระบบในแท็บหลักก่อนเริ่มเรนเดอร์",
+      renderNotRunning: "ไม่มีงานเรนเดอร์ที่กำลังทำงานอยู่ในขณะนี้",
     },
     notifications: {
       updateDownloadedTitle: "ดาวน์โหลดอัปเดต v{version} แล้ว",
@@ -797,6 +825,10 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       logFileFilter: "Berkas Log (*.log)",
       selectProjectDirTitle: "Pilih Direktori Sumber ShortVideo",
       projectDirNotFound: "Direktori tidak ditemukan",
+      renderAlreadyRunning: "Tugas rendering video sedang berjalan",
+      renderScriptNotFound: "Skrip render tidak ditemukan, harap bangun ulang klien desktop",
+      renderAuthRequired: "Kredensial login tidak terdeteksi. Silakan masuk di tab utama sebelum memulai render",
+      renderNotRunning: "Tidak ada tugas rendering yang sedang berjalan",
     },
     notifications: {
       updateDownloadedTitle: "Pembaruan v{version} Telah Diunduh",
@@ -894,6 +926,10 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       logFileFilter: "Archivos de registro (*.log)",
       selectProjectDirTitle: "Seleccionar directorio de origen del proyecto",
       projectDirNotFound: "Directorio no encontrado",
+      renderAlreadyRunning: "La tarea de renderizado de video ya está en ejecución",
+      renderScriptNotFound: "Script de renderizado no encontrado; vuelva a compilar el cliente",
+      renderAuthRequired: "No se detectaron credenciales. Inicie sesión en la pestaña principal antes de renderizar",
+      renderNotRunning: "No hay ninguna tarea de renderizado en ejecución",
     },
     notifications: {
       updateDownloadedTitle: "Actualización v{version} descargada",
@@ -991,6 +1027,10 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       logFileFilter: "Fichiers journaux (*.log)",
       selectProjectDirTitle: "Sélectionner le répertoire du projet",
       projectDirNotFound: "Répertoire introuvable",
+      renderAlreadyRunning: "Une tâche de rendu vidéo est déjà en cours",
+      renderScriptNotFound: "Script de rendu introuvable ; veuillez recompiler le client",
+      renderAuthRequired: "Aucun identifiant détecté. Connectez-vous sur l'onglet principal avant de lancer le rendu",
+      renderNotRunning: "Aucune tâche de rendu en cours",
     },
     notifications: {
       updateDownloadedTitle: "Mise à jour v{version} téléchargée",
@@ -1088,6 +1128,10 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       logFileFilter: "Arquivos de registro (*.log)",
       selectProjectDirTitle: "Selecionar diretório do projeto",
       projectDirNotFound: "Diretório não encontrado",
+      renderAlreadyRunning: "A tarefa de renderização de vídeo já está em execução",
+      renderScriptNotFound: "Script de renderização não encontrado; recompile o cliente",
+      renderAuthRequired: "Nenhuma credencial detectada. Faça login na guia principal antes de renderizar",
+      renderNotRunning: "Nenhuma tarefa de renderização em execução no momento",
     },
     notifications: {
       updateDownloadedTitle: "Atualização v{version} baixada",
@@ -1185,6 +1229,10 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       logFileFilter: "Protokolldateien (*.log)",
       selectProjectDirTitle: "Projektquellverzeichnis auswählen",
       projectDirNotFound: "Verzeichnis nicht gefunden",
+      renderAlreadyRunning: "Eine Videorendering-Aufgabe läuft bereits",
+      renderScriptNotFound: "Render-Skript nicht gefunden; bitte Client neu erstellen",
+      renderAuthRequired: "Keine Anmeldeinformationen erkannt. Bitte melden Sie sich zuerst im Haupt-Tab an",
+      renderNotRunning: "Derzeit läuft keine Rendering-Aufgabe",
     },
     notifications: {
       updateDownloadedTitle: "Update v{version} heruntergeladen",
@@ -1282,6 +1330,10 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       logFileFilter: "File di registro (*.log)",
       selectProjectDirTitle: "Seleziona la directory del progetto",
       projectDirNotFound: "Directory non trovata",
+      renderAlreadyRunning: "Un'attività di rendering video è già in esecuzione",
+      renderScriptNotFound: "Script di rendering non trovato; ricompila il client",
+      renderAuthRequired: "Credenziali di accesso non rilevate. Accedi nella scheda principale prima di avviare il rendering",
+      renderNotRunning: "Nessuna attività di rendering attualmente in esecuzione",
     },
     notifications: {
       updateDownloadedTitle: "Aggiornamento v{version} scaricato",
@@ -1379,6 +1431,10 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       logFileFilter: "Файлы журналов (*.log)",
       selectProjectDirTitle: "Выберите каталог проекта",
       projectDirNotFound: "Каталог не найден",
+      renderAlreadyRunning: "Задача рендеринга видео уже выполняется",
+      renderScriptNotFound: "Скрипт рендеринга не найден; пересоберите клиент",
+      renderAuthRequired: "Учетные данные не найдены. Войдите на главной вкладке перед запуском рендеринга",
+      renderNotRunning: "В данный момент нет запущенных задач рендеринга",
     },
     notifications: {
       updateDownloadedTitle: "Обновление v{version} загружено",
@@ -1476,6 +1532,10 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       logFileFilter: "Günlük Dosyaları (*.log)",
       selectProjectDirTitle: "Proje Kaynak Dizinini Seçin",
       projectDirNotFound: "Belirtilen dizin bulunamadı",
+      renderAlreadyRunning: "Video işleme görevi zaten çalışıyor",
+      renderScriptNotFound: "İşleme betiği bulunamadı; lütfen istemciyi yeniden derleyin",
+      renderAuthRequired: "Oturum bilgisi algılanamadı. Lütfen işlemeyi başlatmadan önce ana sekmede giriş yapın",
+      renderNotRunning: "Şu anda çalışan bir işleme görevi yok",
     },
     notifications: {
       updateDownloadedTitle: "Güncelleme v{version} İndirildi",

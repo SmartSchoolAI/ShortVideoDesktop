@@ -106,7 +106,7 @@ export function getAppTagVersion(): string {
     }
   } catch {}
 
-  return 'v0.1.6';
+  return 'v0.1.19';
 }
 
 export interface AppChannelInfo {

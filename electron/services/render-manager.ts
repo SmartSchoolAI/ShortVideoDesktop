@@ -61,6 +61,21 @@ export class RenderManager {
 
   private configuredProjectDir: string = '';
 
+  private getCurrentLang(): string {
+    try {
+      const { windowManager, WindowManager } = require('./window-manager');
+      const wm = windowManager || (typeof WindowManager?.getInstance === 'function' ? WindowManager.getInstance() : null);
+      return wm?.getCurrentLanguage?.() || 'zh';
+    } catch {
+      return 'zh';
+    }
+  }
+
+  private getLoc() {
+    const { getLocale } = require('../utils/i18n');
+    return getLocale(this.getCurrentLang());
+  }
+
   private getSettingsPath(): string {
     return path.join(app.getPath('userData'), 'app-settings.json');
   }
@@ -113,11 +128,7 @@ export class RenderManager {
     });
 
     ipcMain.handle('render:get-state', async () => {
-      let lang = 'zh';
-      try {
-        const { windowManager } = require('./window-manager');
-        lang = windowManager?.getCurrentLanguage?.() || 'zh';
-      } catch {}
+      const lang = this.getCurrentLang();
       return {
         state: this.getState(),
         logs: this.logs,
@@ -136,17 +147,11 @@ export class RenderManager {
         this.appendLog('system', `📁 项目源码工作目录已更新为: ${dir}`);
         return { success: true, projectDir: dir };
       }
-      return { success: false, message: '指定的目录不存在' };
+      return { success: false, message: this.getLoc().dialogs.projectDirNotFound };
     });
 
     ipcMain.handle('render:select-project-dir', async () => {
-      let lang = 'zh';
-      try {
-        const { windowManager } = require('./window-manager');
-        lang = windowManager?.getCurrentLanguage?.() || 'zh';
-      } catch {}
-      const { getLocale } = require('../utils/i18n');
-      const loc = getLocale(lang);
+      const loc = this.getLoc();
 
       const result = await dialog.showOpenDialog({
         title: loc.dialogs.selectProjectDirTitle,
@@ -165,17 +170,31 @@ export class RenderManager {
       try {
         const userDataDir = app.getPath('userData');
         const defaultOutputDir = path.join(userDataDir, 'out');
-        const candidateOutDirs = [
-          path.join(defaultOutputDir, 'CompareEnglishWord'),
-          defaultOutputDir,
-          path.join(this.resolvePhysicalWorkingDir(), 'out', 'CompareEnglishWord'),
-        ];
-        for (const outDir of candidateOutDirs) {
-          if (fs.existsSync(outDir)) {
-            await shell.openPath(outDir);
-            return { success: true, openedPath: outDir };
+        const workOutDir = path.join(this.resolvePhysicalWorkingDir(), 'out');
+
+        // 收集所有可用输出目录并按最近修改时间智能优先打开最近有渲染产出的模块目录
+        const moduleNames = ['ApCalculusFRQ', 'ApCalculusMCQ', 'CompareEnglishWord'];
+        const existingModuleDirs: Array<{ dir: string; mtimeMs: number }> = [];
+        for (const base of [defaultOutputDir, workOutDir]) {
+          for (const mod of moduleNames) {
+            const sub = path.join(base, mod);
+            if (fs.existsSync(sub)) {
+              try {
+                const entries = fs.readdirSync(sub);
+                if (entries.length > 0) {
+                  const st = fs.statSync(sub);
+                  existingModuleDirs.push({ dir: sub, mtimeMs: st.mtimeMs });
+                }
+              } catch {}
+            }
           }
         }
+        if (existingModuleDirs.length > 0) {
+          existingModuleDirs.sort((a, b) => b.mtimeMs - a.mtimeMs);
+          await shell.openPath(existingModuleDirs[0].dir);
+          return { success: true, openedPath: existingModuleDirs[0].dir };
+        }
+
         if (!fs.existsSync(defaultOutputDir)) {
           fs.mkdirSync(defaultOutputDir, { recursive: true });
         }
@@ -200,11 +219,7 @@ export class RenderManager {
 
     // 立即向新订阅者推送当前状态、语言和已有日志
     try {
-      let lang = 'zh';
-      try {
-        const { windowManager } = require('./window-manager');
-        lang = windowManager?.getCurrentLanguage?.() || 'zh';
-      } catch {}
+      const lang = this.getCurrentLang();
       webContents.send('render:init', {
         state: this.getState(),
         logs: this.logs,
@@ -679,7 +694,7 @@ export class RenderManager {
    */
   public async startRender(): Promise<{ success: boolean; message?: string }> {
     if (this.currentProcess && this.status === 'running') {
-      return { success: false, message: '视频渲染任务已在运行中，请勿重复启动' };
+      return { success: false, message: this.getLoc().dialogs.renderAlreadyRunning };
     }
 
     const renderScript = this.resolveRenderScriptPath();
@@ -689,7 +704,7 @@ export class RenderManager {
     if (!scriptExists) {
       this.appendLog('error', `❌ 未找到编译后的渲染脚本: ${renderScript}`);
       this.appendLog('error', `💡 解决办法: 请重新构建客户端安装包 (pnpm run electron:dist)。`);
-      return { success: false, message: '渲染脚本不存在，请重新构建客户端' };
+      return { success: false, message: this.getLoc().dialogs.renderScriptNotFound };
     }
 
     this.status = 'running';
@@ -737,20 +752,13 @@ export class RenderManager {
         this.appendLog('stderr', `❌ [登录拦截] 检测到当前尚未登录用户账号，已取消启动视频渲染！`);
         this.appendLog('system', `💡 提示: 请先切换到【ShortVideo 主站】标签页登录您的账号，登录成功后回到此页面点击【开始渲染】即可。`);
         this.broadcast('render:status-update', this.getState());
-        return { success: false, message: '未检测到登录凭据，请先在主站登录账号后再执行渲染' };
+        return { success: false, message: this.getLoc().dialogs.renderAuthRequired };
       }
 
       const masked = authToken.length > 12 ? `${authToken.slice(0, 6)}...${authToken.slice(-6)}` : '***';
       this.appendLog('system', `🔑 已成功捕获当前登录用户会话凭据 (${masked})，已注入渲染安全进程`);
 
-      let currentLang = 'zh';
-      try {
-        const { windowManager, WindowManager } = require('./window-manager');
-        const wm = windowManager || (typeof WindowManager?.getInstance === 'function' ? WindowManager.getInstance() : null);
-        if (wm?.getCurrentLanguage) {
-          currentLang = wm.getCurrentLanguage();
-        }
-      } catch {}
+      const currentLang = this.getCurrentLang();
 
       const spawnArgs = [
         renderScript,
@@ -854,7 +862,7 @@ export class RenderManager {
    */
   public stopRender(): { success: boolean; message?: string } {
     if (!this.currentProcess || this.status !== 'running') {
-      return { success: false, message: '当前没有正在运行的渲染任务' };
+      return { success: false, message: this.getLoc().dialogs.renderNotRunning };
     }
 
     const pid = this.currentProcess.pid;

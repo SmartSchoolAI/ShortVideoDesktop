@@ -55,7 +55,7 @@ export class CdpPageClient {
 
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
-        reject(new Error(`[CdpPageClient] 连接超时 (${timeoutMs}ms): ${this.targetInfo.webSocketDebuggerUrl}`));
+        reject(new Error(`[CdpPageClient] Connection timeout (${timeoutMs}ms): ${this.targetInfo.webSocketDebuggerUrl}`));
       }, timeoutMs);
 
       try {
@@ -124,7 +124,7 @@ export class CdpPageClient {
       const timer = setTimeout(() => {
         if (this.pendingCallbacks.has(id)) {
           this.pendingCallbacks.delete(id);
-          reject(new Error(`[CdpPageClient] 命令超时 (${timeoutMs}ms): ${method}`));
+          reject(new Error(`[CdpPageClient] Command timeout (${timeoutMs}ms): ${method}`));
         }
       }, timeoutMs);
 
@@ -142,9 +142,8 @@ export class CdpPageClient {
   public async evaluate(code: string | ((...args: any[]) => any), arg?: any): Promise<any> {
     let expression: string;
     if (typeof code === 'function') {
-      let fnStr = code.toString();
-      // 剥离可能残留在函数源码中的 TypeScript 类型断言，防止浏览器引擎报 SyntaxError: Unexpected identifier 'as'
-      fnStr = fnStr.replace(/\s+as\s+[A-Za-z0-9_<>\[\] |?]+/g, '');
+      // Desktop runtime runs tsc-compiled ES2020 JavaScript, so never mutate code strings with regexes.
+      const fnStr = code.toString();
       expression = `(${fnStr})(${arg !== undefined ? JSON.stringify(arg) : ''})`;
     } else {
       expression = code;
@@ -733,7 +732,7 @@ export class CdpBridgeService {
       await new Promise((r) => setTimeout(r, 300));
     }
 
-    throw new Error(`[CdpBridge] 未能在指定时间内找到 ${platform} 对应的 CDP 页面 Target`);
+    throw new Error(`[CdpBridge] Timed out waiting for CDP page target for ${platform}`);
   }
 }
 

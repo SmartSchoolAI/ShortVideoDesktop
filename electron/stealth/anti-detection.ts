@@ -1,7 +1,7 @@
 /**
  * Anti-detection / Stealth 脚本
  * 工业级浏览器指纹伪装，彻底抹除 Chromium/Electron 自动化与机器人特征
- * 严格对标真实 Windows 原生 Google Chrome 128
+ * 严格对标真实桌面端原生 Google Chrome 131
  *
  * 核心设计原则：
  * 1. 优先尊重底层 Chromium 原生环境，绝不过度篡改已由 Blink 参数（如 AutomationControlled 关闭）保障的原生特性；
@@ -179,6 +179,7 @@ export function generateStealthScript(targetPlatform: string = process.platform,
 
         const pluginArray = Object.create(PluginArray.prototype);
         const mimeTypeArray = Object.create(MimeTypeArray.prototype);
+        let mimeCount = 0;
 
         rawPluginsData.forEach(function(p, pIndex) {
           const plugin = Object.create(Plugin.prototype);
@@ -201,8 +202,11 @@ export function generateStealthScript(targetPlatform: string = process.platform,
             plugin[mIndex] = mimeType;
             plugin[m.type] = mimeType;
 
-            mimeTypeArray[mimeTypeArray.length || 0] = mimeType;
-            mimeTypeArray[m.type] = mimeType;
+            if (!Object.prototype.hasOwnProperty.call(mimeTypeArray, m.type)) {
+              mimeTypeArray[mimeCount] = mimeType;
+              mimeTypeArray[m.type] = mimeType;
+              mimeCount++;
+            }
           });
 
           pluginArray[pIndex] = plugin;
@@ -224,7 +228,7 @@ export function generateStealthScript(targetPlatform: string = process.platform,
         });
 
         Object.defineProperties(mimeTypeArray, {
-          length: { value: 2, enumerable: false },
+          length: { value: mimeCount, enumerable: false },
           item: { value: makeNative(function(index) { return this[index] || null; }, 'item') },
           namedItem: { value: makeNative(function(name) { return this[name] || null; }, 'namedItem') },
           [Symbol.toStringTag]: { value: 'MimeTypeArray', configurable: true }
@@ -347,7 +351,7 @@ export function generateStealthScript(targetPlatform: string = process.platform,
     } catch (e) {}
 
     // -------------------------------------------------------------
-    // 5. 语言与平台规范对齐 (Windows Chrome 128)
+    // 5. 语言与平台规范对齐 (Desktop Chrome 131)
     // -------------------------------------------------------------
     try {
       if (!navigator.languages || navigator.languages.length === 0) {

@@ -11,9 +11,9 @@ import { sessionKeeper } from './session-keeper';
 import { systemLogger } from '../utils/logger';
 import { renderManager } from './render-manager';
 import { oauthBridge } from './oauth-bridge';
-import { SUPPORTED_LANGUAGES, SupportedLanguageItem, getLocale, normalizeLangCode } from '../utils/i18n';
+import { SUPPORTED_LANGUAGES, VALID_LANG_CODES, SupportedLanguageItem, getLocale, normalizeLangCode } from '../utils/i18n';
 
-export { SUPPORTED_LANGUAGES, SupportedLanguageItem, getLocale, normalizeLangCode };
+export { SUPPORTED_LANGUAGES, VALID_LANG_CODES, SupportedLanguageItem, getLocale, normalizeLangCode };
 
 
 export interface TabData {
@@ -64,8 +64,11 @@ export class WindowManager {
       if (fs.existsSync(configPath)) {
         const raw = fs.readFileSync(configPath, 'utf-8');
         const data = JSON.parse(raw);
-        if (data.language && SUPPORTED_LANGUAGES.some((l) => l.code === data.language)) {
-          return data.language;
+        if (data.language) {
+          const norm = normalizeLangCode(data.language);
+          if ((VALID_LANG_CODES as readonly string[]).includes(norm)) {
+            return norm;
+          }
         }
       }
     } catch { }
@@ -121,7 +124,9 @@ export class WindowManager {
    */
   private broadcastLanguageChange(lang: string, syncMainWeb: boolean = false): void {
     if (!lang) return;
-    const targetLang = lang.toLowerCase();
+    const rawPrefix = String(lang).toLowerCase().trim().split(/[-_]/)[0];
+    if (!(VALID_LANG_CODES as readonly string[]).includes(rawPrefix)) return;
+    const targetLang = normalizeLangCode(lang);
     const item = SUPPORTED_LANGUAGES.find((l) => l.code === targetLang);
     if (!item && targetLang !== 'zh') return;
 
@@ -154,7 +159,7 @@ export class WindowManager {
                 localStorage.setItem('i18nextLng', targetLang);
                 localStorage.setItem('oauth_redirect_lang', targetLang);
                 const curPath = window.location.pathname;
-                const langCodes = ['zh', 'en', 'ja', 'ko', 'vi', 'th', 'id', 'es', 'fr', 'pt', 'de', 'it', 'ru', 'tr'];
+                const langCodes = ${JSON.stringify(VALID_LANG_CODES)};
                 const regex = new RegExp('^/(' + langCodes.join('|') + ')([/\\\\?#]|$)', 'i');
                 let targetPath = curPath;
                 if (regex.test(curPath)) {
@@ -436,7 +441,9 @@ export class WindowManager {
     ];
     const loadingHtml = possiblePaths.find((p) => fs.existsSync(p)) || possiblePaths[0];
     console.log('[WindowManager] Loading Screen HTML from:', loadingHtml);
-    this.loadingView.webContents.loadFile(loadingHtml);
+    this.loadingView.webContents.loadFile(loadingHtml, {
+      query: { lang: this.currentLanguage || 'zh' },
+    });
     this.bindDevToolsShortcut(this.loadingView.webContents);
 
     this.isLoadingVisible = true;
@@ -535,7 +542,9 @@ export class WindowManager {
     ];
     const tabBarHtml = possiblePaths.find((p) => fs.existsSync(p)) || possiblePaths[0];
     console.log('[WindowManager] Loading TabBar HTML from:', tabBarHtml);
-    this.tabBarView.webContents.loadFile(tabBarHtml);
+    this.tabBarView.webContents.loadFile(tabBarHtml, {
+      query: { lang: this.currentLanguage || 'zh' },
+    });
     this.bindDevToolsShortcut(this.tabBarView.webContents);
     systemLogger.subscribe(this.tabBarView.webContents);
 
@@ -679,7 +688,16 @@ export class WindowManager {
       },
     });
 
-    this.aboutWindow.loadFile(aboutHtml);
+    this.aboutWindow.loadFile(aboutHtml, {
+      query: { lang: this.currentLanguage || 'zh' },
+    });
+    this.aboutWindow.webContents.on('did-finish-load', () => {
+      try {
+        if (this.aboutWindow && !this.aboutWindow.isDestroyed()) {
+          this.aboutWindow.webContents.send('app:language-change', this.currentLanguage || 'zh');
+        }
+      } catch { }
+    });
 
     this.aboutWindow.on('closed', () => {
       this.aboutWindow = null;
@@ -721,7 +739,9 @@ export class WindowManager {
       });
 
       this.bindDevToolsShortcut(view.webContents);
-      view.webContents.loadFile(logHtml);
+      view.webContents.loadFile(logHtml, {
+        query: { lang: this.currentLanguage || 'zh' },
+      });
       view.webContents.on('did-finish-load', () => {
         try {
           if (!view.webContents.isDestroyed()) {
@@ -743,9 +763,8 @@ export class WindowManager {
       this.tabs.set(tabId, tabData);
     } else {
       tabData.title = getLocale(this.currentLanguage).menu.help.syslogs || tabData.title;
-      // 若 Tab 已存在且当前已处于此页面，平滑刷新以保证最新样式与功能生效
       try {
-        tabData.view.webContents.reload();
+        tabData.view.webContents.send('syslog:language-change', this.currentLanguage || 'zh');
       } catch (e) {
         // ignore
       }
@@ -796,7 +815,9 @@ export class WindowManager {
       });
 
       this.bindDevToolsShortcut(view.webContents);
-      view.webContents.loadFile(renderHtml);
+      view.webContents.loadFile(renderHtml, {
+        query: { lang: this.currentLanguage || 'zh' },
+      });
       view.webContents.on('did-finish-load', () => {
         try {
           if (!view.webContents.isDestroyed()) {
@@ -819,7 +840,7 @@ export class WindowManager {
     } else {
       tabData.title = getLocale(this.currentLanguage).menu.help.render || tabData.title;
       try {
-        tabData.view.webContents.reload();
+        tabData.view.webContents.send('render:language-change', this.currentLanguage || 'zh');
       } catch (e) {
         // ignore
       }
@@ -2199,136 +2220,6 @@ export class WindowManager {
     }
 
     return videoWin;
-  }
-
-  private generateInlinePlayerHtml(videoUrl: string, title: string, localFilePath: string = ''): string {
-    const isAudio = /\.(mp3|wav|m4a|aac|flac)(\?.*)?$/i.test(videoUrl);
-    const safeEscapedPath = localFilePath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-    return `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <title>${title}</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body {
-      width: 100%;
-      height: 100%;
-      background: #090d16;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    }
-    .header-bar {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      padding: 10px 18px;
-      background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%);
-      color: #94a3b8;
-      font-size: 13px;
-      font-weight: 600;
-      z-index: 10;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      white-space: nowrap;
-    }
-    .header-title {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      margin-right: 12px;
-    }
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .action-btn {
-      background: rgba(255, 255, 255, 0.12);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      color: #e2e8f0;
-      border-radius: 4px;
-      padding: 3px 10px;
-      font-size: 11px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .action-btn:hover {
-      background: rgba(255, 255, 255, 0.25);
-      color: #ffffff;
-    }
-    .media-container {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    video {
-      width: 100%;
-      height: 100%;
-      max-height: 100vh;
-      object-fit: contain;
-      outline: none;
-      background: #000000;
-    }
-    audio {
-      width: 80%;
-      max-width: 600px;
-      outline: none;
-    }
-  </style>
-</head>
-<body>
-  <div class="header-bar">
-    <div class="header-title">🎬 ${title}</div>
-    <div class="header-actions">
-      ${localFilePath ? `<button class="action-btn" id="btn-open-system" title="调用系统默认播放器打开 (快捷键 O)">🖥️ 系统播放器打开</button>` : ''}
-    </div>
-  </div>
-  <div class="media-container">
-    ${isAudio
-      ? `<audio src="${videoUrl}" controls autoplay></audio>`
-      : `<video src="${videoUrl}" controls autoplay playsinline></video>`
-    }
-  </div>
-  <script>
-    const localPath = "${safeEscapedPath}";
-    function openInSystem() {
-      if (!localPath) return;
-      try {
-        const { shell } = require('electron');
-        if (shell && shell.openPath) shell.openPath(localPath);
-      } catch (e) {
-        console.error('打开系统播放器失败:', e);
-      }
-    }
-    const btnSystem = document.getElementById('btn-open-system');
-    if (btnSystem) {
-      btnSystem.addEventListener('click', openInSystem);
-    }
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        window.close();
-      } else if (e.code === 'Space') {
-        const media = document.querySelector('video, audio');
-        if (media) {
-          e.preventDefault();
-          if (media.paused) media.play();
-          else media.pause();
-        }
-      } else if (e.key.toLowerCase() === 'o') {
-        openInSystem();
-      }
-    });
-  </script>
-</body>
-</html>`;
   }
 
   /**
