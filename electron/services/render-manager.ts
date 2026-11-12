@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { app, ipcMain, WebContents, dialog, shell } from 'electron';
 import { APP_CONFIG } from '../config';
+import { isTrustedIpcSender } from '../utils/ipc-security';
 
 export interface RenderLogEntry {
   id: number;
@@ -115,20 +116,32 @@ export class RenderManager {
    * 注册 IPC 接口供视图层和标签栏交互
    */
   private registerIpc(): void {
-    ipcMain.handle('render:start', async () => {
+    ipcMain.handle('render:start', async (event) => {
+      if (!isTrustedIpcSender(event)) {
+        return { success: false, message: 'Untrusted IPC sender' };
+      }
       return this.startRender();
     });
 
-    ipcMain.handle('render:stop', async () => {
+    ipcMain.handle('render:stop', async (event) => {
+      if (!isTrustedIpcSender(event)) {
+        return { success: false, message: 'Untrusted IPC sender' };
+      }
       return this.stopRender();
     });
 
-    ipcMain.handle('render:clear', async () => {
+    ipcMain.handle('render:clear', async (event) => {
+      if (!isTrustedIpcSender(event)) {
+        return { success: false, message: 'Untrusted IPC sender' };
+      }
       this.clearLogs();
       return { success: true };
     });
 
-    ipcMain.handle('render:get-state', async () => {
+    ipcMain.handle('render:get-state', async (event) => {
+      if (!isTrustedIpcSender(event)) {
+        return null;
+      }
       const lang = this.getCurrentLang();
       return {
         state: this.getState(),
@@ -138,20 +151,32 @@ export class RenderManager {
       };
     });
 
-    ipcMain.handle('render:get-project-dir', async () => {
+    ipcMain.handle('render:get-project-dir', async (event) => {
+      if (!isTrustedIpcSender(event)) {
+        return '';
+      }
       return this.resolvePhysicalWorkingDir();
     });
 
-    ipcMain.handle('render:set-project-dir', async (_event, dir: string) => {
-      if (dir && fs.existsSync(dir)) {
-        this.saveProjectDir(dir);
-        this.appendLog('system', `📁 项目源码工作目录已更新为: ${dir}`);
-        return { success: true, projectDir: dir };
+    ipcMain.handle('render:set-project-dir', async (event, dir: string) => {
+      if (!isTrustedIpcSender(event)) {
+        return { success: false, message: 'Untrusted IPC sender' };
+      }
+      if (typeof dir === 'string' && dir.trim() && fs.existsSync(dir)) {
+        const cleanDir = path.resolve(dir.trim());
+        if (fs.statSync(cleanDir).isDirectory()) {
+          this.saveProjectDir(cleanDir);
+          this.appendLog('system', `📁 项目源码工作目录已更新为: ${cleanDir}`);
+          return { success: true, projectDir: cleanDir };
+        }
       }
       return { success: false, message: this.getLoc().dialogs.projectDirNotFound };
     });
 
-    ipcMain.handle('render:select-project-dir', async () => {
+    ipcMain.handle('render:select-project-dir', async (event) => {
+      if (!isTrustedIpcSender(event)) {
+        return { success: false, message: 'Untrusted IPC sender' };
+      }
       const loc = this.getLoc();
 
       const result = await dialog.showOpenDialog({
@@ -167,7 +192,10 @@ export class RenderManager {
       return { success: false };
     });
 
-    ipcMain.handle('render:open-output-dir', async () => {
+    ipcMain.handle('render:open-output-dir', async (event) => {
+      if (!isTrustedIpcSender(event)) {
+        return { success: false, message: 'Untrusted IPC sender' };
+      }
       try {
         const userDataDir = app.getPath('userData');
         const defaultOutputDir = path.join(userDataDir, 'out');

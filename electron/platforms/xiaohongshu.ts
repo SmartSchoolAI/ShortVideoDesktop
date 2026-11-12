@@ -3,7 +3,7 @@ import fs from 'fs';
 import { BasePlatform, PublishPayload, PlatformPublishResult, PublishAbortedError } from './base-platform';
 import { PlatformTabAdapter } from '../services/window-manager';
 import { CdpPageClient } from '../services/cdp-bridge';
-import { sleep, simulateClipboardHesitation, waitHumanInterval } from '../utils/human-simulator';
+import { sleep, simulateClipboardHesitation, waitHumanInterval, getRandomDelay } from '../utils/human-simulator';
 import { ActionTracer } from '../utils/action-tracer';
 import { XIAOHONGSHU_PUBLISH_STEPS, getPlatformPublishSteps } from '../utils/step-bar';
 import { tPlatform, getPlatformDisplayName } from './platform-i18n';
@@ -869,28 +869,14 @@ export class XiaohongshuPlatform extends BasePlatform {
           }
 
           await tracer.track(`🖱️ 正在点击【${dialogInfo.btnText || '声明原创'}】确认按钮...`);
-          await sleep(400); // 模拟人类确认前微小停顿
-          await client.mouseClick(dialogInfo.btnCoord.x, dialogInfo.btnCoord.y, { delayMs: 120 });
-
-          // DOM 点击兜底辅助
-          await client.evaluate(() => {
-            const candidateModals = Array.from(
-              document.querySelectorAll('.creator-modal-style, .d-modal, .d-new-modal, [class*="modal"], [role="dialog"]')
-            ) as HTMLElement[];
-            const modal = candidateModals.find((m) => {
-              const s = window.getComputedStyle(m);
-              return s.display !== 'none' && s.visibility !== 'hidden' && (m.textContent || '').includes('原创');
-            });
-            if (modal) {
-              const btns = Array.from(modal.querySelectorAll('button, .d-button, [class*="button"]')) as HTMLElement[];
-              const btn = btns.find((b) => (b.textContent || '').includes('声明原创') || (b.textContent || '').includes('确认'));
-              if (btn) btn.click();
-            }
-          }).catch(() => { });
+          await sleep(getRandomDelay(320, 560)); // 模拟人类确认前微小停顿
+          const origBtnX = dialogInfo.btnCoord.x + Math.round((Math.random() - 0.5) * 4);
+          const origBtnY = dialogInfo.btnCoord.y + Math.round((Math.random() - 0.5) * 4);
+          await client.mouseClick(origBtnX, origBtnY, { delayMs: getRandomDelay(90, 150) });
 
           // 核心断言：循环等待弹窗彻底关闭
           for (let w = 0; w < 10; w++) {
-            await sleep(400);
+            await sleep(getRandomDelay(320, 520));
             const modalStillVisible = await client.evaluate(() => {
               const candidateModals = Array.from(
                 document.querySelectorAll('.creator-modal-style, .d-modal, .d-new-modal, [class*="modal"], [role="dialog"]')
@@ -1065,14 +1051,6 @@ export class XiaohongshuPlatform extends BasePlatform {
           if (!target) return null;
           target.scrollIntoView({ block: 'center', behavior: 'instant' as any });
 
-          // DOM 层面触发完整的交互事件序列
-          try {
-            target.click();
-            target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
-            target.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
-            target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-          } catch (e) {}
-
           const r = target.getBoundingClientRect();
           if (r.width <= 0 || r.height <= 0) return null;
           return {
@@ -1148,17 +1126,8 @@ export class XiaohongshuPlatform extends BasePlatform {
             const leafMatches = matches.filter((el) => el.children.length <= 1);
             const target = leafMatches.length > 0 ? leafMatches[leafMatches.length - 1] : matches[matches.length - 1];
 
-            // 确保选项滚入视口并具备尺寸
+            // 确保选项滚入视口并具备尺寸（纯返回坐标由 CDP 物理鼠标触发点击，不派发非可信 DOM 事件）
             target.scrollIntoView({ block: 'nearest', behavior: 'instant' as any });
-
-            // DOM 层面优先触发事件与聚焦
-            try {
-              target.focus();
-              target.click();
-              target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
-              target.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
-              target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-            } catch (e) {}
 
             const r = target.getBoundingClientRect();
             if (r.width <= 0 || r.height <= 0) return null;
@@ -1173,34 +1142,16 @@ export class XiaohongshuPlatform extends BasePlatform {
           if (optionInfo) break;
         }
 
-        // C. 点击选定目标选项（带微扰动）
+        // C. 点击选定目标选项（带微扰动与拟人鼠标停顿）
         if (optionInfo) {
           const optX = optionInfo.x + randomJitter(3);
           const optY = optionInfo.y + randomJitter(2);
           await tracer.track(`🎯 锁定下拉选项【${optionInfo.text || TARGET_TEXT}】，发起拟人物理鼠标点击 (${optX}, ${optY})...`);
           await client.mouseMove(optX, optY);
-          await sleep(80);
-          await client.mouseClick(optX, optY, { delayMs: 100 });
+          await sleep(getRandomDelay(65, 130));
+          await client.mouseClick(optX, optY, { delayMs: getRandomDelay(80, 140) });
 
-          // DOM 点击兜底双重保障
-          await client.evaluate((keywords: string[]) => {
-            const all = Array.from(document.querySelectorAll('*')) as HTMLElement[];
-            const hits = all.filter((el) => {
-              const txt = (el.textContent || '').trim();
-              return keywords.some((kw) => txt === kw || txt.includes(kw)) && txt.length <= 30;
-            });
-            if (hits.length > 0) {
-              const opt = hits[hits.length - 1];
-              try {
-                opt.click();
-                opt.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-                opt.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-                opt.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-              } catch (e) {}
-            }
-          }, TARGET_KEYWORDS).catch(() => {});
-
-          await sleep(800);
+          await sleep(getRandomDelay(650, 980));
 
           // D. 确认回检是否生效
           const isConfirmed = await client.evaluate((keywords: string[]) => {
@@ -1995,10 +1946,7 @@ export class XiaohongshuPlatform extends BasePlatform {
             }
 
             if (targetInner && isVisible(targetInner)) {
-              try {
-                targetInner.click();
-                targetInner.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-              } catch (e) {}
+              targetInner.scrollIntoView({ block: 'center', behavior: 'instant' as any });
               const r = targetInner.getBoundingClientRect();
               return {
                 found: true,
@@ -2011,11 +1959,6 @@ export class XiaohongshuPlatform extends BasePlatform {
             // 若内部被 closed shadow 封装无法直接查询子节点，基于宿主布局精准计算
             const hostRect = xhsHost.getBoundingClientRect();
             if (hostRect.width > 0 && hostRect.height > 0) {
-              try {
-                xhsHost.click();
-                xhsHost.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-              } catch (e) {}
-
               // xhs-publish-btn 通常在底部工具栏，若为双按钮，发布按钮位于右侧约 30%~40% 区域（或 right - 50px）
               const isDualBtn = xhsHost.hasAttribute('save-text') || xhsHost.getAttribute('is-save-draft') === 'true';
               const targetX = isDualBtn
@@ -2043,10 +1986,6 @@ export class XiaohongshuPlatform extends BasePlatform {
 
           if (pubBtn) {
             pubBtn.scrollIntoView({ block: 'center', behavior: 'auto' });
-            try {
-              pubBtn.click();
-              pubBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-            } catch (e) {}
             const rect = pubBtn.getBoundingClientRect();
             if (rect.width > 0 && rect.height > 0) {
               return {
@@ -2083,8 +2022,12 @@ export class XiaohongshuPlatform extends BasePlatform {
         }
 
         if (finalCoord && finalCoord.x > 0 && finalCoord.y > 0) {
-          await tracer.track(`🖱️ 正在通过 CDP 真实物理鼠标点击【发布】按钮 (坐标: ${finalCoord.x}, ${finalCoord.y}, 来源: ${finalCoord.source})...`);
-          await client.mouseClick(finalCoord.x, finalCoord.y, { delayMs: 120 });
+          const pubX = finalCoord.x + Math.round((Math.random() - 0.5) * 6);
+          const pubY = finalCoord.y + Math.round((Math.random() - 0.5) * 4);
+          await tracer.track(`🖱️ 正在通过 CDP 真实物理鼠标点击【发布】按钮 (坐标: ${pubX}, ${pubY}, 来源: ${finalCoord.source})...`);
+          await client.mouseMove(pubX, pubY);
+          await sleep(getRandomDelay(70, 150), signal);
+          await client.mouseClick(pubX, pubY, { delayMs: getRandomDelay(90, 150) });
         } else {
           await tracer.updateStep(5, 'error');
           await tracer.track('❌ 未能定位到小红书【发布】按钮坐标，无法自动发布！', null, 'error', { persistent: true });
@@ -2095,8 +2038,8 @@ export class XiaohongshuPlatform extends BasePlatform {
           };
         }
 
-        // 点击发布后等待 1.5 秒，检测并处理可能弹出的二次确认对话框（如“确认发布” / “继续发布” / “确定”）
-        await sleep(1500, signal);
+        // 点击发布后等待约 1.5 秒，检测并处理可能弹出的二次确认对话框（如“确认发布” / “继续发布” / “确定”）
+        await sleep(getRandomDelay(1250, 1750), signal);
         const confirmDialog = await client.evaluate(() => {
           const isVisible = (el: HTMLElement | null): boolean => {
             if (!el) return false;
@@ -2128,9 +2071,11 @@ export class XiaohongshuPlatform extends BasePlatform {
         }).catch(() => null);
 
         if (confirmDialog && confirmDialog.x && confirmDialog.y) {
+          const dlgX = confirmDialog.x + Math.round((Math.random() - 0.5) * 4);
+          const dlgY = confirmDialog.y + Math.round((Math.random() - 0.5) * 4);
           await tracer.track(`[二次确认] 检测到发布确认弹窗，正在物理点击【${confirmDialog.text}】按钮...`);
-          await client.mouseClick(confirmDialog.x, confirmDialog.y, { delayMs: 120 });
-          await sleep(1000, signal);
+          await client.mouseClick(dlgX, dlgY, { delayMs: getRandomDelay(90, 150) });
+          await sleep(getRandomDelay(850, 1250), signal);
         }
 
         // 注入发布接口轻量透明监听器（用于 100% 精准捕获小红书后端真实返回结果）

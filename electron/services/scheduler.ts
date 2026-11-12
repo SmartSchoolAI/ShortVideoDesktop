@@ -129,20 +129,54 @@ class LocalPublishScheduler {
    * 批量添加或更新定时任务
    */
   public addTasks(newTasks: ScheduledTaskItem[]): ScheduledTaskItem[] {
+    if (!Array.isArray(newTasks)) {
+      return this.getAllTasks();
+    }
+    let addedCount = 0;
     for (const t of newTasks) {
-      const existing = this.tasks.get(t.id);
+      if (
+        !t ||
+        typeof t !== 'object' ||
+        typeof t.id !== 'string' ||
+        !t.id.trim() ||
+        typeof t.taskId !== 'string' ||
+        !t.taskId.trim() ||
+        (t.platform !== 'wechat' && t.platform !== 'xiaohongshu') ||
+        !Number.isFinite(Number(t.scheduledPublishAt)) ||
+        Number(t.scheduledPublishAt) <= 0 ||
+        typeof t.videoUrl !== 'string'
+      ) {
+        continue;
+      }
+      try {
+        const parsedVideoUrl = new URL(t.videoUrl.trim());
+        if (parsedVideoUrl.protocol !== 'http:' && parsedVideoUrl.protocol !== 'https:') {
+          continue;
+        }
+      } catch {
+        continue;
+      }
+      const cleanId = t.id.trim();
+      const existing = this.tasks.get(cleanId);
       // 如果已存在且处于成功状态，允许重新排期
-      this.tasks.set(t.id, {
+      this.tasks.set(cleanId, {
         ...existing,
         ...t,
+        id: cleanId,
+        taskId: t.taskId.trim(),
+        videoUrl: t.videoUrl.trim(),
+        scheduledPublishAt: Number(t.scheduledPublishAt),
         status: 'pending',
       });
+      addedCount++;
     }
-    this.saveToDisk();
-    this.broadcastUpdate();
-    console.log(`[Scheduler] 成功添加/更新 ${newTasks.length} 个定时任务`);
-    // 添加后立刻触发一次检查
-    setTimeout(() => this.tick(), 500);
+    if (addedCount > 0) {
+      this.saveToDisk();
+      this.broadcastUpdate();
+      console.log(`[Scheduler] 成功添加/更新 ${addedCount} 个定时任务`);
+      // 添加后立刻触发一次检查
+      setTimeout(() => this.tick(), 500);
+    }
     return this.getAllTasks();
   }
 

@@ -11,6 +11,7 @@ import { PublishPayload } from './platforms/base-platform';
 import { localizePlatformLog } from './platforms/platform-i18n';
 import { injectPlatformToast } from './utils/toast-helper';
 import { APP_CONFIG, isOwnSiteUrl } from './config';
+import { isTrustedIpcSender } from './utils/ipc-security';
 import { localScheduler } from './services/scheduler';
 import { sessionKeeper } from './services/session-keeper';
 import { setupConsoleLogger, systemLogger } from './utils/logger';
@@ -363,34 +364,6 @@ function registerIpcHandlers(): void {
     '.mp4', '.webm', '.ogg', '.m4v', '.mov', '.mkv',
     '.mp3', '.wav', '.m4a', '.aac', '.flac', '.log', '.txt',
   ]);
-
-  const BUILTIN_VIEW_NAMES = new Set([
-    'loading-screen.html',
-    'log-viewer.html',
-    'render-viewer.html',
-    'system-info.html',
-    'tab-bar.html',
-    'video-player.html',
-  ]);
-
-  const isTrustedIpcSender = (event: Electron.IpcMainInvokeEvent): boolean => {
-    try {
-      const senderUrl = event?.senderFrame?.url || event?.sender?.getURL?.() || '';
-      if (!senderUrl) return false;
-      if (senderUrl.startsWith('file://')) {
-        const parsed = new URL(senderUrl);
-        let decodedPath = decodeURIComponent(parsed.pathname || '');
-        if (/^\/[A-Za-z]:/.test(decodedPath)) decodedPath = decodedPath.slice(1);
-        const normPath = path.resolve(decodedPath);
-        const baseName = path.basename(normPath);
-        const parentName = path.basename(path.dirname(normPath)).toLowerCase();
-        return parentName === 'views' && BUILTIN_VIEW_NAMES.has(baseName);
-      }
-      return isOwnSiteUrl(senderUrl);
-    } catch {
-      return false;
-    }
-  };
 
   const resolveAllowedLocalMediaPath = (
     filePath: string

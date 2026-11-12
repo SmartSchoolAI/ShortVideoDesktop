@@ -120,6 +120,7 @@ export interface I18nDictionary {
     renderScriptNotFound: string;
     renderAuthRequired: string;
     renderNotRunning: string;
+    renderStartFailed: string;
   };
   notifications: {
     updateDownloadedTitle: string;
@@ -223,6 +224,7 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       renderScriptNotFound: "渲染脚本不存在，请重新构建客户端",
       renderAuthRequired: "未检测到登录凭据，请先在主站登录账号后再执行渲染",
       renderNotRunning: "当前没有正在运行的渲染任务",
+      renderStartFailed: "启动视频渲染失败，请检查配置后重试",
     },
     notifications: {
       updateDownloadedTitle: "新版本 v{version} 已下载完成",
@@ -324,6 +326,7 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       renderScriptNotFound: "Render script not found; please rebuild the desktop client",
       renderAuthRequired: "No login credentials detected. Please sign in on the main tab before starting render",
       renderNotRunning: "No rendering task is currently running",
+      renderStartFailed: "Failed to start video rendering. Please check your configuration",
     },
     notifications: {
       updateDownloadedTitle: "Update v{version} Downloaded",
@@ -425,6 +428,7 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       renderScriptNotFound: "レンダリングスクリプトが見つかりません。クライアントを再ビルドしてください",
       renderAuthRequired: "ログイン認証情報が見つかりません。メインタブでログインしてからレンダリングを実行してください",
       renderNotRunning: "現在実行中のレンダリングタスクはありません",
+      renderStartFailed: "動画レンダリングの開始に失敗しました。設定を確認してください",
     },
     notifications: {
       updateDownloadedTitle: "バージョン v{version} のダウンロード完了",
@@ -526,6 +530,7 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       renderScriptNotFound: "렌더링 스크립트를 찾을 수 없습니다. 클라이언트를 다시 빌드해 주세요",
       renderAuthRequired: "로그인 자격 증명이 감지되지 않았습니다. 메인 탭에서 로그인한 후 렌더링을 시작하세요",
       renderNotRunning: "현재 실행 중인 렌더링 작업이 없습니다",
+      renderStartFailed: "비디오 렌더링을 시작하지 못했습니다. 설정을 확인해 주세요",
     },
     notifications: {
       updateDownloadedTitle: "업데이트 v{version} 다운로드 완료",
@@ -627,6 +632,7 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       renderScriptNotFound: "Không tìm thấy tập lệnh kết xuất, vui lòng đóng gói lại ứng dụng",
       renderAuthRequired: "Chưa phát hiện thông tin đăng nhập. Vui lòng đăng nhập ở tab chính trước khi kết xuất",
       renderNotRunning: "Hiện không có tác vụ kết xuất nào đang chạy",
+      renderStartFailed: "Không thể bắt đầu kết xuất video, vui lòng kiểm tra cấu hình",
     },
     notifications: {
       updateDownloadedTitle: "Đã tải xong bản cập nhật v{version}",
@@ -728,6 +734,7 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       renderScriptNotFound: "ไม่พบสคริปต์เรนเดอร์ โปรดสร้างแพ็กเกจแอปพลิเคชันใหม่",
       renderAuthRequired: "ไม่พบข้อมูลการเข้าสู่ระบบ โปรดเข้าสู่ระบบในแท็บหลักก่อนเริ่มเรนเดอร์",
       renderNotRunning: "ไม่มีงานเรนเดอร์ที่กำลังทำงานอยู่ในขณะนี้",
+      renderStartFailed: "ไม่สามารถเริ่มการเรนเดอร์วิดีโอได้ โปรดตรวจสอบการตั้งค่า",
     },
     notifications: {
       updateDownloadedTitle: "ดาวน์โหลดอัปเดต v{version} แล้ว",
@@ -829,6 +836,7 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       renderScriptNotFound: "Skrip render tidak ditemukan, harap bangun ulang klien desktop",
       renderAuthRequired: "Kredensial login tidak terdeteksi. Silakan masuk di tab utama sebelum memulai render",
       renderNotRunning: "Tidak ada tugas rendering yang sedang berjalan",
+      renderStartFailed: "Gagal memulai rendering video, silakan periksa konfigurasi",
     },
     notifications: {
       updateDownloadedTitle: "Pembaruan v{version} Telah Diunduh",
@@ -930,6 +938,7 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       renderScriptNotFound: "Script de renderizado no encontrado; vuelva a compilar el cliente",
       renderAuthRequired: "No se detectaron credenciales. Inicie sesión en la pestaña principal antes de renderizar",
       renderNotRunning: "No hay ninguna tarea de renderizado en ejecución",
+      renderStartFailed: "Error al iniciar el renderizado de video, verifique la configuración",
     },
     notifications: {
       updateDownloadedTitle: "Actualización v{version} descargada",
@@ -1031,6 +1040,7 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       renderScriptNotFound: "Script de rendu introuvable ; veuillez recompiler le client",
       renderAuthRequired: "Aucun identifiant détecté. Connectez-vous sur l'onglet principal avant de lancer le rendu",
       renderNotRunning: "Aucune tâche de rendu en cours",
+      renderStartFailed: "Échec du démarrage du rendu vidéo, veuillez vérifier la configuration",
     },
     notifications: {
       updateDownloadedTitle: "Mise à jour v{version} téléchargée",
@@ -1132,6 +1142,7 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       renderScriptNotFound: "Script de renderização não encontrado; recompile o cliente",
       renderAuthRequired: "Nenhuma credencial detectada. Faça login na guia principal antes de renderizar",
       renderNotRunning: "Nenhuma tarefa de renderização em execução no momento",
+      renderStartFailed: "Falha ao iniciar a renderização do vídeo, verifique a configuração",
     },
     notifications: {
       updateDownloadedTitle: "Atualização v{version} baixada",
@@ -1233,6 +1244,7 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       renderScriptNotFound: "Render-Skript nicht gefunden; bitte Client neu erstellen",
       renderAuthRequired: "Keine Anmeldeinformationen erkannt. Bitte melden Sie sich zuerst im Haupt-Tab an",
       renderNotRunning: "Derzeit läuft keine Rendering-Aufgabe",
+      renderStartFailed: "Videorendering konnte nicht gestartet werden, bitte Konfiguration prüfen",
     },
     notifications: {
       updateDownloadedTitle: "Update v{version} heruntergeladen",
@@ -1334,6 +1346,7 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       renderScriptNotFound: "Script di rendering non trovato; ricompila il client",
       renderAuthRequired: "Credenziali di accesso non rilevate. Accedi nella scheda principale prima di avviare il rendering",
       renderNotRunning: "Nessuna attività di rendering attualmente in esecuzione",
+      renderStartFailed: "Impossibile avviare il rendering video, verifica la configurazione",
     },
     notifications: {
       updateDownloadedTitle: "Aggiornamento v{version} scaricato",
@@ -1435,6 +1448,7 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       renderScriptNotFound: "Скрипт рендеринга не найден; пересоберите клиент",
       renderAuthRequired: "Учетные данные не найдены. Войдите на главной вкладке перед запуском рендеринга",
       renderNotRunning: "В данный момент нет запущенных задач рендеринга",
+      renderStartFailed: "Не удалось запустить рендеринг видео, проверьте настройки",
     },
     notifications: {
       updateDownloadedTitle: "Обновление v{version} загружено",
@@ -1536,6 +1550,7 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       renderScriptNotFound: "İşleme betiği bulunamadı; lütfen istemciyi yeniden derleyin",
       renderAuthRequired: "Oturum bilgisi algılanamadı. Lütfen işlemeyi başlatmadan önce ana sekmede giriş yapın",
       renderNotRunning: "Şu anda çalışan bir işleme görevi yok",
+      renderStartFailed: "Video işleme başlatılamadı, lütfen yapılandırmayı kontrol edin",
     },
     notifications: {
       updateDownloadedTitle: "Güncelleme v{version} İndirildi",

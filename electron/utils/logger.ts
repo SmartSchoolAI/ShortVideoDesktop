@@ -1,6 +1,7 @@
 import { app, ipcMain, shell, dialog, WebContents, BrowserWindow } from 'electron';
 import fs from 'fs';
 import path from 'path';
+import { isTrustedIpcSender } from './ipc-security';
 
 /**
  * 结构化系统日志条目
@@ -338,15 +339,20 @@ class SystemLoggerService {
    * 注册 IPC 接口
    */
   private registerIpcHandlers(): void {
-    ipcMain.handle('syslog:get-history', () => {
+    ipcMain.handle('syslog:get-history', (event) => {
+      if (!isTrustedIpcSender(event)) return [];
       return this.getHistory();
     });
 
-    ipcMain.handle('syslog:get-info', () => {
+    ipcMain.handle('syslog:get-info', (event) => {
+      if (!isTrustedIpcSender(event)) return null;
       return this.getLogInfo();
     });
 
-    ipcMain.handle('syslog:get-counts', () => {
+    ipcMain.handle('syslog:get-counts', (event) => {
+      if (!isTrustedIpcSender(event)) {
+        return { all: 0, wechat: 0, xiaohongshu: 0, system: 0 };
+      }
       let wechatCount = 0;
       let xhsCount = 0;
       let sysCount = 0;
@@ -379,21 +385,25 @@ class SystemLoggerService {
       };
     });
 
-    ipcMain.handle('syslog:clear', () => {
+    ipcMain.handle('syslog:clear', (event) => {
+      if (!isTrustedIpcSender(event)) return false;
       this.clear();
       return true;
     });
 
-    ipcMain.handle('syslog:open-folder', () => {
+    ipcMain.handle('syslog:open-folder', (event) => {
+      if (!isTrustedIpcSender(event)) return '';
       return this.openLogFolder();
     });
 
     ipcMain.handle('syslog:export', async (event) => {
+      if (!isTrustedIpcSender(event)) return false;
       const win = BrowserWindow.fromWebContents(event.sender) || undefined;
       return await this.exportLogs(win);
     });
 
-    ipcMain.handle('syslog:switch-category', (_event, category: string) => {
+    ipcMain.handle('syslog:switch-category', (event, category: string) => {
+      if (!isTrustedIpcSender(event)) return false;
       for (const wc of Array.from(this.subscribers)) {
         if (!wc.isDestroyed()) {
           try {
@@ -406,7 +416,8 @@ class SystemLoggerService {
       return true;
     });
 
-    ipcMain.on('syslog:category-counts-update', (_event, data: any) => {
+    ipcMain.on('syslog:category-counts-update', (event, data: any) => {
+      if (!isTrustedIpcSender(event)) return;
       for (const wc of Array.from(this.subscribers)) {
         if (!wc.isDestroyed()) {
           try {

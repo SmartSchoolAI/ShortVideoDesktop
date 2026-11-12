@@ -1422,6 +1422,15 @@
         .replace(/'/g, '&#39;');
     }
 
+    function decodeHtmlEntities(str) {
+      return String(str || '')
+        .replace(/&#39;/g, "'")
+        .replace(/&quot;/g, '"')
+        .replace(/&gt;/g, '>')
+        .replace(/&lt;/g, '<')
+        .replace(/&amp;/g, '&');
+    }
+
     const PLAY_VIDEO_TIPS = {
       zh: '点击播放该视频',
       en: 'Click to play video',
@@ -1466,7 +1475,7 @@
         }
 
         const tip = getPlayTip();
-        const safeUrl = escapeAttr(cleanUrl);
+        const safeUrl = escapeAttr(decodeHtmlEntities(cleanUrl));
         return `<a href="javascript:void(0)" class="media-link remote-media-link" data-url="${safeUrl}" title="${tip}">🎬 ${cleanUrl}</a>${trailing}`;
       });
 
@@ -1478,22 +1487,53 @@
         if (!targetPath) return match;
 
         const tip = getPlayTip();
-        const safePath = escapeAttr(targetPath);
+        const safePath = escapeAttr(decodeHtmlEntities(targetPath));
         return `<a href="javascript:void(0)" class="media-link local-media-link" data-path="${safePath}" title="${tip}">▶️ ${targetPath}</a>`;
       });
 
       return html;
     }
 
-    // 搜索词高亮函数（安全跳过已有 HTML 标签与 ANSI 样式）
+    // 搜索词高亮函数（基于 DOM TreeWalker 仅匹配文本节点，彻底避免破坏 HTML 标签与实体转义）
     function highlightSearchQuery(html, query) {
       if (!query || !html) return html;
+      const root = document.createElement('div');
+      root.innerHTML = html;
       const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const reg = new RegExp(`(<[^>]+>)|(${escapedQuery})`, 'gi');
-      return html.replace(reg, (match, tag, text) => {
-        if (tag) return tag;
-        return `<span class="highlight">${text}</span>`;
-      });
+      const reg = new RegExp(escapedQuery, 'gi');
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      const textNodes = [];
+      let current;
+      while ((current = walker.nextNode())) {
+        if (current.nodeValue && reg.test(current.nodeValue)) {
+          textNodes.push(current);
+        }
+        reg.lastIndex = 0;
+      }
+      for (const node of textNodes) {
+        const text = node.nodeValue || '';
+        const frag = document.createDocumentFragment();
+        let lastIdx = 0;
+        reg.lastIndex = 0;
+        let m;
+        while ((m = reg.exec(text)) !== null) {
+          if (m.index > lastIdx) {
+            frag.appendChild(document.createTextNode(text.slice(lastIdx, m.index)));
+          }
+          const span = document.createElement('span');
+          span.className = 'highlight';
+          span.textContent = m[0];
+          frag.appendChild(span);
+          lastIdx = m.index + m[0].length;
+        }
+        if (lastIdx < text.length) {
+          frag.appendChild(document.createTextNode(text.slice(lastIdx)));
+        }
+        if (node.parentNode) {
+          node.parentNode.replaceChild(frag, node);
+        }
+      }
+      return root.innerHTML;
     }
 
     // 视频渲染控制台日志多语言规则表 (支持项目全量 14 种核心语言与兼容语种)
@@ -3828,13 +3868,15 @@
       autoScroll = enabled;
       const c = getRenderLocale();
       const txt = enabled ? c.autoScrollOn : c.autoScrollOff;
+      const labelEl = document.getElementById('btn-autoscroll-text');
+      if (labelEl) {
+        labelEl.textContent = txt;
+      }
       if (enabled) {
         btnAutoScroll.classList.add('active');
-        btnAutoScroll.innerHTML = `<span>⬇</span> <span id="btn-autoscroll-text">${txt}</span>`;
         scrollToBottom();
       } else {
         btnAutoScroll.classList.remove('active');
-        btnAutoScroll.innerHTML = `<span>⬇</span> <span id="btn-autoscroll-text">${txt}</span>`;
       }
     }
 

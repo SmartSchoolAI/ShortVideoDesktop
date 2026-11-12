@@ -3,7 +3,7 @@ import fs from 'fs';
 import { BasePlatform, PublishPayload, PlatformPublishResult, PublishAbortedError } from './base-platform';
 import { PlatformTabAdapter } from '../services/window-manager';
 import { CdpPageClient } from '../services/cdp-bridge';
-import { sleep, simulateClipboardHesitation, waitHumanInterval } from '../utils/human-simulator';
+import { sleep, simulateClipboardHesitation, waitHumanInterval, getRandomDelay } from '../utils/human-simulator';
 import { ActionTracer } from '../utils/action-tracer';
 import { WECHAT_PUBLISH_STEPS, getPlatformPublishSteps } from '../utils/step-bar';
 import { tPlatform, getPlatformDisplayName } from './platform-i18n';
@@ -1335,9 +1335,6 @@ export class WechatChannelsPlatform extends BasePlatform {
 
               clickTarget.scrollIntoView({ behavior: 'auto', block: 'center' });
 
-              // 在 evaluate 内先对 label 执行 JS click（WeUI 内部监听 label click 触发 radio）
-              try { targetLabel.click(); } catch (e) { }
-
               const r = clickTarget.getBoundingClientRect();
               if (r.width > 0 && r.height > 0) {
                 return {
@@ -1353,13 +1350,15 @@ export class WechatChannelsPlatform extends BasePlatform {
           });
 
           if (clickResult.found && clickResult.x && clickResult.y) {
-            await tracer.track(`[定时发表] 正在物理点击【定时】${clickResult.hasIcon ? 'radio图标' : 'label'} (第${rTry + 1}次, 坐标: ${clickResult.x}, ${clickResult.y})...`);
-            // CDP 物理鼠标点击 <i> 图标，确保 Vue 原生鼠标事件响应
-            await client.mouseClick(clickResult.x, clickResult.y);
-            await sleep(900); // 充足等待 Vue 响应式完成 DOM 重渲染
+            const jitterX = clickResult.x + Math.round((Math.random() - 0.5) * 4);
+            const jitterY = clickResult.y + Math.round((Math.random() - 0.5) * 4);
+            await tracer.track(`[定时发表] 正在物理点击【定时】${clickResult.hasIcon ? 'radio图标' : 'label'} (第${rTry + 1}次, 坐标: ${jitterX}, ${jitterY})...`);
+            // 纯 CDP 物理鼠标点击 <i> 图标或 label，触发可信原生事件
+            await client.mouseClick(jitterX, jitterY, { delayMs: getRandomDelay(80, 140) });
+            await sleep(getRandomDelay(780, 1150)); // 等待 Vue 响应式完成 DOM 重渲染
           } else {
             await tracer.track(`[定时发表] ⚠️ ${(clickResult as any).reason || '未找到定时单选'}，等待后重试 (${rTry + 1}/6)...`, null, 'warn');
-            await sleep(700);
+            await sleep(getRandomDelay(580, 880));
           }
         }
 
@@ -2808,21 +2807,27 @@ export class WechatChannelsPlatform extends BasePlatform {
 
               // 1. 如果能找到删除按钮，物理点击删除并处理确认弹窗
               if (uploadState.deleteCoord) {
-                await client.mouseClick(uploadState.deleteCoord.x, uploadState.deleteCoord.y);
-                await sleep(800);
-                // 检查确认弹窗
-                await client.evaluate(() => {
+                await client.mouseClick(uploadState.deleteCoord.x, uploadState.deleteCoord.y, { delayMs: getRandomDelay(80, 140) });
+                await sleep(getRandomDelay(650, 980));
+                // 检查确认弹窗并用 CDP 物理点击确定按钮
+                const okCoord = await client.evaluate(() => {
                   const btns = Array.from(document.querySelectorAll('.weui-desktop-btn_primary, button')) as HTMLElement[];
                   const ok = btns.find((b) => (b.textContent || '').trim() === '确定' || (b.textContent || '').trim() === '确认');
-                  if (ok) ok.click();
-                }).catch(() => { });
-                await sleep(1500);
+                  if (!ok) return null;
+                  ok.scrollIntoView({ behavior: 'auto', block: 'center' });
+                  const r = ok.getBoundingClientRect();
+                  return r.width > 0 && r.height > 0 ? { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) } : null;
+                }).catch(() => null);
+                if (okCoord) {
+                  await client.mouseClick(okCoord.x, okCoord.y, { delayMs: getRandomDelay(80, 140) });
+                }
+                await sleep(getRandomDelay(1200, 1750));
               }
 
               // 2. 重新通过原生 CDP 注入视频文件
               await tracer.track('正在重新注入本地短视频素材并等待上传...');
               await this.uploadVideoViaCdp(client, localVideoPath, tracer);
-              await sleep(3000);
+              await sleep(getRandomDelay(2600, 3500));
               i = 0; // 重置检查计数器，重新进入完整上传轮询
               uploadActiveStart = Date.now();
               continue;
@@ -3078,20 +3083,26 @@ export class WechatChannelsPlatform extends BasePlatform {
                 await tracer.track(`⚠️ [发表前最终检查] 检测到视频上传失败，正在执行删除重传 (第 ${finalRetryCount} 次)...`, null, 'warn', { persistent: true });
                 // 1. 物理点击删除按钮
                 if (uploadState.deleteCoord) {
-                  await client.mouseClick(uploadState.deleteCoord.x, uploadState.deleteCoord.y);
-                  await sleep(800);
-                  // 2. 处理删除确认弹窗
-                  await client.evaluate(() => {
+                  await client.mouseClick(uploadState.deleteCoord.x, uploadState.deleteCoord.y, { delayMs: getRandomDelay(80, 140) });
+                  await sleep(getRandomDelay(650, 980));
+                  // 2. 处理删除确认弹窗（纯 CDP 物理点击）
+                  const okCoord = await client.evaluate(() => {
                     const btns = Array.from(document.querySelectorAll('.weui-desktop-btn_primary, button')) as HTMLElement[];
                     const ok = btns.find((b) => (b.textContent || '').trim() === '确定' || (b.textContent || '').trim() === '确认');
-                    if (ok) ok.click();
-                  }).catch(() => { });
-                  await sleep(1500);
+                    if (!ok) return null;
+                    ok.scrollIntoView({ behavior: 'auto', block: 'center' });
+                    const r = ok.getBoundingClientRect();
+                    return r.width > 0 && r.height > 0 ? { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) } : null;
+                  }).catch(() => null);
+                  if (okCoord) {
+                    await client.mouseClick(okCoord.x, okCoord.y, { delayMs: getRandomDelay(80, 140) });
+                  }
+                  await sleep(getRandomDelay(1200, 1750));
                 }
                 // 3. 重新注入视频并等待上传启动
                 await tracer.track('正在重新注入本地短视频素材，等待重新上传启动...');
                 await this.uploadVideoViaCdp(client, localVideoPath, tracer);
-                await sleep(5000); // 多等 5 秒让上传真正启动后再轮询
+                await sleep(getRandomDelay(4500, 5600)); // 多等约 5 秒让上传真正启动后再轮询
                 fwait = -1; // 修正：continue 后 fwait++ 使其从 0 重新开始完整轮询
                 continue;
               } else {
@@ -3244,27 +3255,15 @@ export class WechatChannelsPlatform extends BasePlatform {
             };
           }
 
-          // 2. 触发点击：采用 CDP 硬件级拟人点击 + DOM click() 双重保险触发
-          await tracer.track(`[最终发表] 正在向【发表】按钮发起硬件级拟人轨迹物理点击 (坐标: ${pubBtnInfo.x}, ${pubBtnInfo.y})...`);
-          await client.mouseClick(pubBtnInfo.x, pubBtnInfo.y, { delayMs: 120 });
+          // 2. 触发点击：采用纯 CDP 硬件级拟人鼠标轨迹与可信物理点击，杜绝 DOM click 双发与非可信事件特征
+          const pubJitterX = pubBtnInfo.x + Math.round((Math.random() - 0.5) * 6);
+          const pubJitterY = pubBtnInfo.y + Math.round((Math.random() - 0.5) * 4);
+          await tracer.track(`[最终发表] 正在向【发表】按钮发起硬件级拟人轨迹物理点击 (坐标: ${pubJitterX}, ${pubJitterY})...`);
+          await client.mouseMove(pubJitterX, pubJitterY);
+          await sleep(getRandomDelay(70, 150), signal);
+          await client.mouseClick(pubJitterX, pubJitterY, { delayMs: getRandomDelay(90, 150) });
 
-          // DOM 双重保底派发
-          await client.evaluate(() => {
-            const isPublishButtonText = (t: string) => {
-              if (!t) return false;
-              const s = t.trim().toLowerCase();
-              return s === '发表' || s === '定时发表' || s === 'publish' || s === 'post' || s === 'schedule publish' || s === 'schedule post';
-            };
-            const btns = Array.from(document.querySelectorAll('button, .weui-desktop-btn')) as HTMLElement[];
-            const pubBtn = btns.find(b => isPublishButtonText((b.textContent || '').trim()));
-            if (pubBtn) {
-              try { pubBtn.focus(); } catch { }
-              try { pubBtn.click(); } catch { }
-              try { pubBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); } catch { }
-            }
-          }).catch(() => { });
-
-          await sleep(1000, signal);
+          await sleep(getRandomDelay(850, 1250), signal);
 
           // 3. 严谨校验微信发表后的反馈状态（循环 18 秒：实时处理弹窗、排查错误、检测成功状态）
           let publishConfirmed = false;
@@ -3328,8 +3327,6 @@ export class WechatChannelsPlatform extends BasePlatform {
                   if (confirmBtn) {
                     confirmBtn.scrollIntoView({ behavior: 'auto', block: 'center' });
                     const r = confirmBtn.getBoundingClientRect();
-                    try { confirmBtn.focus(); } catch { }
-                    try { confirmBtn.click(); } catch { }
                     return {
                       detected: true,
                       dialogText,
@@ -3345,11 +3342,13 @@ export class WechatChannelsPlatform extends BasePlatform {
             }).catch(() => null);
 
             if (dialogAction?.detected && dialogAction?.btnText) {
-              await tracer.track(`[二次确认] 发现弹窗提示: "${dialogAction.dialogText}"，已自动确认点击【${dialogAction.btnText}】`);
+              await tracer.track(`[二次确认] 发现弹窗提示: "${dialogAction.dialogText}"，正在物理点击【${dialogAction.btnText}】`);
               if (dialogAction.x && dialogAction.y) {
-                await client.mouseClick(dialogAction.x, dialogAction.y, { delayMs: 100 });
+                const dlgX = dialogAction.x + Math.round((Math.random() - 0.5) * 4);
+                const dlgY = dialogAction.y + Math.round((Math.random() - 0.5) * 4);
+                await client.mouseClick(dlgX, dlgY, { delayMs: getRandomDelay(80, 140) });
               }
-              await sleep(1000, signal);
+              await sleep(getRandomDelay(850, 1250), signal);
             }
 
             // ── 深度状态检测 ──
@@ -3476,19 +3475,13 @@ export class WechatChannelsPlatform extends BasePlatform {
               await tracer.track('⏳ 微信正在提交视频素材与发表数据中...', null, 'info');
             }
 
-            // 如果经过 5 秒仍未成功且无 loading，进行一次补充点击重试（物理 + DOM）
+            // 如果经过 5 秒仍未成功且无 loading，使用 CDP 物理点击执行一次补充重试
             if (waitSec === 5 && !postResult?.isBtnLoading && !hasRetriedWechatClick && pubBtnInfo.x && pubBtnInfo.y) {
               hasRetriedWechatClick = true;
-              await tracer.track('ℹ️ 正在补充触发一次微信【发表】按钮点击确认...');
-              await client.mouseClick(pubBtnInfo.x, pubBtnInfo.y, { delayMs: 150 });
-              await client.evaluate(() => {
-                const btns = Array.from(document.querySelectorAll('button, .weui-desktop-btn')) as HTMLElement[];
-                const btn = btns.find(b => ['发表', '定时发表'].includes((b.textContent || '').trim()));
-                if (btn) {
-                  try { btn.focus(); } catch { }
-                  try { btn.click(); } catch { }
-                }
-              }).catch(() => { });
+              const retryX = pubBtnInfo.x + Math.round((Math.random() - 0.5) * 4);
+              const retryY = pubBtnInfo.y + Math.round((Math.random() - 0.5) * 4);
+              await tracer.track('ℹ️ 正在补充触发一次微信【发表】按钮物理点击确认...');
+              await client.mouseClick(retryX, retryY, { delayMs: getRandomDelay(110, 170) });
             }
 
             lastPageDiagnosis = `URL: ${postResult?.curUrl || '未知'}, 按钮文案: ${postResult?.btnText || '无'}, Loading: ${postResult?.isBtnLoading}`;
