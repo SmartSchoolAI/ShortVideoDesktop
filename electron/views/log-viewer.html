@@ -1188,7 +1188,8 @@
       }
 };
 
-    let currentLogLang = 'zh';
+    const initialLogUrlLang = (new URLSearchParams(window.location.search).get('lang') || '').toLowerCase();
+    let currentLogLang = I18N_LOGS[initialLogUrlLang] ? initialLogUrlLang : 'zh';
 
     function getLogLocale() {
       return I18N_LOGS[currentLogLang] || I18N_LOGS.zh;
@@ -1344,11 +1345,36 @@
         .replace(/'/g, '&#039;');
     }
 
+    function decodeBasicHtmlEntities(str) {
+      return String(str || '')
+        .replace(/&#039;/g, "'")
+        .replace(/&#39;/g, "'")
+        .replace(/&quot;/g, '"')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&');
+    }
+
     function highlightText(text, query) {
       if (!query) return escapeHtml(text);
-      const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const reg = new RegExp(`(${escapedQuery})`, 'gi');
-      return escapeHtml(text).replace(reg, '<span class="highlight">$1</span>');
+      const qLower = query.toLowerCase();
+      const source = String(text || '');
+      const srcLower = source.toLowerCase();
+      let result = '';
+      let pos = 0;
+      while (pos < source.length) {
+        const idx = srcLower.indexOf(qLower, pos);
+        if (idx === -1) {
+          result += escapeHtml(source.slice(pos));
+          break;
+        }
+        if (idx > pos) {
+          result += escapeHtml(source.slice(pos, idx));
+        }
+        result += `<span class="highlight">${escapeHtml(source.slice(idx, idx + query.length))}</span>`;
+        pos = idx + query.length;
+      }
+      return result;
     }
 
     // 优化时间戳展示：主视口显示标准日期时间，悬浮显示完整时区
@@ -1358,7 +1384,7 @@
       return m ? m[1] : timestamp;
     }
 
-    // 日志消息多语言智能本地化规则字典 (涵盖 9 种支持语言)
+    // 日志消息多语言智能本地化规则字典 (涵盖 14 种核心语言)
     const LOG_RULES = [
       // --- 微信视频号 / WeChat Channels 自动化发布业务日志 ---
       {
@@ -1370,9 +1396,7 @@
           ko: '[단계 5/6] 동영상 설명 및 주제 태그 입력 시작...',
           vi: '[Bước 5/6] Bắt đầu nhập mô tả video và thẻ chủ đề...',
           th: '[ขั้นตอน 5/6] เริ่มป้อนคำอธิบายวิดีโอและแท็กหัวข้อ...',
-          bn: '[ধাপ ৫/৬] ভিডিও বিবরণ এবং বিষয় ট্যাগ প্রবেশ শুরু হচ্ছে...',
           id: '[Langkah 5/6] Mulai memasukkan deskripsi video dan tag topik...',
-          ur: '[مرحلہ 5/6] ویڈیو کی تفصیل اور موضوع کے ٹیگز درج کرنا شروع کر رہے ہیں...',
           es: '[Step 5/6] Starting to enter video description and topic tags...',
           fr: '[Step 5/6] Starting to enter video description and topic tags...',
           pt: '[Step 5/6] Starting to enter video description and topic tags...',
@@ -1391,9 +1415,7 @@
           ko: '[설명 및 태그] 텍스트 편집기 검색 시작 (Shadow DOM 관통 포함)...',
           vi: '[Mô tả & Thẻ] Bắt đầu tìm kiếm trình soạn thảo văn bản (bao gồm xuyên Shadow DOM)...',
           th: '[คำอธิบายและแท็ก] เริ่มค้นหาตัวแก้ไขข้อความ (รวมถึงการเจาะ Shadow DOM)...',
-          bn: '[বিবরণ ও ট্যাগ] পাঠ্য সম্পাদক অনুসন্ধান শুরু হচ্ছে (Shadow DOM সহ)...',
           id: '[Deskripsi & Tag] Mulai mencari editor teks (termasuk penetrasi Shadow DOM)...',
-          ur: '[تفصیل اور ٹیگز] ٹیکسٹ ایڈیٹر کی تلاش شروع کر رہے ہیں (بشمول Shadow DOM)...',
           es: '[Description & Tags] Searching for text editor (including Shadow DOM penetration)...',
           fr: '[Description & Tags] Searching for text editor (including Shadow DOM penetration)...',
           pt: '[Description & Tags] Searching for text editor (including Shadow DOM penetration)...',
@@ -1412,9 +1434,7 @@
           ko: '[설명 및 태그] 텍스트 입력창 물리적 좌표 ($1, $2) 고정 성공!',
           vi: '[Mô tả & Thẻ] Đã khóa thành công tọa độ vật lý hộp chỉnh sửa văn bản ($1, $2)!',
           th: '[คำอธิบายและแท็ก] ล็อคพิกัดจริงของกล่องแก้ไขข้อความ ($1, $2) สำเร็จ!',
-          bn: '[বিবরণ ও ট্যাগ] পাঠ্য সম্পাদনা বাক্সের স্থানাঙ্ক ($1, $2) সফলভাবে লক করা হয়েছে!',
           id: '[Deskripsi & Tag] Berhasil mengunci koordinat fisik kotak edit teks ($1, $2)!',
-          ur: '[تفصیل اور ٹیگز] ٹیکسٹ ایڈیٹر کے فزیکل کوآرڈینیٹس ($1, $2) کامیابی سے لاک ہو گئے!',
           es: '[Description & Tags] Successfully locked text editor physical coordinates ($1, $2)!',
           fr: '[Description & Tags] Successfully locked text editor physical coordinates ($1, $2)!',
           pt: '[Description & Tags] Successfully locked text editor physical coordinates ($1, $2)!',
@@ -1433,9 +1453,7 @@
           ko: '[설명 및 태그] 포커스를 위해 텍스트 입력창 클릭 중...',
           vi: '[Mô tả & Thẻ] Đang nhấp vào hộp chỉnh sửa văn bản để lấy tiêu điểm...',
           th: '[คำอธิบายและแท็ก] กำลังคลิกกล่องข้อความเพื่อโฟกัส...',
-          bn: '[বিবরণ ও ট্যাগ] ফোকাস করার জন্য পাঠ্য সম্পাদনা বাক্সে ক্লিক করা হচ্ছে...',
           id: '[Deskripsi & Tag] Mengklik kotak edit teks untuk fokus...',
-          ur: '[تفصیل اور ٹیگز] فوکس کے لیے ٹیکسٹ ایڈیٹر پر کلک کیا جا رہا ہے...',
           es: '[Description & Tags] Clicking text editor box to focus...',
           fr: '[Description & Tags] Clicking text editor box to focus...',
           pt: '[Description & Tags] Clicking text editor box to focus...',
@@ -1454,9 +1472,7 @@
           ko: '[설명 및 태그] 텍스트 붙여넣기 및 해시태그 분석 시뮬레이션 중...',
           vi: '[Mô tả & Thẻ] Đang mô phỏng dán văn bản và phân tích thẻ chủ đề...',
           th: '[คำอธิบายและแท็ก] กำลังจำลองการวางข้อความและวิเคราะห์แฮชแท็ก...',
-          bn: '[বিবরণ ও ট্যাগ] বিবরণ পেস্ট এবং হ্যাশট্যাগ পার্সিং অনুকরণ করা হচ্ছে...',
           id: '[Deskripsi & Tag] Mensimulasikan penempelan teks dan menguraikan tagar topik...',
-          ur: '[تفصیل اور ٹیگز] متن چسپاں کرنے اور ہیش ٹیگز کا تجزیہ کرنے کی نقل کی جا رہی ہے...',
           es: '[Description & Tags] Simulating user typing description and parsing topic hashtags...',
           fr: '[Description & Tags] Simulating user typing description and parsing topic hashtags...',
           pt: '[Description & Tags] Simulating user typing description and parsing topic hashtags...',
@@ -1475,9 +1491,7 @@
           ko: '[설명 및 태그] 텍스트 입력 성공! (글자 수: $1)',
           vi: '[Mô tả & Thẻ] Gửi văn bản thành công! (Số ký tự: $1)',
           th: '[คำอธิบายและแท็ก] ส่งข้อความสำเร็จ! (จำนวนอักขระ: $1)',
-          bn: '[বিবরণ ও ট্যাগ] পাঠ্য সামগ্রী সফলভাবে পাঠানো হয়েছে! (অক্ষর: $1)',
           id: '[Deskripsi & Tag] Konten teks berhasil dikirim! (Jumlah karakter: $1)',
-          ur: '[تفصیل اور ٹیگز] متن کامیابی سے بھیج دیا گیا! (حروف کی تعداد: $1)',
           es: '[Description & Tags] Text content sent successfully! (Length: $1 chars)',
           fr: '[Description & Tags] Text content sent successfully! (Length: $1 chars)',
           pt: '[Description & Tags] Text content sent successfully! (Length: $1 chars)',
@@ -1496,9 +1510,7 @@
           ko: '[단계 5/6 완료] 설명 및 태그 입력 완료, 고급 옵션 구성 준비 중 (약 $1초 대기)...',
           vi: '[Bước 5/6 Hoàn tất] Đã điền mô tả & thẻ, chuẩn bị cấu hình tùy chọn nâng cao (chờ ~$1s)...',
           th: '[ขั้นตอน 5/6 เสร็จสมบูรณ์] ใส่คำอธิบายและแท็กแล้ว เตรียมตั้งค่าตัวเลือกขั้นสูง (รอประมาณ $1 วินาที)...',
-          bn: '[ধাপ ৫/৬ সম্পন্ন] বিবরণ ও ট্যাগ দেওয়া হয়েছে, উন্নত বিকল্প কনফিগার করা হচ্ছে (অপেক্ষা ~$1s)...',
           id: '[Langkah 5/6 Selesai] Deskripsi & tag telah diisi, menyiapkan opsi publikasi lanjutan (tunggu ~$1s)...',
-          ur: '[مرحلہ 5/6 مکمل] تفصیل اور ٹیگز شامل، اعلی درجے کے اختیارات ترتیب دیے جا رہے ہیں (انتظار ~$1s)...',
           es: '[Step 5/6 Complete] Description & tags injected, configuring advanced publish options (waiting ~$1s)...',
           fr: '[Step 5/6 Complete] Description & tags injected, configuring advanced publish options (waiting ~$1s)...',
           pt: '[Step 5/6 Complete] Description & tags injected, configuring advanced publish options (waiting ~$1s)...',
@@ -1517,9 +1529,7 @@
           ko: '고급 게시 옵션 구성 시작 (위치/컬렉션/예약 발행/오리지널/AI 라벨)...',
           vi: 'Bắt đầu cấu hình tùy chọn nâng cao (Vị trí/Bộ sưu tập/Lên lịch/Bản gốc/Nhãn AI)...',
           th: 'เริ่มตั้งค่าตัวเลือกขั้นสูง (ตำแหน่ง/คอลเลกชัน/ตั้งเวลา/ต้นฉบับ/ป้ายกำกับ AI)...',
-          bn: 'উন্নত প্রকাশনা বিকল্পগুলি কনফিগার করা হচ্ছে (অবস্থান/সংগ্রহ/সময়সূচী/মূল/AI লেবেল)...',
           id: 'Mulai mengonfigurasi opsi lanjutan (Lokasi/Koleksi/Jadwal/Asli/Label AI)...',
-          ur: 'اعلی درجے کے اشاعت کے اختیارات ترتیب دینا شروع (مقام/مجموعہ/شیڈول/اصل/AI لیبل)...',
           es: 'Configuring advanced publish options (Location/Collection/Schedule/Original/AI Label)...',
           fr: 'Configuring advanced publish options (Location/Collection/Schedule/Original/AI Label)...',
           pt: 'Configuring advanced publish options (Location/Collection/Schedule/Original/AI Label)...',
@@ -1538,9 +1548,7 @@
           ko: '위챗 채널 고급 옵션 컴포넌트를 완전히 표시되도록 스크롤 중...',
           vi: 'Đang cuộn các tùy chọn nâng cao của WeChat Channels vào khung nhìn...',
           th: 'กำลังเลื่อนตัวเลือกขั้นสูงของ WeChat Channels ให้อยู่ในมุมมอง...',
-          bn: 'WeChat Channels উন্নত বিকল্পগুলি স্ক্রোল করে প্রদর্শন করা হচ্ছে...',
           id: 'Menggulir opsi lanjutan WeChat Channels ke tampilan...',
-          ur: 'وی چیٹ چینلز کے اعلی درجے کے اختیارات کو اسکرول کر کے دیکھا جا رہا ہے...',
           es: 'Scrolling WeChat Channels advanced options into view (Location/Original/Collection/AI Label)...',
           fr: 'Scrolling WeChat Channels advanced options into view (Location/Original/Collection/AI Label)...',
           pt: 'Scrolling WeChat Channels advanced options into view (Location/Original/Collection/AI Label)...',
@@ -1559,9 +1567,7 @@
           ko: '고급 게시 옵션 컴포넌트 감지 및 마운트 완료 (소요 시간: $1초)!',
           vi: 'Các tùy chọn nâng cao đã được phát hiện và sẵn sàng (mất $1 giây)!',
           th: 'ตรวจพบตัวเลือกขั้นสูงและพร้อมใช้งานแล้ว (ใช้เวลา $1 วินาที)!',
-          bn: 'উন্নত প্রকাশনা বিকল্পগুলি মাউন্ট করা হয়েছে ($1 সেকেন্ড সময় লেগেছে)!',
           id: 'Komponen opsi publikasi lanjutan terpasang dan siap (memakan waktu $1d)!',
-          ur: 'اعلی درجے کے اشاعت کے اختیارات تیار ہیں ($1 سیکنڈ لگے)!',
           es: 'Advanced publish options mounted and ready (took $1s)!',
           fr: 'Advanced publish options mounted and ready (took $1s)!',
           pt: 'Advanced publish options mounted and ready (took $1s)!',
@@ -1580,16 +1586,14 @@
           ko: '현재 위치 설정 확인 중 ("위치 표시 안 함"으로 설정)...',
           vi: 'Đang kiểm tra vị trí hiện tại (đặt thành "Không hiển thị vị trí")...',
           th: 'กำลังตรวจสอบการตั้งค่าตำแหน่ง (ตั้งค่าเป็น "ไม่แสดงตำแหน่ง")...',
-          bn: 'অবস্থান সেটিংস পরীক্ষা করা হচ্ছে ("অবস্থান দেখাবেন না" হিসেবে সেট)...',
           id: 'Memeriksa pengaturan lokasi (disetel ke "Jangan tampilkan lokasi")...',
-          ur: 'مقام کی ترتیب چیک کی جا رہی ہے ("مقام نہ دکھائیں" پر سیٹ)...',
-          es: 'Checking location setting (set to ',
-          fr: 'Checking location setting (set to ',
-          pt: 'Checking location setting (set to ',
-          de: 'Checking location setting (set to ',
-          it: 'Checking location setting (set to ',
-          ru: 'Checking location setting (set to ',
-          tr: 'Checking location setting (set to ',
+          es: 'Comprobando la configuración de ubicación ("No mostrar ubicación")...',
+          fr: 'Vérification du paramètre de localisation (« Ne pas afficher »)...',
+          pt: 'Verificando a configuração de localização ("Não exibir localização")...',
+          de: 'Standorteinstellung wird überprüft ("Standort nicht anzeigen")...',
+          it: 'Verifica delle impostazioni di posizione ("Non mostrare posizione")...',
+          ru: 'Проверка настройки местоположения («Не показывать местоположение»)...',
+          tr: 'Konum ayarı kontrol ediliyor ("Konumu gösterme" olarak ayarla)...',
         }
       },
       {
@@ -1601,9 +1605,7 @@
           ko: '[위치] 현재 위치: [$1], 위치 메뉴 확장 클릭 중 (좌표: $2, $3)...',
           vi: '[Vị trí] Vị trí hiện tại: [$1], đang mở rộng menu vị trí (tọa độ: $2, $3)...',
           th: '[ตำแหน่ง] ตำแหน่งปัจจุบัน: [$1], กำลังเปิดเมนูตำแหน่ง (พิกัด: $2, $3)...',
-          bn: '[অবস্থান] বর্তমান অবস্থান: [$1], অবস্থান মেনু প্রসারিত করা হচ্ছে (স্থানাঙ্ক: $2, $3)...',
           id: '[Lokasi] Lokasi saat ini: [$1], membuka menu lokasi (koordinat: $2, $3)...',
-          ur: '[مقام] موجودہ مقام: [$1]، مقام کا مینو کھولا جا رہا ہے (کوآرڈینیٹس: $2, $3)...',
           es: '[Location] Current location: [$1], opening location menu (coords: $2, $3)...',
           fr: '[Location] Current location: [$1], opening location menu (coords: $2, $3)...',
           pt: '[Location] Current location: [$1], opening location menu (coords: $2, $3)...',
@@ -1622,9 +1624,7 @@
           ko: '[위치] 「위치 표시 안 함」옵션 선택 클릭 중 (좌표: $1, $2)...',
           vi: '[Vị trí] Đang chọn tùy chọn [Không hiển thị vị trí] (tọa độ: $1, $2)...',
           th: '[ตำแหน่ง] กำลังเลือกตัวเลือก [ไม่แสดงตำแหน่ง] (พิกัด: $1, $2)...',
-          bn: '[অবস্থান] [অবস্থান দেখাবেন না] বিকল্প নির্বাচন করা হচ্ছে (স্থানাঙ্ক: $1, $2)...',
           id: '[Lokasi] Memilih opsi [Jangan tampilkan lokasi] (koordinat: $1, $2)...',
-          ur: '[مقام] [مقام نہ دکھائیں] آپشن منتخب کیا جا رہا ہے (کوآرڈینیٹس: $1, $2)...',
           es: '[Location] Selecting [Do not display location] option (coords: $1, $2)...',
           fr: '[Location] Selecting [Do not display location] option (coords: $1, $2)...',
           pt: '[Location] Selecting [Do not display location] option (coords: $1, $2)...',
@@ -1643,16 +1643,14 @@
           ko: '[위치] "위치 표시 안 함"으로 설정 완료!',
           vi: '[Vị trí] Đã đặt thành công "Không hiển thị vị trí"!',
           th: '[ตำแหน่ง] ตั้งค่าเป็น "ไม่แสดงตำแหน่ง" สำเร็จ!',
-          bn: '[অবস্থান] সফলভাবে "অবস্থান দেখাবেন না" সেট করা হয়েছে!',
           id: '[Lokasi] Berhasil disetel ke "Jangan tampilkan lokasi"!',
-          ur: '[مقام] کامیابی سے "مقام نہ دکھائیں" پر سیٹ کر دیا گیا!',
-          es: '[Location] Successfully set to ',
-          fr: '[Location] Successfully set to ',
-          pt: '[Location] Successfully set to ',
-          de: '[Location] Successfully set to ',
-          it: '[Location] Successfully set to ',
-          ru: '[Location] Successfully set to ',
-          tr: '[Location] Successfully set to ',
+          es: '[Ubicación] ¡Configurado como "No mostrar ubicación" con éxito!',
+          fr: '[Localisation] Défini sur « Ne pas afficher » avec succès !',
+          pt: '[Localização] Definido como "Não exibir localização" com sucesso!',
+          de: '[Standort] Erfolgreich auf "Standort nicht anzeigen" gesetzt!',
+          it: '[Posizione] Impostato su "Non mostrare posizione" con successo!',
+          ru: '[Местоположение] Успешно установлено: «Не показывать местоположение»!',
+          tr: '[Konum] "Konumu gösterme" olarak başarıyla ayarlandı!',
         }
       },
       {
@@ -1664,9 +1662,7 @@
           ko: '【컬렉션 추가】확인 및 처리 중...',
           vi: 'Đang kiểm tra và xử lý [Thêm vào bộ sưu tập]...',
           th: 'กำลังตรวจสอบและจัดการ [เพิ่มคอลเลกชัน]...',
-          bn: '[সংগ্রহে যোগ] পরীক্ষা এবং প্রক্রিয়া করা হচ্ছে...',
           id: 'Memeriksa dan menangani [Tambah ke Koleksi]...',
-          ur: '[مجموعہ شامل کریں] کی جانچ اور کارروائی کی جا رہی ہے...',
           es: 'Checking and handling [Add Collection]...',
           fr: 'Checking and handling [Add Collection]...',
           pt: 'Checking and handling [Add Collection]...',
@@ -1685,9 +1681,7 @@
           ko: '[컬렉션 추가] 드롭다운 클릭하여 열기 (좌표: $1, $2)...',
           vi: '[Thêm bộ sưu tập] Nhấp để mở rộng danh sách bộ sưu tập (tọa độ: $1, $2)...',
           th: '[เพิ่มคอลเลกชัน] คลิกเพื่อเปิดรายการคอลเลกชัน (พิกัด: $1, $2)...',
-          bn: '[সংগ্রহে যোগ] সংগ্রহ ড্রপডাউন প্রসারিত করতে ক্লিক করা হচ্ছে (স্থানাঙ্ক: $1, $2)...',
           id: '[Tambah Koleksi] Mengklik untuk membuka menu tarik-turun koleksi (koordinat: $1, $2)...',
-          ur: '[مجموعہ شامل کریں] ڈراپ ڈاؤن کھولنے کے لیے کلک کیا جا رہا ہے (کوآرڈینیٹس: $1, $2)...',
           es: '[Add Collection] Clicking to expand collection dropdown (coords: $1, $2)...',
           fr: '[Add Collection] Clicking to expand collection dropdown (coords: $1, $2)...',
           pt: '[Add Collection] Clicking to expand collection dropdown (coords: $1, $2)...',
@@ -1706,9 +1700,7 @@
           ko: '[컬렉션 추가] 비디오 컬렉션 목록 데이터 응답 대기 중...',
           vi: '[Thêm bộ sưu tập] Đang chờ dữ liệu danh sách bộ sưu tập...',
           th: '[เพิ่มคอลเลกชัน] กำลังรอข้อมูลรายการคอลเลกชันวิดีโอ...',
-          bn: '[সংগ্রহে যোগ] ভিডিও সংগ্রহ তালিকা ডেটার জন্য অপেক্ষা করা হচ্ছে...',
           id: '[Tambah Koleksi] Menunggu data daftar koleksi video...',
-          ur: '[مجموعہ شامل کریں] ویڈیو کلیکشن لسٹ ڈیٹا کا انتظار کیا جا رہا ہے...',
           es: '[Add Collection] Waiting for video collection list data...',
           fr: '[Add Collection] Waiting for video collection list data...',
           pt: '[Add Collection] Waiting for video collection list data...',
@@ -1727,9 +1719,7 @@
           ko: '[컬렉션 추가] 총 $1개 컬렉션 확인, $2번째 항목 선택 중: 【$3】 (좌표: $4, $5)...',
           vi: '[Thêm bộ sưu tập] Trích xuất $1 bộ sưu tập, chọn mục #$2: [$3] (tọa độ: $4, $5)...',
           th: '[เพิ่มคอลเลกชัน] ดึงข้อมูล $1 คอลเลกชัน, เลือกรายการที่ $2: 【$3】 (พิกัด: $4, $5)...',
-          bn: '[সংগ্রহে যোগ] $1টি সংগ্রহ পাওয়া গেছে, #$2 নির্বাচন করা হচ্ছে: [$3] (স্থানাঙ্ক: $4, $5)...',
           id: '[Tambah Koleksi] Mengambil $1 koleksi, memilih #$2: [$3] (koordinat: $4, $5)...',
-          ur: '[مجموعہ شامل کریں] $1 مجموعے ملے، #$2 منتخب کیا جا رہا ہے: [$3] (کوآرڈینیٹس: $4, $5)...',
           es: '[Add Collection] Retrieved $1 collections, selecting #$2: [$3] (coords: $4, $5)...',
           fr: '[Add Collection] Retrieved $1 collections, selecting #$2: [$3] (coords: $4, $5)...',
           pt: '[Add Collection] Retrieved $1 collections, selecting #$2: [$3] (coords: $4, $5)...',
@@ -1748,9 +1738,7 @@
           ko: '[컬렉션 추가] 성공적으로 컬렉션에 추가됨: 【$1】!',
           vi: '[Thêm bộ sưu tập] Đã thêm thành công vào bộ sưu tập: [$1]!',
           th: '[เพิ่มคอลเลกชัน] เข้าร่วมคอลเลกชันสำเร็จ: 【$1】!',
-          bn: '[সংগ্রহে যোগ] সফলভাবে সংগ্রহে যুক্ত হয়েছে: [$1]!',
           id: '[Tambah Koleksi] Berhasil bergabung dengan koleksi: [$1]!',
-          ur: '[مجموعہ شامل کریں] مجموعہ میں کامیابی سے شامل کر دیا گیا: [$1]!',
           es: '[Add Collection] Successfully joined collection: [$1]!',
           fr: '[Add Collection] Successfully joined collection: [$1]!',
           pt: '[Add Collection] Successfully joined collection: [$1]!',
@@ -1769,9 +1757,7 @@
           ko: '【예약 발행】구성 중 (설정 시간: $1)...',
           vi: 'Đang cấu hình [Lên lịch xuất bản] (Thời gian: $1)...',
           th: 'กำลังตั้งค่า [การเผยแพร่ตามกำหนดเวลา] (เวลา: $1)...',
-          bn: '[সময়সূচী প্রকাশনা] কনফিগার করা হচ্ছে (সময়: $1)...',
           id: 'Mengonfigurasi [Jadwalkan Rilis] (Waktu: $1)...',
-          ur: '[شیڈول اشاعت] ترتیب دی جا رہی ہے (طے شدہ وقت: $1)...',
           es: 'Configuring [Scheduled Publish] (Scheduled: $1)...',
           fr: 'Configuring [Scheduled Publish] (Scheduled: $1)...',
           pt: 'Configuring [Scheduled Publish] (Scheduled: $1)...',
@@ -1790,9 +1776,7 @@
           ko: '[예약 발행] 「예약」라디오 버튼 클릭 중 (시도 #$1, 좌표: $2, $3)...',
           vi: '[Lên lịch xuất bản] Đang nhấp vào nút radio [Lên lịch] (lần $1, tọa độ: $2, $3)...',
           th: '[การเผยแพร่ตามกำหนดเวลา] กำลังคลิกปุ่มตัวเลือก [กำหนดเวลา] (ครั้งที่ $1, พิกัด: $2, $3)...',
-          bn: '[সময়সূচী প্রকাশনা] [সময়সূচী] রেডিও বোতামে ক্লিক করা হচ্ছে (প্রচেষ্টা #$1, স্থানাঙ্ক: $2, $3)...',
           id: '[Jadwalkan Rilis] Mengklik tombol radio [Jadwal] (upaya #$1, koordinat: $2, $3)...',
-          ur: '[شیڈول اشاعت] [شیڈول] ریڈیو بٹن پر کلک کیا جا رہا ہے (کوشش #$1, کوآرڈینیٹس: $2, $3)...',
           es: '[Scheduled Publish] Clicking [Schedule] radio button (attempt #$1, coords: $2, $3)...',
           fr: '[Scheduled Publish] Clicking [Schedule] radio button (attempt #$1, coords: $2, $3)...',
           pt: '[Scheduled Publish] Clicking [Schedule] radio button (attempt #$1, coords: $2, $3)...',
@@ -1811,9 +1795,7 @@
           ko: '[예약 발행] 예약 옵션 활성화됨, 달력 패널 준비 완료',
           vi: '[Lên lịch xuất bản] Tùy chọn lên lịch đã kích hoạt, lịch đã sẵn sàng',
           th: '[การเผยแพร่ตามกำหนดเวลา] ตัวเลือกกำหนดเวลาเปิดใช้งานแล้ว ปฏิทินพร้อมแล้ว',
-          bn: '[সময়সূচী প্রকাশনা] সময়সূচী সক্রিয় হয়েছে, ক্যালেন্ডার প্যানেল প্রস্তুত',
           id: '[Jadwalkan Rilis] Opsi jadwal aktif, panel kalender siap',
-          ur: '[شیڈول اشاعت] شیڈول فعال ہو گیا، کیلنڈر پینل تیار ہے',
           es: '[Scheduled Publish] Schedule radio activated, calendar panel is ready',
           fr: '[Scheduled Publish] Schedule radio activated, calendar panel is ready',
           pt: '[Scheduled Publish] Schedule radio activated, calendar panel is ready',
@@ -1832,9 +1814,7 @@
           ko: '[예약 발행] 달력을 열기 위해 시간 입력창 클릭 중 (시도 #$1, 좌표: $2, $3)...',
           vi: '[Lên lịch xuất bản] Nhấp vào hộp nhập thời gian để mở lịch (lần $1, tọa độ: $2, $3)...',
           th: '[การเผยแพร่ตามกำหนดเวลา] คลิกกล่องใส่เวลาเพื่อเปิดปฏิทิน (ครั้งที่ $1, พิกัด: $2, $3)...',
-          bn: '[সময়সূচী প্রকাশনা] ক্যালেন্ডার খুলতে সময় ইনপুটে ক্লিক করা হচ্ছে (প্রচেষ্টা #$1, স্থানাঙ্ক: $2, $3)...',
           id: '[Jadwalkan Rilis] Mengklik input waktu untuk membuka kalender (upaya #$1, koordinat: $2, $3)...',
-          ur: '[شیڈول اشاعت] کیلنڈر کھولنے کے لیے وقت کے خانے پر کلک کیا جا رہا ہے (کوشش #$1, کوآرڈینیٹس: $2, $3)...',
           es: '[Scheduled Publish] Clicking time input to open calendar (attempt #$1, coords: $2, $3)...',
           fr: '[Scheduled Publish] Clicking time input to open calendar (attempt #$1, coords: $2, $3)...',
           pt: '[Scheduled Publish] Clicking time input to open calendar (attempt #$1, coords: $2, $3)...',
@@ -1853,9 +1833,7 @@
           ko: '달력 패널이 열렸습니다',
           vi: 'Bảng lịch đã mở rộng',
           th: 'แผงปฏิทินขยายออกแล้ว',
-          bn: 'ক্যালেন্ডার প্যানেল প্রসারিত হয়েছে',
           id: 'Panel kalender diperluas',
-          ur: 'کیلنڈر پینل پھیل گیا',
           es: 'Calendar panel expanded',
           fr: 'Calendar panel expanded',
           pt: 'Calendar panel expanded',
@@ -1874,9 +1852,7 @@
           ko: '[예약 발행] 날짜 $1일 클릭 중 (좌표: $2, $3)...',
           vi: '[Lên lịch xuất bản] Nhấp vào ngày $1 (tọa độ: $2, $3)...',
           th: '[การเผยแพร่ตามกำหนดเวลา] คลิกเลือกวันที่ $1 (พิกัด: $2, $3)...',
-          bn: '[সময়সূচী প্রকাশনা] তারিখ $1 তারিখে ক্লিক করা হচ্ছে (স্থানাঙ্ক: $2, $3)...',
           id: '[Jadwalkan Rilis] Mengklik tanggal $1 (koordinat: $2, $3)...',
-          ur: '[شیڈول اشاعت] تاریخ کے دن $1 پر کلک کیا جا رہا ہے (کوآرڈینیٹس: $2, $3)...',
           es: '[Scheduled Publish] Clicking date day $1 (coords: $2, $3)...',
           fr: '[Scheduled Publish] Clicking date day $1 (coords: $2, $3)...',
           pt: '[Scheduled Publish] Clicking date day $1 (coords: $2, $3)...',
@@ -1895,9 +1871,7 @@
           ko: '[UpdateManager] 🧹 적용 완료된 설치 패키지 캐시 정리됨: $1',
           vi: '[UpdateManager] 🧹 Đã dọn dẹp bộ nhớ đệm gói cài đặt đã áp dụng: $1',
           th: '[UpdateManager] 🧹 ล้างแคชแพ็กเกจการติดตั้งที่สำเร็จแล้ว: $1',
-          bn: '[UpdateManager] 🧹 কার্যকর প্যাকেজ ক্যাশ পরিষ্কার করা হয়েছে: $1',
           id: '[UpdateManager] 🧹 Membersihkan cache paket pembaruan lama: $1',
-          ur: '[UpdateManager] 🧹 پرانے انسٹالر پیکج کا کیش صاف کر دیا گیا: $1',
           es: '[UpdateManager] 🧹 Cleaned up obsolete update package cache: $1',
           fr: '[UpdateManager] 🧹 Cleaned up obsolete update package cache: $1',
           pt: '[UpdateManager] 🧹 Cleaned up obsolete update package cache: $1',
@@ -1916,9 +1890,7 @@
           ko: '[UpdateManager] 🔄 resources 디렉터리 업데이트 구성을 shortvideo/update 로 보정: $1',
           vi: '[UpdateManager] 🔄 Đồng bộ cấu hình cập nhật thư mục resources thành shortvideo/update: $1',
           th: '[UpdateManager] 🔄 ปรับเทียบการกำหนดค่าการอัปเดตใน resources เป็น shortvideo/update: $1',
-          bn: '[UpdateManager] 🔄 resources ডিরেক্টরি আপডেট কনফিগারেশন shortvideo/update হিসেবে সিঙ্ক করা হয়েছে: $1',
           id: '[UpdateManager] 🔄 Menyelaraskan konfigurasi pembaruan di direktori resources: $1',
-          ur: '[UpdateManager] 🔄 resources ڈائرکٹری اپ ڈیٹ کی ترتیبات کو shortvideo/update پر ہم آہنگ کیا گیا: $1',
           es: '[UpdateManager] 🔄 Calibrating update config in resources dir to shortvideo/update: $1',
           fr: '[UpdateManager] 🔄 Calibrating update config in resources dir to shortvideo/update: $1',
           pt: '[UpdateManager] 🔄 Calibrating update config in resources dir to shortvideo/update: $1',
@@ -1937,9 +1909,7 @@
           ko: '[UpdateManager] resources 디렉터리 업데이트 구성 자동 완성: $1',
           vi: '[UpdateManager] Tự động bổ sung cấu hình cập nhật thư mục resources: $1',
           th: '[UpdateManager] เติมเต็มการกำหนดค่าการอัปเดตใน resources อัตโนมัติ: $1',
-          bn: '[UpdateManager] resources ডিরেক্টরিতে স্বয়ংক্রিয়ভাবে আপডেট কনফিগারেশন সম্পন্ন হয়েছে: $1',
           id: '[UpdateManager] Melengkapi otomatis konfigurasi pembaruan di direktori resources: $1',
-          ur: '[UpdateManager] resources ڈائرکٹری میں خودکار اپ ڈیٹ کنفیگریشن مکمل کی گئی: $1',
           es: '[UpdateManager] Auto-completed update configuration in resources directory: $1',
           fr: '[UpdateManager] Auto-completed update configuration in resources directory: $1',
           pt: '[UpdateManager] Auto-completed update configuration in resources directory: $1',
@@ -1958,9 +1928,7 @@
           ko: '[UpdateManager] userData 디렉터리 업데이트 구성 저장/업데이트: $1',
           vi: '[UpdateManager] Ghi/cập nhật cấu hình cập nhật trong thư mục userData: $1',
           th: '[UpdateManager] เขียน/อัปเดตการกำหนดค่าในไดเรกทอรี userData: $1',
-          bn: '[UpdateManager] userData ডিরেক্টরিতে আপডেট কনফিগারেশন লেখা/হালনাগাদ করা হয়েছে: $1',
           id: '[UpdateManager] Menulis/memperbarui konfigurasi di direktori userData: $1',
-          ur: '[UpdateManager] userData ڈائرکٹری میں اپ ڈیٹ کنفیگریشن محفوظ کی گئی: $1',
           es: '[UpdateManager] Wrote/updated update config in userData directory: $1',
           fr: '[UpdateManager] Wrote/updated update config in userData directory: $1',
           pt: '[UpdateManager] Wrote/updated update config in userData directory: $1',
@@ -1979,9 +1947,7 @@
           ko: '[SessionKeeper] $1 전용 세션 유지 프로브 시작됨 (무음 하트비트 + 활성 가드)',
           vi: '[SessionKeeper] Đã khởi chạy thăm dò duy trì phiên cho $1 (Nhịp tim im lặng + bảo vệ tích cực)',
           th: '[SessionKeeper] เริ่มต้นโพรบรักษาเซสชันสำหรับ $1 แล้ว (ฮาร์ทบีทเงียบ + การป้องกันที่ใช้งานอยู่)',
-          bn: '[SessionKeeper] $1-এর জন্য সেশন কিপ-অ্যালাইভ প্রোব চালু হয়েছে (নীরব হার্টবিট + সক্রিয় গার্ড)',
           id: '[SessionKeeper] Memulai probe penjaga sesi untuk $1 (Detak jantung senyap + pelindung aktif)',
-          ur: '[SessionKeeper] $1 کے لیے سیشن کیپ الائیو پروب شروع ہو گئی ہے (خاموش ہارٹ بیٹ + فعال گارڈ)',
           es: '[SessionKeeper] Started session keep-alive probe for $1 (Silent heartbeat + active guard)',
           fr: '[SessionKeeper] Started session keep-alive probe for $1 (Silent heartbeat + active guard)',
           pt: '[SessionKeeper] Started session keep-alive probe for $1 (Silent heartbeat + active guard)',
@@ -2000,9 +1966,7 @@
           ko: '[SessionKeeper] $1 의 세션 가드를 중지했습니다',
           vi: '[SessionKeeper] Đã dừng bảo vệ phiên cho $1',
           th: '[SessionKeeper] หยุดการป้องกันเซสชันสำหรับ $1 แล้ว',
-          bn: '[SessionKeeper] $1-এর সেশন গার্ড বন্ধ করা হয়েছে',
           id: '[SessionKeeper] Menghentikan penjaga sesi untuk $1',
-          ur: '[SessionKeeper] $1 کے لیے سیشن گارڈ روک دیا گیا',
           es: '[SessionKeeper] Stopped session guard for $1',
           fr: '[SessionKeeper] Stopped session guard for $1',
           pt: '[SessionKeeper] Stopped session guard for $1',
@@ -2021,9 +1985,7 @@
           ko: '[SessionKeeper] 플랫폼 $1 세션 상태 정상',
           vi: '[SessionKeeper] Kiểm tra tình trạng phiên nền tảng $1 bình thường',
           th: '[SessionKeeper] การตรวจสุขภาพเซสชันแพลตฟอร์ม $1 ปกติ',
-          bn: '[SessionKeeper] প্ল্যাটফর্ম $1 সেশন স্বাস্থ্য পরীক্ষা স্বাভাবিক',
           id: '[SessionKeeper] Pemeriksaan kesehatan sesi platform $1 normal',
-          ur: '[SessionKeeper] پلیٹ فارم $1 سیشن ہیلتھ چیک معمول کے مطابق',
           es: '[SessionKeeper] Platform $1 session health check passed',
           fr: '[SessionKeeper] Platform $1 session health check passed',
           pt: '[SessionKeeper] Platform $1 session health check passed',
@@ -2042,9 +2004,7 @@
           ko: '[SessionKeeper] $1 【작업 진행 중】으로 표시됨, 세션 프로브 일시 중지',
           vi: '[SessionKeeper] $1 được đánh dấu là [Đang thực hiện nhiệm vụ], tạm dừng thăm dò duy trì',
           th: '[SessionKeeper] $1 ถูกทำเครื่องหมายเป็น [กำลังดำเนินการ] หยุดโพรบชั่วคราว',
-          bn: '[SessionKeeper] $1 কে [কাজ চলছে] হিসেবে চিহ্নিত করা হয়েছে, প্রোব স্থগিত',
           id: '[SessionKeeper] $1 ditandai sebagai [Tugas Sedang Berjalan], probe dijeda',
-          ur: '[SessionKeeper] $1 کو [کام جاری ہے] کے طور پر نشان زد کیا گیا، پروب روک دی گئی',
           es: '[SessionKeeper] $1 marked as [Task in Progress], paused keep-alive probe',
           fr: '[SessionKeeper] $1 marked as [Task in Progress], paused keep-alive probe',
           pt: '[SessionKeeper] $1 marked as [Task in Progress], paused keep-alive probe',
@@ -2063,9 +2023,7 @@
           ko: '[SessionKeeper] $1 작업 종료됨, 일반 세션 유지 프로브 재개',
           vi: '[SessionKeeper] Nhiệm vụ $1 đã kết thúc, khôi phục thăm dò duy trì phiên định kỳ',
           th: '[SessionKeeper] งาน $1 สิ้นสุดลงแล้ว กลับมาใช้โพรบรักษาเซสชันตามปกติ',
-          bn: '[SessionKeeper] $1 এর কাজ শেষ, নিয়মিত সেশন কিপ-অ্যালাইভ প্রোব পুনরায় শুরু',
           id: '[SessionKeeper] Tugas $1 selesai, melanjutkan probe penjaga sesi berkala',
-          ur: '[SessionKeeper] $1 کا کام ختم ہو گیا، معمول کی سیشن پروب بحال کر دی گئی',
           es: '[SessionKeeper] $1 task ended, resumed regular session keep-alive probe',
           fr: '[SessionKeeper] $1 task ended, resumed regular session keep-alive probe',
           pt: '[SessionKeeper] $1 task ended, resumed regular session keep-alive probe',
@@ -2084,9 +2042,7 @@
           ko: '[SessionKeeper] 명령 수신: $1 전체 페이지 새로고침 실행 중...',
           vi: '[SessionKeeper] Đã nhận lệnh: Đang tải lại toàn bộ trang cho $1...',
           th: '[SessionKeeper] ได้รับคำสั่ง: กำลังโหลดหน้าทั้งหมดใหม่สำหรับ $1...',
-          bn: '[SessionKeeper] নির্দেশ প্রাপ্ত: $1 এর জন্য সম্পূর্ণ পৃষ্ঠা পুনরায় লোড করা হচ্ছে...',
           id: '[SessionKeeper] Menerima instruksi: Memuat ulang seluruh halaman untuk $1...',
-          ur: '[SessionKeeper] کمانڈ موصول: $1 کے لیے پورا صفحہ دوبارہ لوڈ کیا جا رہا ہے...',
           es: '[SessionKeeper] Command received: Reloading full page for $1...',
           fr: '[SessionKeeper] Command received: Reloading full page for $1...',
           pt: '[SessionKeeper] Command received: Reloading full page for $1...',
@@ -2105,9 +2061,7 @@
           ko: '[SessionKeeper] 새로고침 실패: 활성 $1 뷰를 찾을 수 없습니다',
           vi: '[SessionKeeper] Lệnh tải lại thất bại: Không tìm thấy giao diện $1 đang hoạt động',
           th: '[SessionKeeper] คำสั่งโหลดใหม่ล้มเหลว: ไม่พบมุมมอง $1 ที่ใช้งานอยู่',
-          bn: '[SessionKeeper] পুনরায় লোড ব্যর্থ: সক্রিয় $1 দৃশ্য পাওয়া যায়নি',
           id: '[SessionKeeper] Gagal memuat ulang: Tampilan aktif $1 tidak ditemukan',
-          ur: '[SessionKeeper] دوبارہ لوڈ کرنے کی کمانڈ ناکام: $1 کا کوئی فعال منظر نہیں ملا',
           es: '[SessionKeeper] Reload failed: No active view found for $1',
           fr: '[SessionKeeper] Reload failed: No active view found for $1',
           pt: '[SessionKeeper] Reload failed: No active view found for $1',
@@ -2126,9 +2080,7 @@
           ko: '[SessionKeeper] 새로고침 거부됨: $1 현재 게시 작업 실행 중',
           vi: '[SessionKeeper] Từ chối tải lại: $1 hiện đang thực hiện tác vụ đăng bài',
           th: '[SessionKeeper] ปฏิเสธการโหลดใหม่: $1 กำลังดำเนินการเผยแพร่ในขณะนี้',
-          bn: '[SessionKeeper] পুনরায় লোড প্রত্যাখ্যাত: $1 বর্তমানে প্রকাশনার কাজ চালাচ্ছে',
           id: '[SessionKeeper] Menolak muat ulang: $1 sedang menjalankan tugas publikasi',
-          ur: '[SessionKeeper] ریفریش مسترد: $1 فی الوقت اشاعت کا کام انجام دے رہا ہے',
           es: '[SessionKeeper] Reload rejected: $1 is currently executing a publishing task',
           fr: '[SessionKeeper] Reload rejected: $1 is currently executing a publishing task',
           pt: '[SessionKeeper] Reload rejected: $1 is currently executing a publishing task',
@@ -2147,9 +2099,7 @@
           ko: '[SessionKeeper] 전체 페이지 새로고침 실패: $1',
           vi: '[SessionKeeper] Thực hiện tải lại trang thất bại: $1',
           th: '[SessionKeeper] ดำเนินการโหลดหน้าซ้ำล้มเหลว: $1',
-          bn: '[SessionKeeper] পৃষ্ঠা পুনরায় লোড ব্যর্থ হয়েছে: $1',
           id: '[SessionKeeper] Gagal memuat ulang halaman penuh: $1',
-          ur: '[SessionKeeper] صفحہ ریفریش کرنے میں ناکامی: $1',
           es: '[SessionKeeper] Full page reload failed: $1',
           fr: '[SessionKeeper] Full page reload failed: $1',
           pt: '[SessionKeeper] Full page reload failed: $1',
@@ -2168,9 +2118,7 @@
           ko: '[SessionKeeper] 정기 세션 유지 점검: 세션 감지됨 ($1, $2), Ping 요청 준비 중...',
           vi: '[SessionKeeper] Kiểm tra duy trì phiên: Phát hiện phiên ($1, $2), chuẩn bị gửi Ping...',
           th: '[SessionKeeper] ตรวจสอบการรักษาเซสชัน: ตรวจพบเซสชัน ($1, $2) กำลังเตรียมส่งคำขอ Ping...',
-          bn: '[SessionKeeper] সেশন রক্ষণাবেক্ষণ পরীক্ষা: সেশন শনাক্ত হয়েছে ($1, $2), Ping অনুরোধের প্রস্তুতি...',
           id: '[SessionKeeper] Pemeriksaan penjaga sesi: Sesi terdeteksi ($1, $2), menyiapkan permintaan Ping...',
-          ur: '[SessionKeeper] سیشن کیپ الائیو چیک: سیشن مل گیا ($1, $2)، Ping درخواست کی تیاری...',
           es: '[SessionKeeper] Keep-alive check: Session detected ($1, $2), preparing Ping request...',
           fr: '[SessionKeeper] Keep-alive check: Session detected ($1, $2), preparing Ping request...',
           pt: '[SessionKeeper] Keep-alive check: Session detected ($1, $2), preparing Ping request...',
@@ -2189,9 +2137,7 @@
           ko: '[SessionKeeper] 【중요 공지】 세션 인증 쿠키 (auth_session) 갱신 성공!',
           vi: '[SessionKeeper] [Thông báo quan trọng] Làm mới thành công Cookie xác thực phiên (auth_session)!',
           th: '[SessionKeeper] [ประกาศสำคัญ] รีเฟรชคุกกี้การตรวจสอบสิทธิ์เซสชันสำเร็จ (auth_session)!',
-          bn: '[SessionKeeper] [গুরুত্বপূর্ণ বিজ্ঞপ্তি] সফলভাবে সেশন অনুমোদন কুকি (auth_session) রিফ্রেশ করা হয়েছে!',
           id: '[SessionKeeper] [Pemberitahuan Penting] Berhasil menyegarkan Cookie autentikasi sesi (auth_session)!',
-          ur: '[SessionKeeper] [اہم اطلاع] سیشن کی توثیق کوکی (auth_session) کامیابی سے تازہ ہو گئی!',
           es: '[SessionKeeper] [Important Notice] Successfully refreshed session auth Cookie (auth_session)!',
           fr: '[SessionKeeper] [Important Notice] Successfully refreshed session auth Cookie (auth_session)!',
           pt: '[SessionKeeper] [Important Notice] Successfully refreshed session auth Cookie (auth_session)!',
@@ -2210,9 +2156,7 @@
           ko: '[SessionKeeper] 스케줄러 서비스에 Ping 유지 요청 준비 중 (Ping #$1)...',
           vi: '[SessionKeeper] Chuẩn bị gửi Ping duy trì đến dịch vụ lập lịch (Ping #$1)...',
           th: '[SessionKeeper] กำลังเตรียมส่ง Ping ไปยังบริการกำหนดเวลา (Ping #$1)...',
-          bn: '[SessionKeeper] শিডিউলার পরিষেবাতে Ping অনুরোধ পাঠানোর প্রস্তুতি (Ping #$1)...',
           id: '[SessionKeeper] Menyiapkan permintaan Ping keep-alive ke layanan penjadwal (Ping #$1)...',
-          ur: '[SessionKeeper] شیڈولر سروس کو Ping بھیجنے کی تیاری (Ping #$1)...',
           es: '[SessionKeeper] Preparing Ping keep-alive request to scheduler service (Ping #$1)...',
           fr: '[SessionKeeper] Preparing Ping keep-alive request to scheduler service (Ping #$1)...',
           pt: '[SessionKeeper] Preparing Ping keep-alive request to scheduler service (Ping #$1)...',
@@ -2231,9 +2175,7 @@
           ko: '[SessionKeeper] Ping 응답 성공 (HTTP 200), 사용자: $1, 이메일: $2, 스케줄 상태: $3',
           vi: '[SessionKeeper] Phản hồi Ping thành công (HTTP 200), Người dùng: $1, Email: $2, Trạng thái: $3',
           th: '[SessionKeeper] การตอบกลับ Ping สำเร็จ (HTTP 200), ผู้ใช้: $1, อีเมล: $2, สถานะกำหนดเวลา: $3',
-          bn: '[SessionKeeper] Ping প্রতিক্রিয়া সফল (HTTP 200), ব্যবহারকারী: $1, ইমেল: $2, শিডিউলার অবস্থা: $3',
           id: '[SessionKeeper] Respons Ping berhasil (HTTP 200), Pengguna: $1, Email: $2, Status Penjadwal: $3',
-          ur: '[SessionKeeper] Ping جواب کامیاب (HTTP 200)، صارف: $1، ای میل: $2، شیڈولر کی حالت: $3',
           es: '[SessionKeeper] Ping response successful (HTTP 200), User: $1, Email: $2, Scheduler State: $3',
           fr: '[SessionKeeper] Ping response successful (HTTP 200), User: $1, Email: $2, Scheduler State: $3',
           pt: '[SessionKeeper] Ping response successful (HTTP 200), User: $1, Email: $2, Scheduler State: $3',
@@ -2252,9 +2194,7 @@
           ko: '[Scheduler] [Session] 스케줄러 서비스에 Ping 유지 요청 준비 중 (Ping #$1)...',
           vi: '[Scheduler] [Session] Chuẩn bị gửi Ping duy trì đến dịch vụ lập lịch (Ping #$1)...',
           th: '[Scheduler] [Session] กำลังเตรียมส่ง Ping ไปยังบริการกำหนดเวลา (Ping #$1)...',
-          bn: '[Scheduler] [Session] শিডিউলার পরিষেবাতে Ping অনুরোধ পাঠানোর প্রস্তুতি (Ping #$1)...',
           id: '[Scheduler] [Session] Menyiapkan Ping keep-alive ke layanan penjadwal (Ping #$1)...',
-          ur: '[Scheduler] [Session] شیڈولر سروس کو Ping بھیجنے کی تیاری (Ping #$1)...',
           es: '[Scheduler] [Session] Preparing Ping keep-alive to scheduler service (Ping #$1)...',
           fr: '[Scheduler] [Session] Preparing Ping keep-alive to scheduler service (Ping #$1)...',
           pt: '[Scheduler] [Session] Preparing Ping keep-alive to scheduler service (Ping #$1)...',
@@ -2273,9 +2213,7 @@
           ko: '[Scheduler] [Session] 하트비트 응답 수신: status=$1, user=$2, email=$3, scheduleState=$4',
           vi: '[Scheduler] [Session] Nhận được phản hồi nhịp tim: status=$1, user=$2, email=$3, scheduleState=$4',
           th: '[Scheduler] [Session] ได้รับการตอบกลับฮาร์ทบีท: status=$1, user=$2, email=$3, scheduleState=$4',
-          bn: '[Scheduler] [Session] হার্টবিট প্রতিক্রিয়া প্রাপ্ত: status=$1, user=$2, email=$3, scheduleState=$4',
           id: '[Scheduler] [Session] Menerima respons detak jantung: status=$1, user=$2, email=$3, scheduleState=$4',
-          ur: '[Scheduler] [Session] دل کی دھڑکن کا جواب موصول: status=$1, user=$2, email=$3, scheduleState=$4',
           es: '[Scheduler] [Session] Heartbeat response received: status=$1, user=$2, email=$3, scheduleState=$4',
           fr: '[Scheduler] [Session] Heartbeat response received: status=$1, user=$2, email=$3, scheduleState=$4',
           pt: '[Scheduler] [Session] Heartbeat response received: status=$1, user=$2, email=$3, scheduleState=$4',
@@ -2294,9 +2232,7 @@
           ko: '[Main] [시스템 로그] 및 [비디오 렌더링] 탭 준비 중, 메인 사이트 활성 상태 유지...',
           vi: '[Main] Đang chuẩn bị tab [Nhật ký hệ thống] và [Kết xuất video], giữ trang chính hoạt động...',
           th: '[Main] กำลังเตรียมแท็บ [บันทึกคอนโซลระบบ] และ [การเรนเดอร์วิดีโอ] หน้าต่างหลักยังคงทำงานอยู่...',
-          bn: '[Main] [সিস্টেম লগ] এবং [ভিডিও রেন্ডারিং] ট্যাব প্রস্তুত করা হচ্ছে, প্রধান সাইট সক্রিয় রাখা হচ্ছে...',
           id: '[Main] Menyiapkan TAB [Log Konsol Sistem] dan [Rendering Video], situs utama tetap aktif...',
-          ur: '[Main] [سسٹم کنسول لاگز] اور [ویڈیو رینڈرنگ] ٹیبز تیار ہو رہے ہیں، مین سائٹ فعال رہے گی...',
           es: '[Main] Preparing [System Console Logs] and [Video Rendering] TABs, main site remains active...',
           fr: '[Main] Preparing [System Console Logs] and [Video Rendering] TABs, main site remains active...',
           pt: '[Main] Preparing [System Console Logs] and [Video Rendering] TABs, main site remains active...',
@@ -2315,9 +2251,7 @@
           ko: '[WindowManager] 메인 창 생성 및 구성 완료',
           vi: '[WindowManager] Đã tạo và cấu hình cửa sổ chính thành công',
           th: '[WindowManager] สร้างและกำหนดค่าหน้าต่างหลักเสร็จสมบูรณ์',
-          bn: '[WindowManager] প্রধান উইন্ডো তৈরি এবং কনফিগারেশন সম্পন্ন হয়েছে',
           id: '[WindowManager] Jendela utama berhasil dibuat dan dikonfigurasi',
-          ur: '[WindowManager] مین ونڈو کی تخلیق اور ترتیب مکمل ہو گئی',
           es: '[WindowManager] Main window created and configured successfully',
           fr: '[WindowManager] Main window created and configured successfully',
           pt: '[WindowManager] Main window created and configured successfully',
@@ -2336,9 +2270,7 @@
           ko: '[페이지 새로고침] $1 페이지 새로고침이 트리거되었습니다',
           vi: '[Tải lại trang] Trang $1 đã được kích hoạt tải lại thành công',
           th: '[โหลดหน้าซ้ำ] หน้า $1 ถูกทริกเกอร์ให้โหลดใหม่สำเร็จแล้ว',
-          bn: '[পৃষ্ঠা রিলোড] $1 পৃষ্ঠা সফলভাবে পুনরায় লোড করা হয়েছে',
           id: '[Muat Ulang Halaman] Halaman $1 berhasil dimuat ulang',
-          ur: '[صفحہ دوبارہ لوڈ] $1 صفحہ کامیابی سے دوبارہ لوڈ ہو گیا',
           es: '[Page Reload] $1 page reload triggered successfully',
           fr: '[Page Reload] $1 page reload triggered successfully',
           pt: '[Page Reload] $1 page reload triggered successfully',
@@ -2357,9 +2289,7 @@
           ko: '[AutoUpdater] 업데이트 확인 중...',
           vi: '[AutoUpdater] Đang kiểm tra bản cập nhật...',
           th: '[AutoUpdater] กำลังตรวจสอบการอัปเดต...',
-          bn: '[AutoUpdater] আপডেট পরীক্ষা করা হচ্ছে...',
           id: '[AutoUpdater] Memeriksa pembaruan...',
-          ur: '[AutoUpdater] اپ ڈیٹ چیک کی جا رہی ہے...',
           es: '[AutoUpdater] Checking for update',
           fr: '[AutoUpdater] Checking for update',
           pt: '[AutoUpdater] Checking for update',
@@ -2378,9 +2308,7 @@
           ko: '[AutoUpdater] 버전 $1 발견됨 (url: $2)',
           vi: '[AutoUpdater] Tìm thấy phiên bản $1 (url: $2)',
           th: '[AutoUpdater] พบเวอร์ชัน $1 (url: $2)',
-          bn: '[AutoUpdater] সংস্করণ $1 পাওয়া গেছে (url: $2)',
           id: '[AutoUpdater] Ditemukan versi $1 (url: $2)',
-          ur: '[AutoUpdater] ورژن $1 مل گیا (url: $2)',
           es: '[AutoUpdater] Found version $1 (url: $2)',
           fr: '[AutoUpdater] Found version $1 (url: $2)',
           pt: '[AutoUpdater] Found version $1 (url: $2)',
@@ -2399,9 +2327,7 @@
           ko: '[AutoUpdater] 사용 가능한 업데이트가 없습니다.',
           vi: '[AutoUpdater] Không có bản cập nhật nào.',
           th: '[AutoUpdater] ไม่มีการอัปเดตที่ใช้ได้',
-          bn: '[AutoUpdater] কোনো আপডেট উপলব্ধ নেই।',
           id: '[AutoUpdater] Pembaruan tidak tersedia.',
-          ur: '[AutoUpdater] کوئی اپ ڈیٹ دستیاب نہیں ہے۔',
           es: '[AutoUpdater] Update not available.',
           fr: '[AutoUpdater] Update not available.',
           pt: '[AutoUpdater] Update not available.',
@@ -2420,9 +2346,7 @@
           ko: '[System] 클라이언트 메인 윈도우 및 서비스가 완전히 준비되었습니다',
           vi: '[System] Cửa sổ chính và dịch vụ đã hoàn toàn sẵn sàng',
           th: '[System] หน้าต่างหลักของไคลเอนต์และบริการพร้อมใช้งานเต็มรูปแบบแล้ว',
-          bn: '[System] ক্লায়েন্ট প্রধান উইন্ডো এবং পরিষেবাগুলি সম্পূর্ণ প্রস্তুত',
           id: '[System] Jendela utama dan layanan telah siap sepenuhnya',
-          ur: '[System] کلائنٹ کی مین ونڈو اور سروسز مکمل طور پر تیار ہیں',
           es: '[System] Client main window and daemon services are fully ready',
           fr: '[System] Client main window and daemon services are fully ready',
           pt: '[System] Client main window and daemon services are fully ready',
@@ -2441,9 +2365,7 @@
           ko: '[System] 소프트웨어 버전: $1',
           vi: '[System] Phiên bản phần mềm: $1',
           th: '[System] เวอร์ชันซอฟต์แวร์: $1',
-          bn: '[System] সফটওয়্যার সংস্করণ: $1',
           id: '[System] Versi Perangkat Lunak: $1',
-          ur: '[System] سافٹ ویئر ورژن: $1',
           es: '[System] Software Version: $1',
           fr: '[System] Software Version: $1',
           pt: '[System] Software Version: $1',
@@ -2462,9 +2384,7 @@
           ko: '[Scheduler] 로컬 예약 게시 스케줄러 서비스 시작됨, 폴링 주기: $1',
           vi: '[Scheduler] Dịch vụ lập lịch đăng bài cục bộ đã khởi chạy, chu kỳ thăm dò: $1',
           th: '[Scheduler] บริการกำหนดเวลาเผยแพร่ในเครื่องเริ่มต้นแล้ว, รอบการสำรวจ: $1',
-          bn: '[Scheduler] স্থানীয় সময়সূচী প্রকাশনা পরিষেবা শুরু হয়েছে, পোলিং ব্যবধান: $1',
           id: '[Scheduler] Layanan penjadwalan rilis lokal dimulai, interval polling: $1',
-          ur: '[Scheduler] مقامی شیڈول اشاعت کی سروس شروع ہو گئی ہے، پولنگ کا وقفہ: $1',
           es: '[Scheduler] Local scheduled publishing service started, polling interval: $1',
           fr: '[Scheduler] Local scheduled publishing service started, polling interval: $1',
           pt: '[Scheduler] Local scheduled publishing service started, polling interval: $1',
@@ -2483,9 +2403,7 @@
           ko: '[Scheduler] 실패한 작업 $1개를 수동으로 초기화하고 즉시 실행했습니다',
           vi: '[Scheduler] Đã đặt lại thủ công $1 tác vụ thất bại và thực thi ngay lập tức',
           th: '[Scheduler] รีเซ็ตงานที่ล้มเหลว $1 งานด้วยตนเองและดำเนินการทันที',
-          bn: '[Scheduler] ম্যানুয়ালি $1টি ব্যর্থ কাজ রিসেট করে অবিলম্বে কার্যকর করা হয়েছে',
           id: '[Scheduler] Mereset manual $1 tugas gagal dan langsung mengeksekusi',
-          ur: '[Scheduler] دستی طور پر $1 ناکام کاموں کو دوبارہ ترتیب دے کر فوری عمل درآمد کیا گیا',
           es: '[Scheduler] Manually reset $1 failed tasks and executed immediately',
           fr: '[Scheduler] Manually reset $1 failed tasks and executed immediately',
           pt: '[Scheduler] Manually reset $1 failed tasks and executed immediately',
@@ -2504,9 +2422,7 @@
           ko: '[Scheduler] 🔄 시작 시 이전에 실패/중단된 비디오 작업 $1개 감지, 즉시 재발행 예약: $2',
           vi: '[Scheduler] 🔄 Khởi động phát hiện $1 tác vụ video bị lỗi/ngắt trước đó, lên lịch gửi lại ngay: $2',
           th: '[Scheduler] 🔄 ตรวจพบงานวิดีโอที่ล้มเหลว/ถูกขัดจังหวะ $1 งานขณะเริ่มทำงาน กำหนดเวลาเผยแพร่อีกครั้งทันที: $2',
-          bn: '[Scheduler] 🔄 শুরুতে পূর্বে ব্যর্থ/বিঘ্নিত $1টি ভিডিও কাজ সনাক্ত হয়েছে, অবিলম্বে পুনরায় প্রকাশের ব্যবস্থা: $2',
           id: '[Scheduler] 🔄 Startup mendeteksi $1 tugas video yang gagal/terputus sebelumnya, menjadwalkan ulang: $2',
-          ur: '[Scheduler] 🔄 آغاز پر $1 پہلے ناکام ہونے والے ویڈیو کام ملے، فوری دوبارہ شیڈول کیا گیا: $2',
           es: '[Scheduler] 🔄 Startup detected $1 previously failed/interrupted video tasks, scheduling immediate retry: $2',
           fr: '[Scheduler] 🔄 Startup detected $1 previously failed/interrupted video tasks, scheduling immediate retry: $2',
           pt: '[Scheduler] 🔄 Startup detected $1 previously failed/interrupted video tasks, scheduling immediate retry: $2',
@@ -2525,9 +2441,7 @@
           ko: '[Scheduler] 예약 작업 $1개 추가/업데이트 성공',
           vi: '[Scheduler] Đã thêm/cập nhật thành công $1 tác vụ đã lên lịch',
           th: '[Scheduler] เพิ่ม/อัปเดตงานตามกำหนดการ $1 งานสำเร็จ',
-          bn: '[Scheduler] সফলভাবে $1টি নির্ধারিত কাজ যোগ/আপডেট করা হয়েছে',
           id: '[Scheduler] Berhasil menambah/memperbarui $1 tugas terjadwal',
-          ur: '[Scheduler] $1 شیڈول کام کامیابی سے شامل/اپ ڈیٹ ہو گئے',
           es: '[Scheduler] Successfully added/updated $1 scheduled tasks',
           fr: '[Scheduler] Successfully added/updated $1 scheduled tasks',
           pt: '[Scheduler] Successfully added/updated $1 scheduled tasks',
@@ -2546,9 +2460,7 @@
           ko: '[Scheduler] 예약 작업 취소됨: $1',
           vi: '[Scheduler] Đã hủy tác vụ đã lên lịch: $1',
           th: '[Scheduler] ยกเลิกงานตามกำหนดการแล้ว: $1',
-          bn: '[Scheduler] নির্ধারিত কাজ বাতিল করা হয়েছে: $1',
           id: '[Scheduler] Membatalkan tugas terjadwal: $1',
-          ur: '[Scheduler] شیڈول کام منسوخ کر دیا گیا: $1',
           es: '[Scheduler] Cancelled scheduled task: $1',
           fr: '[Scheduler] Cancelled scheduled task: $1',
           pt: '[Scheduler] Cancelled scheduled task: $1',
@@ -2567,9 +2479,7 @@
           ko: '[Scheduler] ⏰ 예약 시간 도달! 자동 업로드 작업 준비 [$1] - $2',
           vi: '[Scheduler] ⏰ Đã đến giờ đã lên lịch! Chuẩn bị tự động tải lên [$1] - $2',
           th: '[Scheduler] ⏰ ถึงเวลาที่กำหนดแล้ว! เตรียมอัปโหลดอัตโนมัติ [$1] - $2',
-          bn: '[Scheduler] ⏰ নির্ধারিত সময় পৌঁছেছে! স্বয়ংক্রিয় আপলোড প্রস্তুত [$1] - $2',
           id: '[Scheduler] ⏰ Waktu terjadwal tercapai! Menyiapkan unggahan otomatis [$1] - $2',
-          ur: '[Scheduler] ⏰ شیڈول وقت پہنچ گیا! خودکار اپ لوڈ کی تیاری [$1] - $2',
           es: '[Scheduler] ⏰ Scheduled time reached! Preparing automatic upload [$1] - $2',
           fr: '[Scheduler] ⏰ Scheduled time reached! Preparing automatic upload [$1] - $2',
           pt: '[Scheduler] ⏰ Scheduled time reached! Preparing automatic upload [$1] - $2',
@@ -2588,9 +2498,7 @@
           ko: '[Scheduler] ✅ 예약 발행 성공: $1',
           vi: '[Scheduler] ✅ Đăng bài theo lịch thành công: $1',
           th: '[Scheduler] ✅ เผยแพร่ตามกำหนดเวลาสำเร็จ: $1',
-          bn: '[Scheduler] ✅ নির্ধারিত প্রকাশনা সফল: $1',
           id: '[Scheduler] ✅ Publikasi terjadwal berhasil: $1',
-          ur: '[Scheduler] ✅ شیڈول اشاعت کامیاب: $1',
           es: '[Scheduler] ✅ Scheduled publishing succeeded: $1',
           fr: '[Scheduler] ✅ Scheduled publishing succeeded: $1',
           pt: '[Scheduler] ✅ Scheduled publishing succeeded: $1',
@@ -2609,9 +2517,7 @@
           ko: '[Scheduler] ❌ 예약 발행 실패: $1',
           vi: '[Scheduler] ❌ Đăng bài theo lịch không thành công: $1',
           th: '[Scheduler] ❌ เผยแพร่ตามกำหนดเวลาไม่สำเร็จ: $1',
-          bn: '[Scheduler] ❌ নির্ধারিত প্রকাশনা ব্যর্থ হয়েছে: $1',
           id: '[Scheduler] ❌ Publikasi terjadwal gagal: $1',
-          ur: '[Scheduler] ❌ شیڈول اشاعت ناکام ہو گئی: $1',
           es: '[Scheduler] ❌ Scheduled publishing failed: $1',
           fr: '[Scheduler] ❌ Scheduled publishing failed: $1',
           pt: '[Scheduler] ❌ Scheduled publishing failed: $1',
@@ -2630,9 +2536,7 @@
           ko: '[Scheduler] ❌ 예약 발행 실행 예외: $1',
           vi: '[Scheduler] ❌ Ngoại lệ khi thực hiện đăng bài theo lịch: $1',
           th: '[Scheduler] ❌ ข้อผิดพลาดในการเผยแพร่ตามกำหนดเวลา: $1',
-          bn: '[Scheduler] ❌ নির্ধারিত প্রকাশনা সম্পাদন ব্যতিক্রম: $1',
           id: '[Scheduler] ❌ Pengecualian saat mengeksekusi publikasi terjadwal: $1',
-          ur: '[Scheduler] ❌ شیڈول اشاعت کے عمل میں خرابی: $1',
           es: '[Scheduler] ❌ Error executing scheduled publishing: $1',
           fr: '[Scheduler] ❌ Error executing scheduled publishing: $1',
           pt: '[Scheduler] ❌ Error executing scheduled publishing: $1',
@@ -2651,9 +2555,7 @@
           ko: '[Scheduler] 로컬 파일에서 예약 작업 $1개 로드됨',
           vi: '[Scheduler] Đã tải $1 tác vụ đã lên lịch từ tệp cục bộ',
           th: '[Scheduler] โหลดงานตามกำหนดการ $1 งานจากไฟล์ในเครื่องแล้ว',
-          bn: '[Scheduler] স্থানীয় ফাইল থেকে $1টি নির্ধারিত কাজ লোড করা হয়েছে',
           id: '[Scheduler] Memuat $1 tugas terjadwal dari file lokal',
-          ur: '[Scheduler] مقامی فائل سے $1 شیڈول کام لوڈ کیے گئے',
           es: '[Scheduler] Loaded $1 scheduled tasks from local storage',
           fr: '[Scheduler] Loaded $1 scheduled tasks from local storage',
           pt: '[Scheduler] Loaded $1 scheduled tasks from local storage',
@@ -2672,9 +2574,7 @@
           ko: '[Scheduler] 로컬 영구 작업 읽기 실패: $1',
           vi: '[Scheduler] Không thể đọc tác vụ cục bộ: $1',
           th: '[Scheduler] ไม่สามารถอ่านงานในเครื่อง: $1',
-          bn: '[Scheduler] স্থানীয় সংরক্ষিত কাজ পড়তে ব্যর্থ হয়েছে: $1',
           id: '[Scheduler] Gagal membaca tugas lokal yang persisten: $1',
-          ur: '[Scheduler] مقامی محفوظ شدہ کاموں کو پڑھنے میں ناکامی: $1',
           es: '[Scheduler] Failed to read local persistent tasks: $1',
           fr: '[Scheduler] Failed to read local persistent tasks: $1',
           pt: '[Scheduler] Failed to read local persistent tasks: $1',
@@ -2693,9 +2593,7 @@
           ko: '[Scheduler] 로컬 작업 파일 저장 실패: $1',
           vi: '[Scheduler] Không thể lưu tệp tác vụ cục bộ: $1',
           th: '[Scheduler] ไม่สามารถบันทึกไฟล์งานในเครื่อง: $1',
-          bn: '[Scheduler] স্থানীয় টাস্ক ফাইল সংরক্ষণ করতে ব্যর্থ হয়েছে: $1',
           id: '[Scheduler] Gagal menyimpan file tugas lokal: $1',
-          ur: '[Scheduler] مقامی ٹاسک فائل کو محفوظ کرنے میں ناکامی: $1',
           es: '[Scheduler] Failed to save local task file: $1',
           fr: '[Scheduler] Failed to save local task file: $1',
           pt: '[Scheduler] Failed to save local task file: $1',
@@ -2714,9 +2612,7 @@
           ko: '[Scheduler] 저장 경로 초기화 실패: $1',
           vi: '[Scheduler] Không thể khởi tạo đường dẫn lưu trữ: $1',
           th: '[Scheduler] ไม่สามารถกำหนดเส้นทางการจัดเก็บได้: $1',
-          bn: '[Scheduler] স্টোরেজ পাথ আরম্ভ করতে ব্যর্থ হয়েছে: $1',
           id: '[Scheduler] Gagal menginisialisasi jalur penyimpanan: $1',
-          ur: '[Scheduler] اسٹوریج کا راستہ شروع کرنے میں ناکامی: $1',
           es: '[Scheduler] Failed to initialize storage path: $1',
           fr: '[Scheduler] Failed to initialize storage path: $1',
           pt: '[Scheduler] Failed to initialize storage path: $1',
@@ -2735,9 +2631,7 @@
           ko: '[Scheduler] 시스템 알림 표시 예외: $1',
           vi: '[Scheduler] Ngoại lệ hiển thị thông báo hệ thống: $1',
           th: '[Scheduler] ข้อยกเว้นในการแสดงการแจ้งเตือนของระบบ: $1',
-          bn: '[Scheduler] সিস্টেম বিজ্ঞপ্তি প্রদর্শন ব্যতিক্রম: $1',
           id: '[Scheduler] Pengecualian menampilkan notifikasi sistem: $1',
-          ur: '[Scheduler] سسٹم نوٹیفکیشن دکھانے میں خرابی: $1',
           es: '[Scheduler] Exception showing system notification: $1',
           fr: '[Scheduler] Exception showing system notification: $1',
           pt: '[Scheduler] Exception showing system notification: $1',
@@ -2756,9 +2650,7 @@
           ko: '[AutoUpdater] resources 디렉터리 업데이트 패키지 자동 생성: $1',
           vi: '[AutoUpdater] Tự động tạo gói cập nhật thư mục resources: $1',
           th: '[AutoUpdater] สร้างแพ็กเกจอัปเดตในไดเรกทอรี resources อัตโนมัติ: $1',
-          bn: '[AutoUpdater] resources ডিরেক্টরিতে স্বয়ংক্রিয়ভাবে আপডেট প্যাকেজ তৈরি করা হয়েছে: $1',
           id: '[AutoUpdater] Paket pembaruan dibuat otomatis di direktori resources: $1',
-          ur: '[AutoUpdater] resources ڈائرکٹری میں خودکار اپ ڈیٹ پیکج تیار کیا گیا: $1',
           es: '[AutoUpdater] Auto-generated update package in resources directory: $1',
           fr: '[AutoUpdater] Auto-generated update package in resources directory: $1',
           pt: '[AutoUpdater] Auto-generated update package in resources directory: $1',
@@ -2777,9 +2669,7 @@
           ko: '[UpdateManager] 현재 최신 버전입니다 ($1)',
           vi: '[UpdateManager] Hiện đã là phiên bản mới nhất ($1)',
           th: '[UpdateManager] ปัจจุบันเป็นเวอร์ชันล่าสุดแล้ว ($1)',
-          bn: '[UpdateManager] ইতিমধ্যে সর্বশেষ সংস্করণে রয়েছে ($1)',
           id: '[UpdateManager] Sudah menggunakan versi terbaru ($1)',
-          ur: '[UpdateManager] فی الوقت جدید ترین ورژن پر ہے ($1)',
           es: '[UpdateManager] Already on the latest version ($1)',
           fr: '[UpdateManager] Already on the latest version ($1)',
           pt: '[UpdateManager] Already on the latest version ($1)',
@@ -2798,9 +2688,7 @@
           ko: '[WindowManager] 클라이언트 언어를 zh (중국어) 로 전환했습니다',
           vi: '[WindowManager] Đã chuyển ngôn ngữ ứng dụng sang: zh (Tiếng Trung)',
           th: '[WindowManager] สลับภาษาของไคลเอนต์เป็น: zh (ภาษาจีน)',
-          bn: '[WindowManager] ক্লায়েন্টের ভাষা zh (চীনা)-তে পরিবর্তন করা হয়েছে',
           id: '[WindowManager] Beralih bahasa klien ke: zh (Bahasa Mandarin)',
-          ur: '[WindowManager] کلائنٹ کی زبان تبدیل کر دی گئی: zh (چینی)',
           es: '[WindowManager] Switched client language to: zh (Chinese)',
           fr: '[WindowManager] Switched client language to: zh (Chinese)',
           pt: '[WindowManager] Switched client language to: zh (Chinese)',
@@ -2819,9 +2707,7 @@
           ko: '[WindowManager] 클라이언트 언어를 ja (일본어) 로 전환했습니다',
           vi: '[WindowManager] Đã chuyển ngôn ngữ ứng dụng sang: ja (Tiếng Nhật)',
           th: '[WindowManager] สลับภาษาของไคลเอนต์เป็น: ja (ภาษาญี่ปุ่น)',
-          bn: '[WindowManager] ক্লায়েন্টের ভাষা ja (জাপানি)-তে পরিবর্তন করা হয়েছে',
           id: '[WindowManager] Beralih bahasa klien ke: ja (Bahasa Jepang)',
-          ur: '[WindowManager] کلائنٹ کی زبان تبدیل کر دی گئی: ja (جاپانی)',
           es: '[WindowManager] Switched client language to: ja (Japanese)',
           fr: '[WindowManager] Switched client language to: ja (Japanese)',
           pt: '[WindowManager] Switched client language to: ja (Japanese)',
@@ -2840,9 +2726,7 @@
           ko: '[WindowManager] 클라이언트 언어를 $1 (으)로 전환했습니다',
           vi: '[WindowManager] Đã chuyển ngôn ngữ ứng dụng sang: $1',
           th: '[WindowManager] สลับภาษาของไคลเอนต์เป็น: $1',
-          bn: '[WindowManager] ক্লায়েন্টের ভাষা পরিবর্তন করা হয়েছে: $1',
           id: '[WindowManager] Beralih bahasa klien ke: $1',
-          ur: '[WindowManager] کلائنٹ کی زبان تبدیل کر دی گئی: $1',
           es: '[WindowManager] Switched client language to: $1',
           fr: '[WindowManager] Switched client language to: $1',
           pt: '[WindowManager] Switched client language to: $1',
@@ -2861,9 +2745,7 @@
           ko: '[WindowManager] OAuth 인증 팝업 요청(window.open) 감지, 독립 인증 창 열기: $1',
           vi: '[WindowManager] Bắt được yêu cầu cửa sổ xác thực OAuth, mở cửa sổ xác thực độc lập: $1',
           th: '[WindowManager] ตรวจพบคำขอการรับรองความถูกต้อง OAuth เปิดหน้าต่างอิสระ: $1',
-          bn: '[WindowManager] OAuth অনুমোদন উইন্ডো অনুরোধ সনাক্ত, স্বাধীন উইন্ডো খোলা হয়েছে: $1',
           id: '[WindowManager] Menangkap permintaan popup OAuth, membuka jendela autentikasi mandiri: $1',
-          ur: '[WindowManager] OAuth ونڈو کی درخواست مل گئی، خود مختار ونڈو کھول دی گئی: $1',
           es: '[WindowManager] Caught OAuth popup request (window.open), opened dedicated auth window: $1',
           fr: '[WindowManager] Caught OAuth popup request (window.open), opened dedicated auth window: $1',
           pt: '[WindowManager] Caught OAuth popup request (window.open), opened dedicated auth window: $1',
@@ -2882,9 +2764,7 @@
           ko: '[WindowManager] OAuth 자격 증명 수신, 메인 사이트 LocalStorage 로 동기화 시작...',
           vi: '[WindowManager] Nhận được thông tin xác thực OAuth, đang đồng bộ hóa vào LocalStorage...',
           th: '[WindowManager] ได้รับข้อมูลประจำตัว OAuth กำลังซิงค์กับ LocalStorage...',
-          bn: '[WindowManager] OAuth শংসাপত্র প্রাপ্ত হয়েছে, LocalStorage-এ সিঙ্ক শুরু হচ্ছে...',
           id: '[WindowManager] Menerima kredensial OAuth, menyinkronkan ke LocalStorage...',
-          ur: '[WindowManager] OAuth اسناد موصول ہو گئیں، LocalStorage میں ہم آہنگی شروع ہو رہی ہے...',
           es: '[WindowManager] Received OAuth credentials, synchronizing to main LocalStorage...',
           fr: '[WindowManager] Received OAuth credentials, synchronizing to main LocalStorage...',
           pt: '[WindowManager] Received OAuth credentials, synchronizing to main LocalStorage...',
@@ -2903,9 +2783,7 @@
           ko: '[WindowManager] 자격 증명 주입 완료, 로그인 페이지로 리디렉션 중: $1',
           vi: '[WindowManager] Đã chèn thông tin xác thực, chuyển hướng đến trang đã đăng nhập: $1',
           th: '[WindowManager] ใส่ข้อมูลประจำตัวแล้ว กำลังนำทางไปยังหน้าที่เข้าสู่ระบบแล้ว: $1',
-          bn: '[WindowManager] শংসাপত্র যুক্ত হয়েছে, লগইন পৃষ্ঠায় পুনঃনির্দেশ করা হচ্ছে: $1',
           id: '[WindowManager] Kredensial disuntikkan, mengarahkan ke halaman masuk: $1',
-          ur: '[WindowManager] اسناد شامل کر دی گئیں، لاگ ان صفحہ پر لے جایا جا رہا ہے: $1',
           es: '[WindowManager] Credentials injected, redirecting main site to authenticated page: $1',
           fr: '[WindowManager] Credentials injected, redirecting main site to authenticated page: $1',
           pt: '[WindowManager] Credentials injected, redirecting main site to authenticated page: $1',
@@ -2924,9 +2802,7 @@
           ko: '[WindowManager] OAuth 로그인 성공, 토큰 생성됨, 데스크톱 클라이언트에 동기화 시작...',
           vi: '[WindowManager] Đăng nhập OAuth thành công, đã tạo Token, đang đồng bộ vào ứng dụng...',
           th: '[WindowManager] เข้าสู่ระบบ OAuth สำเร็จ สร้างโทเค็นแล้ว กำลังซิงค์ข้อมูลประจำตัว...',
-          bn: '[WindowManager] OAuth লগইন সফল হয়েছে, টোকেন তৈরি হয়েছে, সিঙ্ক করা হচ্ছে...',
           id: '[WindowManager] Login OAuth berhasil, Token dibuat, menyinkronkan ke klien...',
-          ur: '[WindowManager] OAuth لاگ ان کامیاب، ٹوکن تیار، کلائنٹ میں ہم آہنگ کیا جا رہا ہے...',
           es: '[WindowManager] OAuth login succeeded, Token generated, syncing credentials to client...',
           fr: '[WindowManager] OAuth login succeeded, Token generated, syncing credentials to client...',
           pt: '[WindowManager] OAuth login succeeded, Token generated, syncing credentials to client...',
@@ -2945,9 +2821,7 @@
           ko: '[WindowManager] 보안 인증을 위한 독립 OAuth 팝업 실행: $1',
           vi: '[WindowManager] Khởi chạy cửa sổ OAuth độc lập để xác thực an toàn: $1',
           th: '[WindowManager] เปิดหน้าต่างป๊อปอัป OAuth เพื่อการรับรองความถูกต้องที่ปลอดภัย: $1',
-          bn: '[WindowManager] নিরাপদ প্রমাণীকরণের জন্য স্বাধীন OAuth পপআপ চালু করা হচ্ছে: $1',
           id: '[WindowManager] Meluncurkan popup OAuth mandiri untuk autentikasi aman: $1',
-          ur: '[WindowManager] محفوظ تصدیق کے لیے آزاد OAuth ونڈو کھولی جا رہی ہے: $1',
           es: '[WindowManager] Launching dedicated OAuth popup for secure auth: $1',
           fr: '[WindowManager] Launching dedicated OAuth popup for secure auth: $1',
           pt: '[WindowManager] Launching dedicated OAuth popup for secure auth: $1',
@@ -2966,9 +2840,7 @@
           ko: '🛑 비디오 렌더링 프로세스 종료 중 (PID: $1)...',
           vi: '🛑 Đang chấm dứt tiến trình kết xuất video (PID: $1)...',
           th: '🛑 กำลังยุติกระบวนการเรนเดอร์วิดีโอ (PID: $1)...',
-          bn: '🛑 ভিডিও রেন্ডারিং প্রক্রিয়া বন্ধ করা হচ্ছে (PID: $1)...',
           id: '🛑 Menghentikan proses rendering video (PID: $1)...',
-          ur: '🛑 ویڈیو رینڈرنگ پروسیس ختم کیا جا رہا ہے (PID: $1)...',
           es: '🛑 Terminating video rendering process (PID: $1)...',
           fr: '🛑 Terminating video rendering process (PID: $1)...',
           pt: '🛑 Terminating video rendering process (PID: $1)...',
@@ -2987,9 +2859,7 @@
           ko: '🛑 비디오 렌더링 작업이 사용자에 의해 수동 종료되었습니다',
           vi: '🛑 Tác vụ kết xuất video đã được người dùng dừng thủ công',
           th: '🛑 งานเรนเดอร์วิดีโอถูกยกเลิกด้วยตนเองโดยผู้ใช้',
-          bn: '🛑 ভিডিও রেন্ডারিং কাজটি ব্যবহারকারী ম্যানুয়ালি বন্ধ করেছেন',
           id: '🛑 Tugas rendering video dihentikan secara manual oleh pengguna',
-          ur: '🛑 ویڈیو رینڈرنگ کا کام صارف نے دستی طور پر ختم کر دیا',
           es: '🛑 Video rendering task was terminated manually by user',
           fr: '🛑 Video rendering task was terminated manually by user',
           pt: '🛑 Video rendering task was terminated manually by user',
@@ -3008,9 +2878,7 @@
           ko: '❌ 비디오 렌더링 작업이 비정상 종료되었습니다 (종료 코드: $1)',
           vi: '❌ Tác vụ kết xuất video đã thoát bất thường (Mã thoát: $1)',
           th: '❌ งานเรนเดอร์วิดีโอออกโดยไม่คาดคิด (รหัสออก: $1)',
-          bn: '❌ ভিডিও রেন্ডারিং টাস্ক অপ্রত্যাশিতভাবে প্রস্থান করেছে (প্রস্থান কোড: $1)',
           id: '❌ Tugas rendering video keluar secara tidak normal (Kode keluar: $1)',
-          ur: '❌ ویڈیو رینڈرنگ ٹاسک غیر متوقع طور پر بند ہو گیا (خروج کوڈ: $1)',
           es: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
           fr: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
           pt: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
@@ -3029,9 +2897,7 @@
           ko: '[Main] 【시스템 로그】및【비디오 렌더링】탭 준비 중, 메인 뷰 활성 유지...',
           vi: '[Main] Đang chuẩn bị tab [Nhật ký hệ thống] & [Kết xuất video], duy trì tab chính...',
           th: '[Main] กำลังเตรียมแท็บ [บันทึกระบบ] & [การเรนเดอร์วิดีโอ], รักษาหน้าหลักไว้...',
-          bn: '[Main] [সিস্টেম লগ] ও [ভিডিও রেন্ডারিং] ট্যাব প্রস্তুত হচ্ছে, মূল ভিউ সক্রিয় আছে...',
           id: '[Main] Menyiapkan tab [Log Sistem] & [Rendering Video], tampilan utama tetap aktif...',
-          ur: '[Main] [سسٹم لاگز] اور [ویڈیو رینڈرنگ] ٹیب تیار ہو رہے ہیں، مین ویو فعال ہے...',
           es: '[Main] Initializing [System Logs] & [Video Rendering] tabs, main view remains active...',
           fr: '[Main] Initializing [System Logs] & [Video Rendering] tabs, main view remains active...',
           pt: '[Main] Initializing [System Logs] & [Video Rendering] tabs, main view remains active...',
@@ -3050,9 +2916,7 @@
           ko: '[UpdateManager] 서버에서 새 버전 확인 중...',
           vi: '[UpdateManager] Đang kiểm tra phiên bản mới từ máy chủ...',
           th: '[UpdateManager] กำลังตรวจสอบการอัปเดตจากเซิร์ฟเวอร์...',
-          bn: '[UpdateManager] দূরবর্তী সার্ভারে আপডেটের জন্য পরীক্ষা করা হচ্ছে...',
           id: '[UpdateManager] Memeriksa pembaruan di server jarak jauh...',
-          ur: '[UpdateManager] ریموٹ سرور پر اپ ڈیٹس چیک کی جا رہی ہیں...',
           es: '[UpdateManager] Checking for updates on remote server...',
           fr: '[UpdateManager] Checking for updates on remote server...',
           pt: '[UpdateManager] Checking for updates on remote server...',
@@ -3071,9 +2935,7 @@
           ko: '[UpdateManager] 새 버전 발견: $1 (현재 버전: $2)',
           vi: '[UpdateManager] Tìm thấy phiên bản mới: $1 (Phiên bản hiện tại: $2)',
           th: '[UpdateManager] พบเวอร์ชันใหม่: $1 (เวอร์ชันปัจจุบัน: $2)',
-          bn: '[UpdateManager] নতুন সংস্করণ পাওয়া গেছে: $1 (বর্তমান সংস্করণ: $2)',
           id: '[UpdateManager] Ditemukan versi baru: $1 (Versi saat ini: $2)',
-          ur: '[UpdateManager] نیا ورژن مل گیا: $1 (موجودہ ورژن: $2)',
           es: '[UpdateManager] Found new client version: $1 (Current version: $2)',
           fr: '[UpdateManager] Found new client version: $1 (Current version: $2)',
           pt: '[UpdateManager] Found new client version: $1 (Current version: $2)',
@@ -3092,9 +2954,7 @@
           ko: '[UpdateManager] 이미 최신 버전입니다 (v$1), 업데이트가 필요 없습니다',
           vi: '[UpdateManager] Hiện đã là phiên bản mới nhất (v$1), không cần cập nhật',
           th: '[UpdateManager] เป็นเวอร์ชันล่าสุดแล้ว (v$1) ไม่จำเป็นต้องอัปเดต',
-          bn: '[UpdateManager] ইতিমধ্যে সর্বশেষ সংস্করণ (v$1), আপডেটের প্রয়োজন নেই',
           id: '[UpdateManager] Sudah versi terbaru (v$1), tidak perlu pembaruan',
-          ur: '[UpdateManager] فی الحال تازہ ترین ورژن ہے (v$1)، اپ ڈیٹ کی ضرورت نہیں',
           es: '[UpdateManager] Currently the latest version (v$1), no update required',
           fr: '[UpdateManager] Currently the latest version (v$1), no update required',
           pt: '[UpdateManager] Currently the latest version (v$1), no update required',
@@ -3113,9 +2973,7 @@
           ko: '[UpdateManager] 업데이트 다운로드 시작: $1',
           vi: '[UpdateManager] Bắt đầu tải xuống bản cập nhật: $1',
           th: '[UpdateManager] เริ่มดาวน์โหลดการอัปเดต: $1',
-          bn: '[UpdateManager] আপডেট প্যাকেজ ডাউনলোড শুরু হচ্ছে: $1',
           id: '[UpdateManager] Memulai unduhan pembaruan: $1',
-          ur: '[UpdateManager] اپ ڈیٹ ڈاؤن لوڈ شروع ہو رہا ہے: $1',
           es: '[UpdateManager] Starting update package download: $1',
           fr: '[UpdateManager] Starting update package download: $1',
           pt: '[UpdateManager] Starting update package download: $1',
@@ -3134,9 +2992,7 @@
           ko: '[UpdateManager] 증분 차분 블록맵 다운로드 중...',
           vi: '[UpdateManager] Đang tải xuống gia tăng blockmap vi phân...',
           th: '[UpdateManager] กำลังดาวน์โหลดส่วนเพิ่ม blockmap...',
-          bn: '[UpdateManager] ডিফারেনশিয়াল ব্লকম্যাপ ইনক্রিমেন্টাল ডাউনলোড চলছে...',
           id: '[UpdateManager] Mengunduh bertahap diferensial blockmap...',
-          ur: '[UpdateManager] تفریق شدہ بلاک میپ انکریمنٹل ڈاؤن لوڈ جاری ہے...',
           es: '[UpdateManager] Differential blockmap incremental downloading...',
           fr: '[UpdateManager] Differential blockmap incremental downloading...',
           pt: '[UpdateManager] Differential blockmap incremental downloading...',
@@ -3155,9 +3011,7 @@
           ko: '[UpdateManager] 업데이트 다운로드 완료, 설치 준비 완료',
           vi: '[UpdateManager] Đã tải xong bản cập nhật, sẵn sàng cài đặt',
           th: '[UpdateManager] ดาวน์โหลดการอัปเดตเสร็จแล้ว พร้อมติดตั้ง',
-          bn: '[UpdateManager] আপডেট ডাউনলোড সম্পন্ন হয়েছে, ইনস্টল করতে প্রস্তুত',
           id: '[UpdateManager] Unduhan pembaruan selesai, siap dipasang',
-          ur: '[UpdateManager] اپ ڈیٹ ڈاؤن لوڈ مکمل، انسٹال کے لیے تیار',
           es: '[UpdateManager] Update download completed, ready to install',
           fr: '[UpdateManager] Update download completed, ready to install',
           pt: '[UpdateManager] Update download completed, ready to install',
@@ -3176,9 +3030,7 @@
           ko: '[UpdateManager] 새 버전이 준비되었습니다. 지금 재시작하여 설치합니다',
           vi: '[UpdateManager] Phiên bản mới đã sẵn sàng, khởi động lại ngay để cài đặt',
           th: '[UpdateManager] เวอร์ชันใหม่พร้อมแล้ว กำลังรีสตาร์ทเพื่อติดตั้งเดี๋ยวนี้',
-          bn: '[UpdateManager] নতুন সংস্করণ প্রস্তুত, এখনই ইনস্টল করতে পুনরায় চালু হচ্ছে',
           id: '[UpdateManager] Versi baru siap, memulai ulang untuk memasang sekarang',
-          ur: '[UpdateManager] نیا ورژن تیار ہے، ابھی انسٹال کرنے کے لیے دوبارہ شروع ہو رہا ہے',
           es: '[UpdateManager] New version is ready, restarting to install now',
           fr: '[UpdateManager] New version is ready, restarting to install now',
           pt: '[UpdateManager] New version is ready, restarting to install now',
@@ -3197,9 +3049,7 @@
           ko: '[SessionKeeper] $1 전용 세션 유지 프로브 시작 (무음 하트비트 + 활성 가드)',
           vi: '[SessionKeeper] Khởi chạy thăm dò duy trì phiên cho $1 (nhịp tim im lặng + bảo vệ)',
           th: '[SessionKeeper] เริ่มต้นโพรบรักษาเซสชันสำหรับ $1 (ฮาร์ทบีทเงียบ + การปกป้อง)',
-          bn: '[SessionKeeper] $1 এর জন্য সেশন অ্যাক্টিভ প্রোব শুরু হয়েছে (হার্টবিট + সক্রিয় সুরক্ষা)',
           id: '[SessionKeeper] Memulai probe penjaga sesi untuk $1 (detak jantung senyap + perlindungan aktif)',
-          ur: '[SessionKeeper] $1 کے لیے سیشن کیپ الائیو پروب شروع کر دیا گیا (خاموش دھڑکن + فعال محافظ)',
           es: '[SessionKeeper] Started dedicated session keep-alive probe for $1 (silent heartbeat + active guard)',
           fr: '[SessionKeeper] Started dedicated session keep-alive probe for $1 (silent heartbeat + active guard)',
           pt: '[SessionKeeper] Started dedicated session keep-alive probe for $1 (silent heartbeat + active guard)',
@@ -3218,9 +3068,7 @@
           ko: '[SessionKeeper] $1 세션 유지 프로브 중지',
           vi: '[SessionKeeper] Đã dừng thăm dò duy trì phiên cho $1',
           th: '[SessionKeeper] หยุดโพรบรักษาเซสชันสำหรับ $1',
-          bn: '[SessionKeeper] $1 এর জন্য সেশন অ্যাক্টিভ প্রোব বন্ধ করা হয়েছে',
           id: '[SessionKeeper] Menghentikan probe penjaga sesi untuk $1',
-          ur: '[SessionKeeper] $1 کے لیے سیشن کیپ الائیو پروب روک دیا گیا',
           es: '[SessionKeeper] Stopped session keep-alive probe for $1',
           fr: '[SessionKeeper] Stopped session keep-alive probe for $1',
           pt: '[SessionKeeper] Stopped session keep-alive probe for $1',
@@ -3239,9 +3087,7 @@
           ko: '[SessionKeeper] 플랫폼 $1 세션 상태 정상',
           vi: '[SessionKeeper] Kiểm tra tình trạng phiên nền tảng $1 bình thường',
           th: '[SessionKeeper] การตรวจสุขภาพเซสชันแพลตฟอร์ม $1 ปกติ',
-          bn: '[SessionKeeper] প্ল্যাটফর্ম $1 সেশন স্বাস্থ্য পরীক্ষা স্বাভাবিক',
           id: '[SessionKeeper] Pemeriksaan kesehatan sesi platform $1 normal',
-          ur: '[SessionKeeper] پلیٹ فارم $1 سیشن ہیلتھ چیک معمول کے مطابق',
           es: '[SessionKeeper] Platform $1 session health check passed',
           fr: '[SessionKeeper] Platform $1 session health check passed',
           pt: '[SessionKeeper] Platform $1 session health check passed',
@@ -3260,9 +3106,7 @@
           ko: '[AutoUpdater] 업데이트 확인 중...',
           vi: '[AutoUpdater] Đang kiểm tra bản cập nhật...',
           th: '[AutoUpdater] กำลังตรวจสอบการอัปเดต...',
-          bn: '[AutoUpdater] আপডেট পরীক্ষা করা হচ্ছে...',
           id: '[AutoUpdater] Memeriksa pembaruan...',
-          ur: '[AutoUpdater] اپ ڈیٹ چیک کی جا رہی ہے...',
           es: '[AutoUpdater] Checking for update',
           fr: '[AutoUpdater] Checking for update',
           pt: '[AutoUpdater] Checking for update',
@@ -3281,9 +3125,7 @@
           ko: '[AutoUpdater] 버전 $1 발견됨 (url: $2)',
           vi: '[AutoUpdater] Tìm thấy phiên bản $1 (url: $2)',
           th: '[AutoUpdater] พบเวอร์ชัน $1 (url: $2)',
-          bn: '[AutoUpdater] সংস্করণ $1 পাওয়া গেছে (url: $2)',
           id: '[AutoUpdater] Ditemukan versi $1 (url: $2)',
-          ur: '[AutoUpdater] ورژن $1 مل گیا (url: $2)',
           es: '[AutoUpdater] Found version $1 (url: $2)',
           fr: '[AutoUpdater] Found version $1 (url: $2)',
           pt: '[AutoUpdater] Found version $1 (url: $2)',
@@ -3302,9 +3144,7 @@
           ko: '[AutoUpdater] 사용 가능한 업데이트가 없습니다.',
           vi: '[AutoUpdater] Không có bản cập nhật nào.',
           th: '[AutoUpdater] ไม่มีการอัปเดตที่ใช้ได้',
-          bn: '[AutoUpdater] কোনো আপডেট উপলব্ধ নেই।',
           id: '[AutoUpdater] Pembaruan tidak tersedia.',
-          ur: '[AutoUpdater] کوئی اپ ڈیٹ دستیاب نہیں ہے۔',
           es: '[AutoUpdater] Update not available.',
           fr: '[AutoUpdater] Update not available.',
           pt: '[AutoUpdater] Update not available.',
@@ -3323,9 +3163,7 @@
           ko: '[System] 클라이언트 메인 윈도우 및 서비스가 완전히 준비되었습니다',
           vi: '[System] Cửa sổ chính và dịch vụ đã hoàn toàn sẵn sàng',
           th: '[System] หน้าต่างหลักของไคลเอนต์และบริการพร้อมใช้งานเต็มรูปแบบแล้ว',
-          bn: '[System] ক্লায়েন্ট প্রধান উইন্ডো এবং পরিষেবাগুলি সম্পূর্ণ প্রস্তুত',
           id: '[System] Jendela utama dan layanan telah siap sepenuhnya',
-          ur: '[System] کلائنٹ کی مین ونڈو اور سروسز مکمل طور پر تیار ہیں',
           es: '[System] Client main window and daemon services are fully ready',
           fr: '[System] Client main window and daemon services are fully ready',
           pt: '[System] Client main window and daemon services are fully ready',
@@ -3344,9 +3182,7 @@
           ko: '[Scheduler] 로컬 예약 게시 스케줄러 서비스 시작됨, 폴링 주기: $1',
           vi: '[Scheduler] Dịch vụ lập lịch đăng bài cục bộ đã khởi chạy, chu kỳ thăm dò: $1',
           th: '[Scheduler] บริการกำหนดเวลาเผยแพร่ในเครื่องเริ่มต้นแล้ว, รอบการสำรวจ: $1',
-          bn: '[Scheduler] স্থানীয় সময়সূচী প্রকাশনা পরিষেবা শুরু হয়েছে, পোলিং ব্যবধান: $1',
           id: '[Scheduler] Layanan penjadwalan rilis lokal dimulai, interval polling: $1',
-          ur: '[Scheduler] مقامی شیڈول اشاعت کی سروس شروع ہو گئی ہے، پولنگ کا وقفہ: $1',
           es: '[Scheduler] Local scheduled publishing service started, polling interval: $1',
           fr: '[Scheduler] Local scheduled publishing service started, polling interval: $1',
           pt: '[Scheduler] Local scheduled publishing service started, polling interval: $1',
@@ -3365,9 +3201,7 @@
           ko: '[AutoUpdater] resources 디렉터리 업데이트 패키지 자동 생성: $1',
           vi: '[AutoUpdater] Tự động tạo gói cập nhật thư mục resources: $1',
           th: '[AutoUpdater] สร้างแพ็กเกจอัปเดตในไดเรกทอรี resources อัตโนมัติ: $1',
-          bn: '[AutoUpdater] resources ডিরেক্টরিতে স্বয়ংক্রিয়ভাবে আপডেট প্যাকেজ তৈরি করা হয়েছে: $1',
           id: '[AutoUpdater] Paket pembaruan dibuat otomatis di direktori resources: $1',
-          ur: '[AutoUpdater] resources ڈائرکٹری میں خودکار اپ ڈیٹ پیکج تیار کیا گیا: $1',
           es: '[AutoUpdater] Auto-generated update package in resources directory: $1',
           fr: '[AutoUpdater] Auto-generated update package in resources directory: $1',
           pt: '[AutoUpdater] Auto-generated update package in resources directory: $1',
@@ -3386,9 +3220,7 @@
           ko: '[UpdateManager] 현재 최신 버전입니다 ($1)',
           vi: '[UpdateManager] Hiện đã là phiên bản mới nhất ($1)',
           th: '[UpdateManager] ปัจจุบันเป็นเวอร์ชันล่าสุดแล้ว ($1)',
-          bn: '[UpdateManager] ইতিমধ্যে সর্বশেষ সংস্করণে রয়েছে ($1)',
           id: '[UpdateManager] Sudah menggunakan versi terbaru ($1)',
-          ur: '[UpdateManager] فی الوقت جدید ترین ورژن پر ہے ($1)',
           es: '[UpdateManager] Already on the latest version ($1)',
           fr: '[UpdateManager] Already on the latest version ($1)',
           pt: '[UpdateManager] Already on the latest version ($1)',
@@ -3407,9 +3239,7 @@
           ko: '[WindowManager] 클라이언트 언어를 $1 (으)로 전환했습니다',
           vi: '[WindowManager] Đã chuyển ngôn ngữ ứng dụng sang: $1',
           th: '[WindowManager] สลับภาษาของไคลเอนต์เป็น: $1',
-          bn: '[WindowManager] ক্লায়েন্টের ভাষা পরিবর্তন করা হয়েছে: $1',
           id: '[WindowManager] Beralih bahasa klien ke: $1',
-          ur: '[WindowManager] کلائنٹ کی زبان تبدیل کر دی گئی: $1',
           es: '[WindowManager] Switched client language to: $1',
           fr: '[WindowManager] Switched client language to: $1',
           pt: '[WindowManager] Switched client language to: $1',
@@ -3428,9 +3258,7 @@
           ko: '[SessionKeeper] $1 전용 세션 유지 프로브 시작됨 (무음 하트비트 + 활성 가드)',
           vi: '[SessionKeeper] Đã khởi chạy đầu dò duy trì phiên cho $1 (Nhịp tim im lặng + bảo vệ tích cực)',
           th: '[SessionKeeper] เริ่มต้นโพรบรักษาเซสชันสำหรับ $1 แล้ว (ฮาร์ทบีทเงียบ + การป้องกันที่ใช้งานอยู่)',
-          bn: '[SessionKeeper] $1-এর জন্য সেশন কিপ-অ্যালাইভ প্রোব চালু হয়েছে (নীরব হার্টবিট + সক্রিয় গার্ড)',
           id: '[SessionKeeper] Memulai probe penjaga sesi untuk $1 (Detak jantung senyap + pelindung aktif)',
-          ur: '[SessionKeeper] $1 کے لیے سیشن کیپ الائیو پروب شروع ہو گئی ہے (خاموش ہارٹ بیٹ + فعال گارڈ)',
           es: '[SessionKeeper] Started session keep-alive probe for $1 (Silent heartbeat + active guard)',
           fr: '[SessionKeeper] Started session keep-alive probe for $1 (Silent heartbeat + active guard)',
           pt: '[SessionKeeper] Started session keep-alive probe for $1 (Silent heartbeat + active guard)',
@@ -3449,9 +3277,7 @@
           ko: '[SessionKeeper] $1 의 세션 가드를 중지했습니다',
           vi: '[SessionKeeper] Đã dừng bảo vệ phiên cho $1',
           th: '[SessionKeeper] หยุดการป้องกันเซสชันสำหรับ $1 แล้ว',
-          bn: '[SessionKeeper] $1-এর সেশন গার্ড বন্ধ করা হয়েছে',
           id: '[SessionKeeper] Menghentikan penjaga sesi untuk $1',
-          ur: '[SessionKeeper] $1 کے لیے سیشن گارڈ روک دیا گیا',
           es: '[SessionKeeper] Stopped session guard for $1',
           fr: '[SessionKeeper] Stopped session guard for $1',
           pt: '[SessionKeeper] Stopped session guard for $1',
@@ -3470,9 +3296,7 @@
           ko: '🛑 비디오 렌더링 프로세스 종료 중 (PID: $1)...',
           vi: '🛑 Đang chấm dứt tiến trình kết xuất video (PID: $1)...',
           th: '🛑 กำลังยุติกระบวนการเรนเดอร์วิดีโอ (PID: $1)...',
-          bn: '🛑 ভিডিও রেন্ডারিং প্রক্রিয়া বন্ধ করা হচ্ছে (PID: $1)...',
           id: '🛑 Menghentikan proses rendering video (PID: $1)...',
-          ur: '🛑 ویڈیو رینڈرنگ پروسیس ختم کیا جا رہا ہے (PID: $1)...',
           es: '🛑 Terminating video rendering process (PID: $1)...',
           fr: '🛑 Terminating video rendering process (PID: $1)...',
           pt: '🛑 Terminating video rendering process (PID: $1)...',
@@ -3491,9 +3315,7 @@
           ko: '🛑 비디오 렌더링 작업이 사용자에 의해 수동 종료되었습니다',
           vi: '🛑 Tác vụ kết xuất video đã được người dùng dừng thủ công',
           th: '🛑 งานเรนเดอร์วิดีโอถูกยกเลิกด้วยตนเองโดยผู้ใช้',
-          bn: '🛑 ভিডিও রেন্ডারিং কাজটি ব্যবহারকারী ম্যানুয়ালি বন্ধ করেছেন',
           id: '🛑 Tugas rendering video dihentikan secara manual oleh pengguna',
-          ur: '🛑 ویڈیو رینڈرنگ کا کام صارف نے دستی طور پر ختم کر دیا',
           es: '🛑 Video rendering task was terminated manually by user',
           fr: '🛑 Video rendering task was terminated manually by user',
           pt: '🛑 Video rendering task was terminated manually by user',
@@ -3512,9 +3334,7 @@
           ko: '❌ 비디오 렌더링 작업이 비정상 종료되었습니다 (종료 코드: $1)',
           vi: '❌ Tác vụ kết xuất video đã thoát bất thường (Mã thoát: $1)',
           th: '❌ งานเรนเดอร์วิดีโอออกโดยไม่คาดคิด (รหัสออก: $1)',
-          bn: '❌ ভিডিও রেন্ডারিং টাস্ক অপ্রত্যাশিতভাবে প্রস্থান করেছে (প্রস্থান কোড: $1)',
           id: '❌ Tugas rendering video keluar secara tidak normal (Kode keluar: $1)',
-          ur: '❌ ویڈیو رینڈرنگ ٹاسک غیر متوقع طور پر بند ہو گیا (خروج کوڈ: $1)',
           es: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
           fr: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
           pt: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
@@ -3543,8 +3363,6 @@
           de: '[$1] Intelligente Suche nach dem Zieleingabefeld (inkl. Shadow-DOM-Durchdringung)...',
           tr: '[$1] Hedef giriş alanı akıllı konumlandırması başlatılıyor (Shadow DOM geçişli)...',
           it: '[$1] Rilevamento intelligente del campo di input (con penetrazione Shadow DOM)...',
-          bn: '[$1] লক্ষ্য ইনপুট ফিল্ড স্মার্ট অবস্থান সনাক্তকরণ শুরু (Shadow DOM সহ)...',
-          ur: '[$1] ہدف ان پٹ فیلڈ کا سمارٹ پوزیشننگ شروع (بشمول Shadow DOM)...'
         }
       },
       {
@@ -3564,8 +3382,6 @@
           de: '[$1] ✅ Physische Koordinaten des Eingabefelds erfolgreich fixiert ($2, $3)!',
           tr: '[$1] ✅ Giriş alanı fiziksel koordinatları başarıyla kilitlendi ($2, $3)!',
           it: '[$1] ✅ Coordinate fisiche del campo di input bloccate con successo ($2, $3)!',
-          bn: '[$1] ✅ সফলভাবে ইনপুট ফিল্ডের শারীরিক স্থানাঙ্ক লক করা হয়েছে ($2, $3)!',
-          ur: '[$1] ✅ ان پٹ فیلڈ کے فزیکل کوآرڈینیٹس کامیابی سے لاک ہو گئے ($2, $3)!'
         }
       },
       {
@@ -3585,8 +3401,6 @@
           de: '[$1] Physischer Klick auf Eingabefeld zur Fokussierung (menschliche Mausbewegung)...',
           tr: '[$1] Odaklanmak için giriş alanına fiziksel olarak tıklanıyor (insansı fare hareketi)...',
           it: '[$1] Clic fisico sul campo di input per mettere a fuoco (movimento mouse naturale)...',
-          bn: '[$1] ফোকাস করার জন্য ইনপুট ফিল্ডে ফিজিক্যাল ক্লিক করা হচ্ছে (হিউম্যানাইজড মাউস ট্রেইল)...',
-          ur: '[$1] فوکس کرنے کے لیے ان پٹ باکس پر فزیکل کلک کیا جا رہا ہے (انسانی ماؤس ٹریک)...'
         }
       },
       {
@@ -3606,8 +3420,6 @@
           de: '[$1] Simulation menschlicher Eingabe (natürlicher Tastenanschlag & Mikropausen)...',
           tr: '[$1] İnsan yazma girişi simüle ediliyor (doğal tuş vuruşu temposu ve mikro duraklamalar)...',
           it: '[$1] Simulazione della digitazione umana (ritmo di battitura naturale e micro-pause)...',
-          bn: '[$1] মানুষের টাইপিং ইনপুট অনুকরণ করা হচ্ছে (স্বাভাবিক টাইপিং ছন্দ ও বিরতি)...',
-          ur: '[$1] انسانی ٹائپنگ ان پٹ کی نقل کی جا رہی ہے (قدرتی کی اسٹروک فریکوئنسی اور وقفے)...'
         }
       },
       {
@@ -3627,8 +3439,6 @@
           de: '[$1] ✅ Eingabe & Überprüfung abgeschlossen! Endgültiger Steuerelementwert: "$2" (Länge: $3)',
           tr: '[$1] ✅ Yazma ve doğrulama tamamlandı! Kontrol nihai değeri: "$2" (Karakter: $3)',
           it: '[$1] ✅ Digitazione e verifica completate! Valore finale del controllo: "$2" (Caratteri: $3)',
-          bn: '[$1] ✅ টাইপিং ও যাচাই সম্পূর্ণ! নিয়ন্ত্রণের চূড়ান্ত মান: "$2" (দৈর্ঘ্য: $3)',
-          ur: '[$1] ✅ ٹائپنگ اور تصدیق مکمل! کنٹرول کی حتمی ویلیو: "$2" (حروف: $3)'
         }
       },
       {
@@ -3648,8 +3458,6 @@
           de: 'Notiztitel eingegeben, weiter zu Text und Tags (geschätzte Wartezeit $1s)...',
           tr: 'Not başlığı girildi, gövde metni ve etiketlere geçiliyor (tahmini bekleme $1 sn)...',
           it: 'Titolo della nota inserito, passaggio al corpo e ai tag (attesa stimata $1s)...',
-          bn: 'নোটের শিরোনাম প্রবেশ করানো হয়েছে, মূল অংশ ও ট্যাগে প্রবেশ করা হচ্ছে (প্রত্যাশিত অপেক্ষা $1 সেকেন্ড)...',
-          ur: 'نوٹ کا عنوان درج کر دیا گیا، باڈی اور ٹیگز کی طرف بڑھ رہے ہیں (متوقع انتظار $1 سیکنڈ)...'
         }
       },
       {
@@ -3669,8 +3477,6 @@
           de: '[$1] Suche nach Rich-Text-Editor (inkl. Shadow-DOM-Durchdringung)...',
           tr: '[$1] Zengin metin editörü konumlandırılıyor (Shadow DOM geçişli)...',
           it: '[$1] Rilevamento dell’editor di testo formattato (con penetrazione Shadow DOM)...',
-          bn: '[$1] রিচ টেক্সট এডিটর অবস্থান সনাক্তকরণ শুরু (Shadow DOM সহ)...',
-          ur: '[$1] رچ ٹیکسٹ ایڈیٹر پوزیشننگ شروع (بشمول Shadow DOM)...'
         }
       },
       {
@@ -3690,8 +3496,6 @@
           de: '[$1] ✅ Physische Koordinaten des Rich-Text-Felds fixiert ($2, $3)!',
           tr: '[$1] ✅ Zengin metin kutusu fiziksel koordinatları kilitlendi ($2, $3)!',
           it: '[$1] ✅ Coordinate fisiche dell’editor di testo formattato bloccate ($2, $3)!',
-          bn: '[$1] ✅ সফলভাবে রিচ টেক্সট বক্সের শারীরিক স্থানাঙ্ক লক করা হয়েছে ($2, $3)!',
-          ur: '[$1] ✅ رچ ٹیکسٹ باکس کے فزیکل کوآرڈینیٹس کامیابی سے لاک ہو گئے ($2, $3)!'
         }
       },
       {
@@ -3711,8 +3515,6 @@
           de: '[$1] Physischer Klick auf das Rich-Text-Editor-Feld zur Fokussierung...',
           tr: '[$1] Odaklanmak için zengin metin düzenleme kutusuna fiziksel olarak tıklanıyor...',
           it: '[$1] Clic fisico sull’editor di testo per mettere a fuoco...',
-          bn: '[$1] ফোকাস করার জন্য রিচ টেক্সট এডিটরে ফিজিক্যাল ক্লিক করা হচ্ছে...',
-          ur: '[$1] فوکس کرنے کے لیے رچ ٹیکسٹ ایڈیٹر پر فزیکل کلک کیا جا رہا ہے...'
         }
       },
       {
@@ -3732,8 +3534,6 @@
           de: '[CdpBridge] Erfolgreich mit CDP-WebSocket der Seite $1 verbunden: $2',
           tr: '[CdpBridge] $1 sayfası CDP WebSocket bağlantısı başarıyla kuruldu: $2',
           it: '[CdpBridge] Connessione riuscita a CDP WebSocket della pagina $1: $2',
-          bn: '[CdpBridge] সফলভাবে $1 পৃষ্ঠার CDP WebSocket এর সাথে সংযুক্ত হয়েছে: $2',
-          ur: '[CdpBridge] $1 صفحہ CDP WebSocket سے کامیابی کے ساتھ جڑ گیا: $2'
         }
       },
       {
@@ -3753,8 +3553,6 @@
           de: 'Ausweichplan: Direkte Navigation zur Veröffentlichungsseite per URL...',
           tr: 'Yedek plan: URL üzerinden doğrudan yayınlama sayfasına gidiliyor...',
           it: 'Piano di riserva: Navigazione diretta alla pagina di pubblicazione tramite URL...',
-          bn: 'বিকল্প পরিকল্পনা: URL এর মাধ্যমে সরাসরি প্রকাশনা পৃষ্ঠায় নেভিগেট করা হচ্ছে...',
-          ur: 'متبادل منصوبہ: URL کے ذریعے براہ راست اشاعت کے صفحے پر نیویگیٹ کیا جا رہا ہے...'
         }
       },
       {
@@ -3774,8 +3572,6 @@
           de: 'Warte auf Abschluss des Ladevorgangs und Renderns der WeChat Channels-Veröffentlichungsoberfläche ($1s)...',
           tr: 'WeChat Channels yayınlama arayüzünün yüklenmesi ve işlenmesi bekleniyor ($1 sn)...',
           it: 'In attesa che l’interfaccia di pubblicazione di WeChat Channels completi il caricamento ($1s)...',
-          bn: 'উইচ্যাট চ্যানেল প্রকাশনা ইন্টারফেস নেটওয়ার্ক লোড ও রেন্ডারিং সম্পন্ন হওয়ার অপেক্ষা ($1 সেকেন্ড)...',
-          ur: 'وی چیٹ چینلز اشاعت انٹرفیس کے نیٹ ورک لوڈ اور رینڈرنگ مکمل ہونے کا انتظار ($1 سیکنڈ)...'
         }
       },
       {
@@ -3795,8 +3591,6 @@
           de: '[$1] Simulation des Einfügens durch den Benutzer zum Einfügen von Text und Tags...',
           tr: '[$1] Metin eklemek ve etiketleri ayrıştırmak için kullanıcı yapıştırması simüle ediliyor...',
           it: '[$1] Simulazione dell’incolla utente per inserire testo e analizzare i tag...',
-          bn: '[$1] টেক্সট ইনজেক্ট করতে এবং ট্যাগ পার্স করতে ব্যবহারকারীর পেস্ট অনুকরণ করা হচ্ছে...',
-          ur: '[$1] مواد شامل کرنے اور ٹیگز کو پارس کرنے کے لیے صارف کے پیسٹ کی نقل کی جا رہی ہے...'
         }
       },
       {
@@ -3816,8 +3610,6 @@
           de: '[$1] ✅ Rich-Text-Beschreibung erfolgreich eingefügt! (Länge: $2)',
           tr: '[$1] ✅ Zengin metin açıklaması başarıyla eklendi! (Karakter: $2)',
           it: '[$1] ✅ Descrizione in testo formattato inserita con successo! (Caratteri: $2)',
-          bn: '[$1] ✅ রিচ টেক্সট বিবরণ সফলভাবে ইনজেক্ট করা হয়েছে! (অক্ষর: $2)',
-          ur: '[$1] ✅ رچ ٹیکسٹ تفصیل کامیابی سے داخل ہو گئی! (حروف: $2)'
         }
       },
       {
@@ -3837,8 +3629,6 @@
           de: 'Inhalt & Tags vollständig eingefügt, erweiterte Veröffentlichungsoptionen werden geprüft (ca. $1s)...',
           tr: 'İçerik ve etiketler eklendi, gelişmiş yayınlama seçenekleri denetleniyor (tahmini $1 sn)...',
           it: 'Contenuto e tag inseriti, verifica delle opzioni avanzate di pubblicazione (attesa stimata $1s)...',
-          bn: 'বিষয়বস্তু ও ট্যাগ সম্পূর্ণভাবে প্রবেশ করানো হয়েছে, উন্নত প্রকাশনা বিকল্প পরীক্ষা করা হচ্ছে (অপেক্ষা $1 সেকেন্ড)...',
-          ur: 'مواد اور ٹیگز مکمل داخل ہو گئے، جدید اشاعت کے اختیارات چیک کیے جا رہے ہیں (متوقع $1 سیکنڈ)...'
         }
       },
       {
@@ -3858,8 +3648,6 @@
           de: '⚙ Erweiterte Xiaohongshu-Optionen konfigurieren (Original / KI-Erstellung / Zeitplan)...',
           tr: '⚙ Xiaohongshu gelişmiş yayın seçenekleri yapılandırılıyor (Orijinal / Yapay Zeka / Zamanlanmış)...',
           it: '⚙ Configurazione delle opzioni avanzate di Xiaohongshu (Originale / IA / Programmato)...',
-          bn: '⚙ Xiaohongshu উন্নত প্রকাশনা বিকল্প কনফিগার করা হচ্ছে (মূল বিষয়বস্তু / AI / সময়সূচী)...',
-          ur: '⚙ Xiaohongshu کے جدید اشاعت کے اختیارات کی تشکیل کی جا رہی ہے (اصل مواد / AI / شیڈول)...'
         }
       },
       {
@@ -3879,8 +3667,6 @@
           de: '🚀 Automatisierter Xiaohongshu-Veröffentlichungs-Workflow gestartet',
           tr: '🚀 Xiaohongshu otomatik yayınlama iş akışı başlatıldı',
           it: '🚀 Flusso di pubblicazione automatizzata di Xiaohongshu avviato',
-          bn: '🚀 Xiaohongshu স্বয়ংক্রিয় প্রকাশনা কার্যপ্রবাহ শুরু হয়েছে',
-          ur: '🚀 Xiaohongshu خودکار اشاعت کا ورک فلو شروع ہو گیا'
         }
       },
       {
@@ -3900,8 +3686,6 @@
           de: '🚀 Automatisierter WeChat Channels-Veröffentlichungs-Workflow gestartet',
           tr: '🚀 WeChat Channels otomatik yayınlama iş akışı başlatıldı',
           it: '🚀 Flusso di pubblicazione automatizzata di WeChat Channels avviato',
-          bn: '🚀 উইচ্যাট চ্যানেল স্বয়ংক্রিয় প্রকাশনা কার্যপ্রবাহ শুরু হয়েছে',
-          ur: '🚀 وی چیٹ چینلز خودکار اشاعت کا ورک فلو شروع ہو گیا'
         }
       },
       {
@@ -3921,8 +3705,6 @@
           de: '🔍 Tiefendiagnose der DOM-Elemente der Seite (inkl. Shadow-DOM-Durchdringung)...',
           tr: '🔍 Sayfa DOM öğelerinin derin tanılaması başlatılıyor (Shadow DOM geçişli)...',
           it: '🔍 Diagnosi approfondita degli elementi DOM della pagina (con penetrazione Shadow DOM)...',
-          bn: '🔍 পৃষ্ঠা DOM উপাদানগুলির গভীর নির্ণয় শুরু (Shadow DOM সহ)...',
-          ur: '🔍 صفحہ کے DOM عناصر کی گہری تشخیص شروع (بشمول Shadow DOM)...'
         }
       },
       {
@@ -3942,8 +3724,6 @@
           de: '📊 DOM-Diagnoseergebnis generiert',
           tr: '📊 DOM tanılama sonucu oluşturuldu',
           it: '📊 Risultato della diagnosi DOM generato',
-          bn: '📊 DOM নির্ণয়ের ফলাফল তৈরি হয়েছে',
-          ur: '📊 DOM تشخیص کا نتیجہ تیار ہو گیا'
         }
       },
       {
@@ -3963,8 +3743,6 @@
           de: '⏳ Mögliche inaktive Sitzung erkannt, Seite wird zur Selbstheilung neu geladen...',
           tr: '⏳ Olası etkin olmayan oturum algılandı, kendi kendini onarmak için sayfa yenileniyor...',
           it: '⏳ Possibile sessione inattiva rilevata, ricaricamento della pagina per autoriparazione...',
-          bn: '⏳ নিষ্ক্রিয় সেশন শনাক্ত হয়েছে, স্ব-নিরাময়ের জন্য পৃষ্ঠা রিফ্রেশ করা হচ্ছে...',
-          ur: '⏳ غیر فعال سیشن کی نشاندہی ہوئی، خودکار بحالی کے لیے صفحہ ریفریش کیا جا رہا ہے...'
         }
       },
       {
@@ -3984,8 +3762,6 @@
           de: '🎉 Selbstheilung durch Neuladen erfolgreich, Anmeldesitzung vollständig wiederhergestellt!',
           tr: '🎉 Sayfa yenileme ile kendi kendini onarma başarılı, oturum tamamen geri yüklendi!',
           it: '🎉 Ripristino tramite ricarica riuscito, sessione di accesso completamente recuperata!',
-          bn: '🎉 পৃষ্ঠা রিফ্রেশ পুনরুদ্ধার সফল হয়েছে, লগইন সেশন সম্পূর্ণ পুনরুদ্ধার হয়েছে!',
-          ur: '🎉 صفحہ ریفریش کی بحالی کامیاب، لاگ ان سیشن مکمل طور پر بحال ہو گیا!'
         }
       },
       {
@@ -4005,8 +3781,6 @@
           de: '⏳ Startseite der Creator-Plattform wird zur Anmeldung geöffnet...',
           tr: '⏳ Giriş yapmak için içerik üretici platformu ana sayfası açılıyor...',
           it: '⏳ Apertura della home page della piattaforma creatori per l’accesso...',
-          bn: '⏳ লগইন করার জন্য নির্মাতা পরিষেবা প্ল্যাটফর্মের হোম পেজ খোলা হচ্ছে...',
-          ur: '⏳ لاگ ان کرنے کے لیے تخلیق کار سروس پلیٹ فارم کا ہوم پیج کھولا جا رہا ہے...'
         }
       },
       {
@@ -4026,8 +3800,6 @@
           de: '⏳ Nicht angemeldet. Bitte QR-Code mit mobiler App scannen (wird automatisch fortgesetzt)...',
           tr: '⏳ Giriş yapılmadı. Lütfen mobil uygulamayla QR kodu tarayın (otomatik devam edecek)...',
           it: '⏳ Non connesso. Scansiona il codice QR con l’app mobile (continuerà automaticamente)...',
-          bn: '⏳ লগ ইন করা নেই। অনুগ্রহ করে মোবাইল অ্যাপ দিয়ে QR কোড স্ক্যান করুন (স্বয়ংক্রিয়ভাবে চলবে)...',
-          ur: '⏳ لاگ ان نہیں ہیں۔ براہ کرم موبائل ایپ سے QR کوڈ اسکین کریں (خودکار جاری رہے گا)...'
         }
       },
       {
@@ -4047,8 +3819,6 @@
           de: '❌ Zeitüberschreitung bei Anmeldung oder QR-Scan unvollständig, Automatisierung beendet!',
           tr: '❌ Giriş zaman aşımına uğradı veya QR tarama tamamlanmadı, otomasyon durduruldu!',
           it: '❌ Timeout di accesso o scansione non completata, automazione interrotta!',
-          bn: '❌ লগইন সময় শেষ বা QR স্ক্যান অসম্পূর্ণ, অটোমেশন বন্ধ করা হয়েছে!',
-          ur: '❌ لاگ ان کا وقت ختم ہو گیا یا QR اسکین نامکمل رہا، خودکار عمل روک دیا گیا!'
         }
       },
       {
@@ -4068,8 +3838,6 @@
           de: '✅ Anmeldung per QR-Code erfolgreich! Warte auf Stabilisierung der Seitendaten...',
           tr: '✅ QR kodla giriş başarılı! Sayfa verilerinin kararlı hale gelmesi bekleniyor...',
           it: '✅ Accesso tramite codice QR riuscito! In attesa della stabilizzazione dei dati...',
-          bn: '✅ QR কোড লগইন সফল হয়েছে! পৃষ্ঠা ডেটা স্থিতিশীল হওয়ার অপেক্ষা করা হচ্ছে...',
-          ur: '✅ QR کوڈ لاگ ان کامیاب رہا! صفحہ کا ڈیٹا مستحکم ہونے کا انتظار کیا جا رہا ہے...'
         }
       },
       {
@@ -4089,141 +3857,125 @@
           de: '✅ Bestätigt: Benutzer befindet sich in einer aktiven Anmeldesitzung!',
           tr: '✅ Kullanıcının şu anda aktif oturumda olduğu doğrulandı!',
           it: '✅ Verificato: l’utente è attualmente in una sessione di accesso attiva!',
-          bn: '✅ যাচাই করা হয়েছে যে ব্যবহারকারী বর্তমানে সক্রিয় লগইন অবস্থায় রয়েছেন!',
-          ur: '✅ تصدیق ہوئی کہ صارف اس وقت فعال لاگ ان حالت میں ہے!'
         }
       }
     ];
 
 
-    // 通用中括号标签与业务状态映射表 (覆盖全部 14 种核心语言 + bn/ur 兼容)
+    // 通用中括号标签与业务状态映射表 (覆盖全部 14 种核心语言)
     const TAG_PHRASES = {
       '[信息]': {
         en: '[INFO]', ja: '[情報]', ko: '[정보]', vi: '[Thông tin]', th: '[ข้อมูล]', id: '[Info]',
         es: '[INFO]', fr: '[INFO]', pt: '[INFO]', ru: '[ИНФО]', de: '[INFO]', tr: '[BİLGİ]', it: '[INFO]',
-        bn: '[তথ্য]', ur: '[معلومات]'
       },
       '[成功]': {
         en: '[SUCCESS]', ja: '[成功]', ko: '[성공]', vi: '[Thành công]', th: '[สำเร็จ]', id: '[Sukses]',
         es: '[ÉXITO]', fr: '[SUCCÈS]', pt: '[SUCESSO]', ru: '[УСПЕХ]', de: '[ERFOLG]', tr: '[BAŞARILI]', it: '[SUCCESSO]',
-        bn: '[সফল]', ur: '[کامیاب]'
       },
       '[警告]': {
         en: '[WARN]', ja: '[警告]', ko: '[경고]', vi: '[Cảnh báo]', th: '[เตือน]', id: '[Peringatan]',
         es: '[AVISO]', fr: '[AVERTISSEMENT]', pt: '[AVISO]', ru: '[ВНИМАНИЕ]', de: '[WARNUNG]', tr: '[UYARI]', it: '[AVVISO]',
-        bn: '[সতর্কতা]', ur: '[انتباہ]'
       },
       '[错误]': {
         en: '[ERROR]', ja: '[エラー]', ko: '[오류]', vi: '[Lỗi]', th: '[ข้อผิดพลาด]', id: '[Kesalahan]',
         es: '[ERROR]', fr: '[ERREUR]', pt: '[ERRO]', ru: '[ОШИБКА]', de: '[FEHLER]', tr: '[HATA]', it: '[ERRORE]',
-        bn: '[ত্রুটি]', ur: '[خرابی]'
       },
       '[小红书笔记标题]': {
         en: '[XHS Note Title]', ja: '[RED ノートタイトル]', ko: '[XHS 노트 제목]', vi: '[Tiêu đề ghi chú XHS]',
         th: '[ชื่อโน้ต XHS]', id: '[Judul Catatan XHS]', es: '[Título de Nota XHS]', fr: '[Titre Note XHS]',
         pt: '[Título da Nota XHS]', ru: '[Заголовок XHS]', de: '[XHS-Notiztitel]', tr: '[XHS Not Başlığı]',
-        it: '[Titolo Nota XHS]', bn: '[XHS নোটের শিরোনাম]', ur: '[XHS نوٹ کا عنوان]'
+        it: '[Titolo Nota XHS]'
       },
       '[小红书笔记正文与话题]': {
         en: '[XHS Content & Tags]', ja: '[RED 本文とタグ]', ko: '[XHS 본문 및 태그]', vi: '[Nội dung & Thẻ XHS]',
         th: '[เนื้อหาและแท็ก XHS]', id: '[Isi & Tag XHS]', es: '[Contenido y Etiquetas XHS]', fr: '[Contenu & Tags XHS]',
         pt: '[Conteúdo e Tags XHS]', ru: '[Контент и теги XHS]', de: '[XHS-Inhalt & Tags]', tr: '[XHS İçerik ve Etiketler]',
-        it: '[Contenuto e Tag XHS]', bn: '[XHS বিষয়বস্তু ও ট্যাগ]', ur: '[XHS مواد اور ٹیگز]'
+        it: '[Contenuto e Tag XHS]'
       },
       '[小红书高级发布选项]': {
         en: '[XHS Advanced Options]', ja: '[RED 高度な公開設定]', ko: '[XHS 고급 게시 옵션]', vi: '[Tùy chọn nâng cao XHS]',
         th: '[ตัวเลือกขั้นสูง XHS]', id: '[Opsi Lanjutan XHS]', es: '[Opciones Avanzadas XHS]', fr: '[Options Avancées XHS]',
         pt: '[Opções Avançadas XHS]', ru: '[Расширенные опции XHS]', de: '[XHS Erweiterte Optionen]', tr: '[XHS Gelişmiş Seçenekler]',
-        it: '[Opzioni Avanzate XHS]', bn: '[XHS উন্নত বিকল্প]', ur: '[XHS جدید اختیارات]'
+        it: '[Opzioni Avanzate XHS]'
       },
       '[小红书视频上传]': {
         en: '[XHS Video Upload]', ja: '[RED 動画アップロード]', ko: '[XHS 비디오 업로드]', vi: '[Tải lên video XHS]',
         th: '[อัปโหลดวิดีโอ XHS]', id: '[Unggah Video XHS]', es: '[Subida de Video XHS]', fr: '[Téléversement Vidéo XHS]',
         pt: '[Envio de Vídeo XHS]', ru: '[Загрузка видео XHS]', de: '[XHS Video-Upload]', tr: '[XHS Video Yükleme]',
-        it: '[Caricamento Video XHS]', bn: '[XHS ভিডিও আপলোড]', ur: '[XHS ویڈیو اپ لوڈ]'
+        it: '[Caricamento Video XHS]'
       },
       '[微信视频号视频上传]': {
         en: '[WeChat Video Upload]', ja: '[WeChat 動画アップロード]', ko: '[위챗 비디오 업로드]', vi: '[Tải lên video WeChat]',
         th: '[อัปโหลดวิดีโอ WeChat]', id: '[Unggah Video WeChat]', es: '[Subida de Video WeChat]', fr: '[Téléversement Vidéo WeChat]',
         pt: '[Envio de Vídeo WeChat]', ru: '[Загрузка видео WeChat]', de: '[WeChat Video-Upload]', tr: '[WeChat Video Yükleme]',
-        it: '[Caricamento Video WeChat]', bn: '[উইচ্যাট ভিডিও আপলোড]', ur: '[وی چیٹ ویڈیو اپ لوڈ]'
+        it: '[Caricamento Video WeChat]'
       },
       '[微信视频号动态描述与话题]': {
         en: '[WeChat Description & Tags]', ja: '[WeChat 概要とタグ]', ko: '[위챗 설명 및 태그]', vi: '[Mô tả & Thẻ WeChat]',
         th: '[คำอธิบายและแท็ก WeChat]', id: '[Deskripsi & Tag WeChat]', es: '[Descripción y Etiquetas WeChat]', fr: '[Description & Tags WeChat]',
         pt: '[Descrição e Tags WeChat]', ru: '[Описание и теги WeChat]', de: '[WeChat Beschreibung & Tags]', tr: '[WeChat Açıklama ve Etiketler]',
-        it: '[Descrizione e Tag WeChat]', bn: '[উইচ্যাট বিবরণ ও ট্যাগ]', ur: '[وی چیٹ تفصیل اور ٹیگز]'
+        it: '[Descrizione e Tag WeChat]'
       },
       '[微信视频号扩展配置与声明]': {
         en: '[WeChat Options & Declarations]', ja: '[WeChat 拡張設定と宣言]', ko: '[위챗 확장 설정 및 선언]', vi: '[Cấu hình & Tuyên bố WeChat]',
         th: '[การกำหนดค่าและประกาศ WeChat]', id: '[Konfigurasi & Deklarasi WeChat]', es: '[Configuración y Declaraciones WeChat]', fr: '[Paramètres & Déclarations WeChat]',
         pt: '[Configurações e Declarações WeChat]', ru: '[Настройки и декларации WeChat]', de: '[WeChat Optionen & Deklarationen]', tr: '[WeChat Ayarlar ve Bildirimler]',
-        it: '[Impostazioni e Dichiarazioni WeChat]', bn: '[উইচ্যাট কনফিগারেশন ও ঘোষণা]', ur: '[وی چیٹ ترتیبات اور اعلانات]'
+        it: '[Impostazioni e Dichiarazioni WeChat]'
       },
       '[视频简介与话题]': {
         en: '[Description & Tags]', ja: '[概要とタグ]', ko: '[설명 및 태그]', vi: '[Mô tả & Thẻ]', th: '[คำอธิบายและแท็ก]', id: '[Deskripsi & Tag]',
         es: '[Descripción y Etiquetas]', fr: '[Description & Tags]', pt: '[Descrição e Tags]', ru: '[Описание и теги]', de: '[Beschreibung & Tags]', tr: '[Açıklama ve Etiketler]', it: '[Descrizione e Tag]',
-        bn: '[বিবরণ ও ট্যাগ]', ur: '[تفصیل اور ٹیگز]'
       },
       '[位置]': {
         en: '[Location]', ja: '[位置]', ko: '[위치]', vi: '[Vị trí]', th: '[ตำแหน่ง]', id: '[Lokasi]',
         es: '[Ubicación]', fr: '[Lieu]', pt: '[Localização]', ru: '[Местоположение]', de: '[Standort]', tr: '[Konum]', it: '[Posizione]',
-        bn: '[অবস্থান]', ur: '[مقام]'
       },
       '[添加合集]': {
         en: '[Add Collection]', ja: '[コレクション追加]', ko: '[컬렉션 추가]', vi: '[Thêm bộ sưu tập]', th: '[เพิ่มคอลเลกชัน]', id: '[Tambah Koleksi]',
         es: '[Añadir Colección]', fr: '[Ajouter une Collection]', pt: '[Adicionar Coleção]', ru: '[Добавить коллекцию]', de: '[Sammlung hinzufügen]', tr: '[Koleksiyon Ekle]', it: '[Aggiungi Raccolta]',
-        bn: '[সংগ্রহে যোগ]', ur: '[مجموعہ شامل کریں]'
       },
       '[定时发表]': {
         en: '[Scheduled Publish]', ja: '[予約投稿]', ko: '[예약 발행]', vi: '[Lên lịch đăng]', th: '[ตั้งเวลาเผยแพร่]', id: '[Jadwalkan Rilis]',
         es: '[Publicación Programada]', fr: '[Publication Programmée]', pt: '[Publicação Agendada]', ru: '[Отложенная публикация]', de: '[Geplante Veröffentlichung]', tr: '[Zamanlanmış Yayın]', it: '[Pubblicazione Programmata]',
-        bn: '[সময়সূচী প্রকাশনা]', ur: '[شیڈول اشاعت]'
       },
       '[定时发布]': {
         en: '[Scheduled Publish]', ja: '[予約投稿]', ko: '[예약 발행]', vi: '[Lên lịch đăng]', th: '[ตั้งเวลาเผยแพร่]', id: '[Jadwalkan Rilis]',
         es: '[Publicación Programada]', fr: '[Publication Programmée]', pt: '[Publicação Agendada]', ru: '[Отложенная публикация]', de: '[Geplante Veröffentlichung]', tr: '[Zamanlanmış Yayın]', it: '[Pubblicazione Programmata]',
-        bn: '[সময়সূচী প্রকাশনা]', ur: '[شیڈول اشاعت]'
       },
       '[声明原创]': {
         en: '[Original Declaration]', ja: '[オリジナル宣言]', ko: '[오리지널 선언]', vi: '[Tuyên bố gốc]', th: '[ประกาศต้นฉบับ]', id: '[Deklarasi Asli]',
         es: '[Declaración Original]', fr: '[Déclaration d’Originalité]', pt: '[Declaração Original]', ru: '[Заявление об оригинальности]', de: '[Originalerklärung]', tr: '[Orijinallik Bildirimi]', it: '[Dichiarazione di Originalità]',
-        bn: '[মূল বিষয়বস্তু ঘোষণা]', ur: '[اصل مواد کا اعلان]'
       },
       '[原创声明]': {
         en: '[Original Declaration]', ja: '[オリジナル宣言]', ko: '[오리지널 선언]', vi: '[Tuyên bố gốc]', th: '[ประกาศต้นฉบับ]', id: '[Deklarasi Asli]',
         es: '[Declaración Original]', fr: '[Déclaration d’Originalité]', pt: '[Declaração Original]', ru: '[Заявление об оригинальности]', de: '[Originalerklärung]', tr: '[Orijinallik Bildirimi]', it: '[Dichiarazione di Originalità]',
-        bn: '[মূল বিষয়বস্তু ঘোষণা]', ur: '[اصل مواد کا اعلان]'
       },
       '[AI标注]': {
         en: '[AI Labeling]', ja: '[AIラベル]', ko: '[AI 라벨]', vi: '[Gắn nhãn AI]', th: '[ป้ายกำกับ AI]', id: '[Pelabelan AI]',
         es: '[Etiquetado IA]', fr: '[Étiquetage IA]', pt: '[Rotulagem por IA]', ru: '[Маркировка ИИ]', de: '[KI-Kennzeichnung]', tr: '[Yapay Zeka Etiketi]', it: '[Etichettatura IA]',
-        bn: '[AI লেবেলিং]', ur: '[AI لیبلنگ]'
       },
       '[AI创作声明]': {
         en: '[AI Creation Declaration]', ja: '[AI作成宣言]', ko: '[AI 제작 선언]', vi: '[Tuyên bố tạo AI]', th: '[ประกาศการสร้าง AI]', id: '[Deklarasi Kreasi AI]',
         es: '[Declaración de Creación IA]', fr: '[Déclaration de Création par IA]', pt: '[Declaração de Criação com IA]', ru: '[Декларация создания ИИ]', de: '[KI-Erstellungserklärung]', tr: '[Yapay Zeka Bildirimi]', it: '[Dichiarazione Creazione IA]',
-        bn: '[AI তৈরি ঘোষণা]', ur: '[AI تخلیق کا اعلان]'
       },
       '[发布复核]': {
         en: '[Publish Review]', ja: '[公開前確認]', ko: '[게시 검토]', vi: '[Đánh giá xuất bản]', th: '[ตรวจสอบก่อนเผยแพร่]', id: '[Tinjauan Publikasi]',
         es: '[Revisión de Publicación]', fr: '[Examen de Publication]', pt: '[Revisão de Publicação]', ru: '[Проверка публикации]', de: '[Veröffentlichungsprüfung]', tr: '[Yayın İncelemesi]', it: '[Revisione Pubblicazione]',
-        bn: '[প্রকাশনা পর্যালোচনা]', ur: '[اشاعت کا جائزہ]'
       }
     };
 
-    // JSON 字段国际化键名翻译映射表 (覆盖全部 14 种语言 + bn/ur)
+    // JSON 字段国际化键名翻译映射表 (覆盖全部 14 种核心语言)
     const JSON_KEY_LOCALIZATIONS = {
-      '目标文本': { en: 'targetText', ja: '対象テキスト', ko: '대상 텍스트', vi: 'Văn bản mục tiêu', th: 'ข้อความเป้าหมาย', id: 'Teks Target', es: 'Texto Objetivo', fr: 'Texte Cible', pt: 'Texto Alvo', ru: 'Целевой текст', de: 'Zieltext', tr: 'Hedef Metin', it: 'Testo Destinazione', bn: 'লক্ষ্য টেক্সট', ur: 'ہدف متن' },
-      '候选选择器': { en: 'candidateSelectors', ja: '候補セレクター', ko: '후보 선택자', vi: 'Bộ chọn ứng cử viên', th: 'ตัวเลือกตัวแทน', id: 'Selektor Kandidat', es: 'Selectores Candidatos', fr: 'Sélecteurs Candidats', pt: 'Seletores Candidatos', ru: 'Кандидаты селекторов', de: 'Kandidatenselektoren', tr: 'Aday Seçiciler', it: 'Selettori Candidati', bn: 'প্রার্থী নির্বাচক', ur: 'امیدوار سلیکٹرز' },
-      '字数': { en: 'charCount', ja: '文字数', ko: '글자 수', vi: 'Số ký tự', th: 'จำนวนตัวอักษร', id: 'Jumlah Karakter', es: 'Recuento Caracteres', fr: 'Nombre de Caractères', pt: 'Contagem de Caracteres', ru: 'Количество символов', de: 'Zeichenanzahl', tr: 'Karakter Sayısı', it: 'Conteggio Caratteri', bn: 'অক্ষর সংখ্যা', ur: 'حروف کی تعداد' },
-      '候选规则': { en: 'candidateRules', ja: '候補ルール', ko: '후보 규칙', vi: 'Quy tắc ứng cử viên', th: 'กฎตัวแทน', id: 'Aturan Kandidat', es: 'Reglas Candidatas', fr: 'Règles Candidates', pt: 'Regras Candidatas', ru: 'Правила кандидатов', de: 'Kandidatenregeln', tr: 'Aday Kurallar', it: 'Regole Candidate', bn: 'প্রার্থী নিয়ম', ur: 'امیدوار قواعد' },
-      '预览': { en: 'preview', ja: 'プレビュー', ko: '미리보기', vi: 'Xem trước', th: 'ดูตัวอย่าง', id: 'Pratinjau', es: 'Vista Previa', fr: 'Aperçu', pt: 'Pré-visualização', ru: 'Предпросмотр', de: 'Vorschau', tr: 'Önizleme', it: 'Anteprima', bn: 'পূর্বরূপ', ur: 'پیش نظارہ' },
-      '主页地址': { en: 'homeUrl', ja: 'ホームページURL', ko: '홈페이지 URL', vi: 'URL trang chủ', th: 'URL หน้าแรก', id: 'URL Beranda', es: 'URL de Inicio', fr: 'URL d’Accueil', pt: 'URL da Página Inicial', ru: 'URL домашней страницы', de: 'Startseiten-URL', tr: 'Ana Sayfa URL', it: 'URL Home', bn: 'হোমপেজ URL', ur: 'ہوم پیج URL' },
-      '发布地址': { en: 'publishUrl', ja: '投稿ページURL', ko: '게시 URL', vi: 'URL xuất bản', th: 'URL เผยแพร่', id: 'URL Publikasi', es: 'URL de Publicación', fr: 'URL de Publication', pt: 'URL de Publicação', ru: 'URL публикации', de: 'Veröffentlichungs-URL', tr: 'Yayın URL', it: 'URL di Pubblicazione', bn: 'প্রকাশনা URL', ur: 'اشاعت URL' },
-      '视频文件': { en: 'videoFile', ja: '動画ファイル', ko: '비디오 파일', vi: 'Tệp video', th: 'ไฟล์วิดีโอ', id: 'File Video', es: 'Archivo de Video', fr: 'Fichier Vidéo', pt: 'Arquivo de Vídeo', ru: 'Видеофайл', de: 'Videodatei', tr: 'Video Dosyası', it: 'File Video', bn: 'ভিডিও ফাইল', ur: 'ویڈیو فائل' },
-      '标题': { en: 'title', ja: 'タイトル', ko: '제목', vi: 'Tiêu đề', th: 'ชื่อเรื่อง', id: 'Judul', es: 'Título', fr: 'Titre', pt: 'Título', ru: 'Заголовок', de: 'Titel', tr: 'Başlık', it: 'Titolo', bn: 'শিরোনাম', ur: 'عنوان' },
-      '时长': { en: 'duration', ja: '時間', ko: '시간', vi: 'Thời lượng', th: 'ระยะเวลา', id: 'Durasi', es: 'Duración', fr: 'Durée', pt: 'Duração', ru: 'Длительность', de: 'Dauer', tr: 'Süre', it: 'Durata', bn: 'সময়কাল', ur: 'دورانیہ' }
+      '目标文本': { en: 'targetText', ja: '対象テキスト', ko: '대상 텍스트', vi: 'Văn bản mục tiêu', th: 'ข้อความเป้าหมาย', id: 'Teks Target', es: 'Texto Objetivo', fr: 'Texte Cible', pt: 'Texto Alvo', ru: 'Целевой текст', de: 'Zieltext', tr: 'Hedef Metin', it: 'Testo Destinazione' },
+      '候选选择器': { en: 'candidateSelectors', ja: '候補セレクター', ko: '후보 선택자', vi: 'Bộ chọn ứng cử viên', th: 'ตัวเลือกตัวแทน', id: 'Selektor Kandidat', es: 'Selectores Candidatos', fr: 'Sélecteurs Candidats', pt: 'Seletores Candidatos', ru: 'Кандидаты селекторов', de: 'Kandidatenselektoren', tr: 'Aday Seçiciler', it: 'Selettori Candidati' },
+      '字数': { en: 'charCount', ja: '文字数', ko: '글자 수', vi: 'Số ký tự', th: 'จำนวนตัวอักษร', id: 'Jumlah Karakter', es: 'Recuento Caracteres', fr: 'Nombre de Caractères', pt: 'Contagem de Caracteres', ru: 'Количество символов', de: 'Zeichenanzahl', tr: 'Karakter Sayısı', it: 'Conteggio Caratteri' },
+      '候选规则': { en: 'candidateRules', ja: '候補ルール', ko: '후보 규칙', vi: 'Quy tắc ứng cử viên', th: 'กฎตัวแทน', id: 'Aturan Kandidat', es: 'Reglas Candidatas', fr: 'Règles Candidates', pt: 'Regras Candidatas', ru: 'Правила кандидатов', de: 'Kandidatenregeln', tr: 'Aday Kurallar', it: 'Regole Candidate' },
+      '预览': { en: 'preview', ja: 'プレビュー', ko: '미리보기', vi: 'Xem trước', th: 'ดูตัวอย่าง', id: 'Pratinjau', es: 'Vista Previa', fr: 'Aperçu', pt: 'Pré-visualização', ru: 'Предпросмотр', de: 'Vorschau', tr: 'Önizleme', it: 'Anteprima' },
+      '主页地址': { en: 'homeUrl', ja: 'ホームページURL', ko: '홈페이지 URL', vi: 'URL trang chủ', th: 'URL หน้าแรก', id: 'URL Beranda', es: 'URL de Inicio', fr: 'URL d’Accueil', pt: 'URL da Página Inicial', ru: 'URL домашней страницы', de: 'Startseiten-URL', tr: 'Ana Sayfa URL', it: 'URL Home' },
+      '发布地址': { en: 'publishUrl', ja: '投稿ページURL', ko: '게시 URL', vi: 'URL xuất bản', th: 'URL เผยแพร่', id: 'URL Publikasi', es: 'URL de Publicación', fr: 'URL de Publication', pt: 'URL de Publicação', ru: 'URL публикации', de: 'Veröffentlichungs-URL', tr: 'Yayın URL', it: 'URL di Pubblicazione' },
+      '视频文件': { en: 'videoFile', ja: '動画ファイル', ko: '비디오 파일', vi: 'Tệp video', th: 'ไฟล์วิดีโอ', id: 'File Video', es: 'Archivo de Video', fr: 'Fichier Vidéo', pt: 'Arquivo de Vídeo', ru: 'Видеофайл', de: 'Videodatei', tr: 'Video Dosyası', it: 'File Video' },
+      '标题': { en: 'title', ja: 'タイトル', ko: '제목', vi: 'Tiêu đề', th: 'ชื่อเรื่อง', id: 'Judul', es: 'Título', fr: 'Titre', pt: 'Título', ru: 'Заголовок', de: 'Titel', tr: 'Başlık', it: 'Titolo' },
+      '时长': { en: 'duration', ja: '時間', ko: '시간', vi: 'Thời lượng', th: 'ระยะเวลา', id: 'Durasi', es: 'Duración', fr: 'Durée', pt: 'Duração', ru: 'Длительность', de: 'Dauer', tr: 'Süre', it: 'Durata' }
     };
 
     const STEP_TEMPLATES = {
@@ -4241,8 +3993,6 @@
         de: '[Schritt $1/$2]',
         tr: '[Adım $1/$2]',
         it: '[Passo $1/$2]',
-        bn: '[ধাপ $1/$2]',
-        ur: '[مرحلہ $1/$2]'
       },
       stepComplete: {
         en: '[Step $1/$2 Complete]',
@@ -4258,8 +4008,6 @@
         de: '[Schritt $1/$2 Abgeschlossen]',
         tr: '[Adım $1/$2 Tamamlandı]',
         it: '[Passo $1/$2 Completato]',
-        bn: '[ধাপ $1/$2 সম্পন্ন]',
-        ur: '[مرحلہ $1/$2 مکمل]'
       }
     };
 
@@ -4310,7 +4058,12 @@
 
 
     function escapeAttr(str) {
-      return String(str || '').replace(/"/g, '&quot;');
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     }
 
     function linkifyMediaText(html) {
@@ -4335,8 +4088,9 @@
           return match;
         }
 
-        const tip = '点击播放该视频 (Click to play MP4)';
-        const safeUrl = escapeAttr(cleanUrl);
+        const tipMap = { zh: '点击播放该视频', en: 'Click to play video', ja: 'クリックして動画を再生', ko: '클릭하여 동영상 재생', vi: 'Nhấp để phát video', th: 'คลิกเพื่อเล่นวิดีโอ', id: 'Klik untuk memutar video', es: 'Clic para reproducir', fr: 'Cliquer pour lire la vidéo', pt: 'Clique para reproduzir', de: 'Klicken zum Abspielen', it: 'Fai clic per riprodurre', ru: 'Нажмите для воспроизведения', tr: 'Oynatmak için tıklayın' };
+        const tip = escapeAttr(tipMap[currentLogLang] || tipMap.en);
+        const safeUrl = escapeAttr(decodeBasicHtmlEntities(cleanUrl));
         return `<a href="javascript:void(0)" class="media-link remote-media-link" data-url="${safeUrl}" title="${tip}">🎬 ${cleanUrl}</a>${trailing}`;
       });
 
@@ -4346,8 +4100,9 @@
         if (tag) return tag;
         const targetPath = winPath || unixPath;
         if (!targetPath) return match;
-        const tip = '点击播放该视频 (Click to play MP4)';
-        const safePath = escapeAttr(targetPath);
+        const tipMap = { zh: '点击播放该视频', en: 'Click to play video', ja: 'クリックして動画を再生', ko: '클릭하여 동영상 재생', vi: 'Nhấp để phát video', th: 'คลิกเพื่อเล่นวิดีโอ', id: 'Klik untuk memutar video', es: 'Clic para reproducir', fr: 'Cliquer pour lire la vidéo', pt: 'Clique para reproduzir', de: 'Klicken zum Abspielen', it: 'Fai clic per riprodurre', ru: 'Нажмите для воспроизведения', tr: 'Oynatmak için tıklayın' };
+        const tip = escapeAttr(tipMap[currentLogLang] || tipMap.en);
+        const safePath = escapeAttr(decodeBasicHtmlEntities(targetPath));
         return `<a href="javascript:void(0)" class="media-link local-media-link" data-path="${safePath}" title="${tip}">▶️ ${targetPath}</a>`;
       });
       return html;
@@ -4382,7 +4137,7 @@
         detailsHtml = `<div class="log-details">${escapeHtml(localizedDetails)}</div>`;
       }
 
-      el.innerHTML = `<span class="log-id">#${entry.id}</span><span class="log-time" title="${escapeHtml(entry.timestamp)}">[${timeDisplay}]</span>${catTagHtml}<span class="log-badge ${badgeClass}">${entry.level}</span><div class="log-message">${msgHtml}${detailsHtml}</div>`;
+      el.innerHTML = `<span class="log-id">#${escapeHtml(entry.id)}</span><span class="log-time" title="${escapeAttr(entry.timestamp)}">[${escapeHtml(timeDisplay)}]</span>${catTagHtml}<span class="log-badge ${escapeAttr(badgeClass)}">${escapeHtml(entry.level)}</span><div class="log-message">${msgHtml}${detailsHtml}</div>`;
 
       return el;
     }
@@ -4506,11 +4261,11 @@
       const c = getLogLocale();
       if (enabled) {
         btnAutoScroll.classList.add('active');
-        btnAutoScroll.innerHTML = `<svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg> <span id="btn-autoscroll-text">${c.autoScrollOn}</span>`;
+        btnAutoScroll.innerHTML = `<svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg> <span id="btn-autoscroll-text">${escapeHtml(c.autoScrollOn)}</span>`;
         scrollToBottom();
       } else {
         btnAutoScroll.classList.remove('active');
-        btnAutoScroll.innerHTML = `<svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg> <span id="btn-autoscroll-text">${c.autoScrollOff}</span>`;
+        btnAutoScroll.innerHTML = `<svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg> <span id="btn-autoscroll-text">${escapeHtml(c.autoScrollOff)}</span>`;
       }
     }
 
@@ -4720,6 +4475,7 @@
       }
     });
 
+    applyLanguage(currentLogLang);
     init();
   </script>
 </body>

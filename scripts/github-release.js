@@ -571,8 +571,7 @@ ${changelogSection}
 
 ---
 ### ⬇️ 快速链接 (Downloads & Links)
-* 🌐 **Web 应用**: https://app.shortvideo.ca
-* ⚡ **Release 标签**: https://github.com/${repoInfo.owner}/${repoInfo.repo}/releases/tag/${targetTag}
+${(() => { const u = (process.env.NEXT_PUBLIC_APP_SITE_URL || process.env.NEXT_PUBLIC_SITE_ORIGIN || '').trim().replace(/\/+$/, ''); return u ? `* 🌐 **Web 应用**: ${u}\n` : ''; })()}* ⚡ **Release 标签**: https://github.com/${repoInfo.owner}/${repoInfo.repo}/releases/tag/${targetTag}
 `;
 
   const token = findGitHubToken();

@@ -42,6 +42,7 @@ export class RenderManager {
   private activeProgressLogId: number | null = null;
   private activeIdleLogId: number | null = null;
   private activeNoiseLogId: number | null = null;
+  private lastProgressPercent: number = -1;
   private status: RenderStatus = 'idle';
   private startTime: number | null = null;
   private endTime: number | null = null;
@@ -385,6 +386,13 @@ export class RenderManager {
 
     // 1. 如果是渲染帧进度日志 (如 Rendered 133/660... 或 渲染进度: 72.3%)，持续原地覆写该行，绝不换行
     if (isProgressText) {
+      // 若百分比出现明显回落（如完成 90%+ 后切换到下一语言从 0% 开始），重置原地覆写行以便新起一行显示新任务进度
+      if (progress && typeof progress.percent === 'number') {
+        if (this.lastProgressPercent >= 50 && progress.percent + 25 < this.lastProgressPercent) {
+          this.activeProgressLogId = null;
+        }
+        this.lastProgressPercent = progress.percent;
+      }
       if (this.activeProgressLogId !== null) {
         const existing = this.logs.find((l) => l.id === this.activeProgressLogId);
         if (existing) {
@@ -447,20 +455,29 @@ export class RenderManager {
       this.activeIdleLogId = null;
     }
 
-    // 若一个渲染阶段结束或进入新步骤（如完成、失败、开始新语言），重置 activeProgressLogId
+    // 若一个渲染阶段结束或进入新步骤（支持多语言：完成/失败/开始新语言/切换上传或阶段标记），重置 activeProgressLogId
     if (
       text.includes('渲染完成') ||
       text.includes('渲染失败') ||
       text.includes('▶️') ||
       text.includes('🏆') ||
       text.includes('全部') ||
-      /render\s+(?:completed|finished|failed)/i.test(text) ||
+      text.includes('✅') ||
+      text.includes('☁️') ||
+      text.includes('📤') ||
+      text.includes('🎉') ||
+      text.includes('⚡') ||
+      text.includes('🛑') ||
+      text.includes('❌') ||
+      /^\s*\[\d+\/\d+\]/.test(text) ||
+      /render\s+(?:completed|finished|failed)|rendered:/i.test(text) ||
       /rendering\s+(?:failed|completed)/i.test(text) ||
       /uploaded successfully|upload failed/i.test(text) ||
       /All\s+\d+\s+language/i.test(text)
     ) {
       this.activeProgressLogId = null;
       this.activeNoiseLogId = null;
+      this.lastProgressPercent = -1;
     }
 
     const entry: RenderLogEntry = {
@@ -497,6 +514,7 @@ export class RenderManager {
     this.activeProgressLogId = null;
     this.activeIdleLogId = null;
     this.activeNoiseLogId = null;
+    this.lastProgressPercent = -1;
     this.broadcast('render:cleared', {});
   }
 
@@ -693,7 +711,7 @@ export class RenderManager {
    * 启动视频渲染任务（直接用 node 执行编译后的 JS，无需 pnpm / package.json）
    */
   public async startRender(): Promise<{ success: boolean; message?: string }> {
-    if (this.currentProcess && this.status === 'running') {
+    if (this.status === 'running') {
       return { success: false, message: this.getLoc().dialogs.renderAlreadyRunning };
     }
 
@@ -711,6 +729,7 @@ export class RenderManager {
     this.startTime = Date.now();
     this.endTime = null;
     this.exitCode = null;
+    this.lastProgressPercent = -1;
 
     const appVersion = app.getVersion();
     const appTag = appVersion.startsWith('v') ? appVersion : `v${appVersion}`;
@@ -742,7 +761,13 @@ export class RenderManager {
         if (!fs.existsSync(cacheBaseDir)) fs.mkdirSync(cacheBaseDir, { recursive: true });
       } catch (_) {}
       const workingDir = this.resolvePhysicalWorkingDir();
-      const targetApiUrl = APP_CONFIG.siteUrl || APP_CONFIG.productionUrl || 'https://app.shortvideo.ca';
+      const targetApiUrl = (APP_CONFIG.siteUrl || APP_CONFIG.productionUrl || '').trim().replace(/\/+$/, '');
+      if (!targetApiUrl) {
+        this.status = 'idle';
+        this.appendLog('stderr', '❌ Missing siteUrl configuration in .env.desktop');
+        this.broadcast('render:status-update', this.getState());
+        return { success: false, message: this.getLoc().dialogs.renderStartFailed || 'Missing siteUrl configuration' };
+      }
       
       this.appendLog('system', `🌐 目标渲染接口地址: ${targetApiUrl}`);
       this.appendLog('system', `📦 渲染运行模式: 独立客户端引擎 (免源码依赖)`);
@@ -763,7 +788,6 @@ export class RenderManager {
       const spawnArgs = [
         renderScript,
         `--url=${targetApiUrl}`,
-        `--token=${authToken}`,
         `--client=electron`,
         `--scope=current_user`,
         `--lang=${currentLang}`,

@@ -1,3 +1,5 @@
+import { getChromiumVersionInfo } from '../config';
+
 /**
  * Anti-detection / Stealth 脚本
  * 工业级浏览器指纹伪装，彻底抹除 Chromium/Electron 自动化与机器人特征
@@ -13,6 +15,9 @@
  * 严禁包含任何 TypeScript 类型语法（如 as any, : number 等），否则会导致浏览器解析报 SyntaxError 中断！
  */
 export function generateStealthScript(targetPlatform: string = process.platform, targetArch: string = process.arch): string {
+  const chromeVer = getChromiumVersionInfo();
+  const chromeMajor = chromeVer.major;
+  const chromeFull = chromeVer.full;
   const isMac = targetPlatform === 'darwin';
   const isLinux = targetPlatform === 'linux';
   const isArm = targetArch === 'arm64' || targetArch === 'arm';
@@ -261,8 +266,8 @@ export function generateStealthScript(targetPlatform: string = process.platform,
           });
           if (hasElectron) {
             const cleanBrands = [
-              { brand: 'Google Chrome', version: '131' },
-              { brand: 'Chromium', version: '131' },
+              { brand: 'Google Chrome', version: '${chromeMajor}' },
+              { brand: 'Chromium', version: '${chromeMajor}' },
               { brand: 'Not_A Brand', version: '24' }
             ];
             Object.defineProperty(navigator.userAgentData, 'brands', {
@@ -275,8 +280,8 @@ export function generateStealthScript(targetPlatform: string = process.platform,
       } else {
         // 若环境完全缺失 userAgentData，构造符合标准 NavigatorUAData 形状的数据
         const defaultBrands = [
-          { brand: 'Google Chrome', version: '131' },
-          { brand: 'Chromium', version: '131' },
+          { brand: 'Google Chrome', version: '${chromeMajor}' },
+          { brand: 'Chromium', version: '${chromeMajor}' },
           { brand: 'Not_A Brand', version: '24' }
         ];
         const uaData = {
@@ -292,7 +297,7 @@ export function generateStealthScript(targetPlatform: string = process.platform,
               model: '',
               platform: '${uaSyntheticPlatform}',
               platformVersion: '${uaSyntheticPlatformVersion}',
-              uaFullVersion: '131.0.6778.205'
+              uaFullVersion: '${chromeFull}'
             });
           }, 'getHighEntropyValues'),
           toJSON: makeNative(function() {

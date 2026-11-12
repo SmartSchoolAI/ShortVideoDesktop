@@ -634,8 +634,21 @@
     }
 
     // 从 URL 参数中解析播放源
+    function sanitizeMediaUrl(url) {
+      if (!url || typeof url !== 'string') return '';
+      const trimmed = url.trim();
+      try {
+        const parsed = new URL(trimmed, window.location.href);
+        if (['http:', 'https:', 'file:'].includes(parsed.protocol)) {
+          return parsed.href;
+        }
+      } catch (_) {}
+      return '';
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const rawSrc = urlParams.get('src') || '';
+    const safeMediaSrc = sanitizeMediaUrl(rawSrc);
     const rawTitle = urlParams.get('title') || '';
     const localFilePath = urlParams.get('localPath') || '';
     const lang = urlParams.get('lang') || 'zh';
@@ -727,20 +740,32 @@
     // 创建媒体 DOM
     let mediaEl = null;
 
-    if (isAudio) {
+    if (!safeMediaSrc) {
+      loadingOverlay.classList.add('hidden');
+      errorCard.classList.add('show');
+    } else if (isAudio) {
       const card = document.createElement('div');
       card.className = 'audio-card';
-      card.innerHTML = `
-        <div class="audio-icon-wrap">🎵</div>
-        <div class="audio-title">${displayTitle}</div>
-        <audio id="active-media" src="${rawSrc}" controls autoplay></audio>
-      `;
+      const iconWrap = document.createElement('div');
+      iconWrap.className = 'audio-icon-wrap';
+      iconWrap.textContent = '🎵';
+      const titleDiv = document.createElement('div');
+      titleDiv.className = 'audio-title';
+      titleDiv.textContent = displayTitle;
+      const audio = document.createElement('audio');
+      audio.id = 'active-media';
+      audio.src = safeMediaSrc;
+      audio.controls = true;
+      audio.autoplay = true;
+      card.appendChild(iconWrap);
+      card.appendChild(titleDiv);
+      card.appendChild(audio);
       playerContainer.appendChild(card);
-      mediaEl = card.querySelector('audio');
+      mediaEl = audio;
     } else {
       const video = document.createElement('video');
       video.id = 'active-media';
-      video.src = rawSrc;
+      video.src = safeMediaSrc;
       video.controls = true;
       video.autoplay = true;
       video.playsInline = true;

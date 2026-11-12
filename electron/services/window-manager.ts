@@ -3,7 +3,7 @@ import path from 'path';
 import { pathToFileURL } from 'url';
 import fs from 'fs';
 import crypto from 'crypto';
-import { APP_CONFIG } from '../config';
+import { APP_CONFIG, getConfiguredRootDomain, isOwnSiteUrl, getChromiumVersionInfo } from '../config';
 import { STEALTH_SCRIPT } from '../stealth/anti-detection';
 import { MEDIA_GUARDIAN_SCRIPT } from '../stealth/media-guardian';
 import { cdpBridge, CdpPageClient } from './cdp-bridge';
@@ -57,6 +57,7 @@ export class WindowManager {
   private oauthWindow: BrowserWindow | null = null;
   private stealthInjectedContents: WeakSet<WebContents> = new WeakSet();
   private videoPlayerWindow: BrowserWindow | null = null;
+  private externalWebWindow: BrowserWindow | null = null;
 
   private loadPersistedLanguage(): string {
     try {
@@ -103,7 +104,7 @@ export class WindowManager {
   }
 
   /**
-   * 全局设置并同步应用语言（9种语言支持）
+   * 全局设置并同步应用语言（14 种核心语言支持）
    */
     /**
    * 根据当前或指定语言获取对应 Tab 的本地化显示标题
@@ -236,7 +237,7 @@ export class WindowManager {
   }
 
   /**
-   * 弹出操作系统原生多语言选择菜单 (包含全部 9 种语言)
+   * 弹出操作系统原生多语言选择菜单 (包含全部 14 种核心语言)
    */
   public showLanguageMenu(x?: number, y?: number): void {
     const menuTemplate: MenuItemConstructorOptions[] = SUPPORTED_LANGUAGES.map((item) => ({
@@ -327,7 +328,7 @@ export class WindowManager {
     this.mainWindow.setMaxListeners(100);
     this.mainWindow.webContents.setMaxListeners(100);
 
-    // 配置全局会话放行自有素材域名的 CORS 限制（彻底解决 download.shortvideo.ca 跨域阻断）
+    // 配置全局会话放行自有素材域名的 CORS 限制
     this.configureSessionInterceptors(session.defaultSession, 'default');
 
     this.bindDevToolsShortcut(this.mainWindow.webContents);
@@ -1031,7 +1032,11 @@ export class WindowManager {
 
         // 主站自身域名的链接在当前 View 内导航，非主站的外部链接统一在独立窗口中打开，避免主站被覆盖
         if (url.startsWith('http://') || url.startsWith('https://')) {
-          const isMainDomain = url.includes('shortvideo.ca') || url.includes('localhost') || url.includes('127.0.0.1');
+          let openHost = '';
+          try {
+            openHost = new URL(url).hostname.toLowerCase();
+          } catch {}
+          const isMainDomain = isOwnSiteUrl(url) || openHost === 'localhost' || openHost === '127.0.0.1';
           if (isMainDomain) {
             mainView.webContents.loadURL(url).catch((e) => {
               console.warn('[WindowManager] 主站 window.open 重定向失败:', e?.message || e);
@@ -1527,16 +1532,23 @@ export class WindowManager {
 
   /**
    * 配置 session 放行自有资源与多媒体素材跨域限制 (CORS Bypass)
-   * 针对 download.shortvideo.ca 与 shortvideo.ca 注入标准 CORS 响应头
+   * 针对配置的 CDN 与主站域名动态注入标准 CORS 响应头
    */
   private setupCorsBypass(sess: Electron.Session): void {
     if (!sess) return;
     try {
+      const rootDomain = getConfiguredRootDomain();
+      if (!rootDomain) return;
+      const escapedRoot = rootDomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const filterUrls = [`*://*.${rootDomain}/*`, `*://${rootDomain}/*`];
+      try {
+        if (APP_CONFIG.downloadUrl) {
+          const dlHost = new URL(APP_CONFIG.downloadUrl).hostname;
+          if (dlHost) filterUrls.push(`*://${dlHost}/*`);
+        }
+      } catch {}
       const filter = {
-        urls: [
-          '*://*.shortvideo.ca/*',
-          '*://download.shortvideo.ca/*',
-        ],
+        urls: Array.from(new Set(filterUrls)),
       };
 
       sess.webRequest.onHeadersReceived(filter, (details, callback) => {
@@ -1557,15 +1569,17 @@ export class WindowManager {
         // 从请求 Origin 头动态取值，保证凭证携带场景下的 CORS 握手合规
         const reqHeaders = (details as any).requestHeaders as Record<string, string> | undefined;
         const requestOrigin = reqHeaders?.['Origin'] || reqHeaders?.['origin'] || '';
-        const allowedOriginPattern = /^https?:\/\/([a-z0-9-]+\.)?shortvideo\.ca(:\d+)?$/i;
+        const allowedOriginPattern = new RegExp(`^https?:\\/\\/([a-z0-9-]+\\.)?${escapedRoot}(:\\d+)?$`, 'i');
         const resolvedOrigin = (requestOrigin && allowedOriginPattern.test(requestOrigin))
           ? requestOrigin
-          : (process.env.NEXT_PUBLIC_APP_SITE_URL || process.env.NEXT_PUBLIC_SITE_ORIGIN || 'https://app.shortvideo.ca');
+          : (APP_CONFIG.siteUrl || APP_CONFIG.productionUrl || '');
 
-        responseHeaders['Access-Control-Allow-Origin'] = [resolvedOrigin];
-        responseHeaders['Access-Control-Allow-Methods'] = ['GET, HEAD, POST, PUT, DELETE, OPTIONS'];
-        responseHeaders['Access-Control-Allow-Headers'] = ['*'];
-        responseHeaders['Access-Control-Allow-Credentials'] = ['true'];
+        if (resolvedOrigin) {
+          responseHeaders['Access-Control-Allow-Origin'] = [resolvedOrigin];
+          responseHeaders['Access-Control-Allow-Methods'] = ['GET, HEAD, POST, PUT, DELETE, OPTIONS'];
+          responseHeaders['Access-Control-Allow-Headers'] = ['*'];
+          responseHeaders['Access-Control-Allow-Credentials'] = ['true'];
+        }
 
         callback({ responseHeaders });
       });
@@ -1589,13 +1603,14 @@ export class WindowManager {
           { urls: [`http://127.0.0.1:${cdpPort}/*`, `http://localhost:${cdpPort}/*`] },
           (details, callback) => {
             const initiator = (details as any).initiator || details.referrer || '';
-            if (
-              initiator &&
-              (initiator.startsWith('http://') || initiator.startsWith('https://')) &&
-              !initiator.includes('localhost') &&
-              !initiator.includes('127.0.0.1')
-            ) {
-              return callback({ cancel: true });
+            if (initiator && (initiator.startsWith('http://') || initiator.startsWith('https://'))) {
+              let initHost = '';
+              try {
+                initHost = new URL(initiator).hostname.toLowerCase();
+              } catch {}
+              if (initHost !== 'localhost' && initHost !== '127.0.0.1' && initHost !== '[::1]') {
+                return callback({ cancel: true });
+              }
             }
             callback({ cancel: false });
           }
@@ -1618,13 +1633,14 @@ export class WindowManager {
           }
         }
 
-        // 2. 统一注入纯净的原生 Client Hints（平台自适应）
+        // 2. 统一注入纯净的原生 Client Hints（平台与实际内置 Chromium 内核版本自适应）
+        const chromeVer = getChromiumVersionInfo();
         req['User-Agent'] = APP_CONFIG.userAgent;
         req['user-agent'] = APP_CONFIG.userAgent;
-        req['sec-ch-ua'] = '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"';
+        req['sec-ch-ua'] = `"Google Chrome";v="${chromeVer.major}", "Chromium";v="${chromeVer.major}", "Not_A Brand";v="24"`;
         req['sec-ch-ua-mobile'] = '?0';
-        req['sec-ch-ua-full-version'] = '"131.0.6778.205"';
-        req['sec-ch-ua-full-version-list'] = '"Google Chrome";v="131.0.6778.205", "Chromium";v="131.0.6778.205", "Not_A Brand";v="24.0.0.0"';
+        req['sec-ch-ua-full-version'] = `"${chromeVer.full}"`;
+        req['sec-ch-ua-full-version-list'] = `"Google Chrome";v="${chromeVer.full}", "Chromium";v="${chromeVer.full}", "Not_A Brand";v="24.0.0.0"`;
         const isArm = process.arch === 'arm64' || process.arch === 'arm';
         const archName = isArm ? 'arm' : 'x86';
 
@@ -1701,7 +1717,7 @@ export class WindowManager {
         `);
 
         const curMainUrl = mainTab.view.webContents.getURL() || '';
-        const siteOrigin = APP_CONFIG.siteUrl || APP_CONFIG.productionUrl || 'https://app.shortvideo.ca';
+        const siteOrigin = APP_CONFIG.siteUrl || APP_CONFIG.productionUrl || '';
         let targetDestination = siteOrigin;
         if (curMainUrl && curMainUrl.includes('/login')) {
           // 精确保留用户原本的语言路径 (如 /zh/login -> /zh/)
@@ -1744,8 +1760,9 @@ export class WindowManager {
       return trimmed;
     }
     try {
-      const keyHex = process.env.NEXT_PUBLIC_AESKEY || '68656c6c6f20776f726c64203132333435363738';
-      const ivHex = process.env.NEXT_PUBLIC_AESIV || '31323334353637383930313233343536';
+      const keyHex = (process.env.NEXT_PUBLIC_AESKEY || '').trim();
+      const ivHex = (process.env.NEXT_PUBLIC_AESIV || '').trim();
+      if (!keyHex || !ivHex) return '';
       const key = Buffer.from(keyHex.padEnd(64, '0'), 'hex');
       const iv = Buffer.from(ivHex, 'hex');
       const decipher = crypto.createDecipheriv('aes-256-cbc', key as any, iv as any);
@@ -1766,7 +1783,7 @@ export class WindowManager {
         }
       }
     } catch (_) {}
-    return trimmed;
+    return '';
   }
 
   /**
@@ -1774,11 +1791,14 @@ export class WindowManager {
    */
   public async getMainAuthToken(): Promise<string> {
     const sessionFile = path.join(app.getPath('userData'), 'user_session.json');
+    let isMainTabOnOwnSite = false;
 
     // 1. 尝试从活动的主站点页面 WebContents 中提取
     const mainTab = this.tabs.get('main');
     if (mainTab?.view && !mainTab.view.webContents.isDestroyed()) {
       try {
+        const curMainUrl = mainTab.view.webContents.getURL() || '';
+        isMainTabOnOwnSite = isOwnSiteUrl(curMainUrl);
         const rawToken = await mainTab.view.webContents.executeJavaScript(`
           (function() {
             try {
@@ -1816,8 +1836,8 @@ export class WindowManager {
 
     // 2. 尝试从 Electron 会话 Cookie 体系提取
     try {
-      const siteUrl = APP_CONFIG.siteUrl || APP_CONFIG.productionUrl || 'https://app.shortvideo.ca';
-      const cookies = await session.defaultSession.cookies.get({ url: siteUrl });
+      const siteUrl = (APP_CONFIG.siteUrl || APP_CONFIG.productionUrl || '').trim();
+      const cookies = siteUrl ? await session.defaultSession.cookies.get({ url: siteUrl }) : [];
       for (const c of cookies) {
         if ((c.name === 'token' || c.name === 'TokenKeyName' || c.name === 'auth_token') && c.value) {
           const decrypted = this.decryptTokenString(c.value);
@@ -1831,13 +1851,23 @@ export class WindowManager {
       }
     } catch (_) { }
 
-    // 3. 兜底回退：尝试读取本地持久化用户会话文件
+    // 若主站当前已正常加载于自有域名，但 localStorage 与 Cookie 均无有效 Token，说明用户已在网页退出登录；必须同步清空本地缓存文件，严禁复用旧会话
+    if (isMainTabOnOwnSite) {
+      try {
+        if (fs.existsSync(sessionFile)) {
+          fs.unlinkSync(sessionFile);
+        }
+      } catch (_) {}
+      return '';
+    }
+
+    // 3. 兜底回退：仅在主站视图尚未就绪/加载失败时，尝试读取本地持久化用户会话文件
     try {
       if (fs.existsSync(sessionFile)) {
         const raw = fs.readFileSync(sessionFile, 'utf-8');
         const parsed = JSON.parse(raw);
         if (parsed?.token && typeof parsed.token === 'string') {
-          return parsed.token.trim();
+          return this.decryptTokenString(parsed.token);
         }
       }
     } catch (_) {}
@@ -1851,7 +1881,11 @@ export class WindowManager {
   public openOAuthWindow(oauthUrl: string): void {
     if (!oauthUrl) return;
 
-    const isGoogleAuth = oauthUrl.includes('accounts.google.com') || oauthUrl.includes('google');
+    let isGoogleAuth = false;
+    try {
+      const oauthHost = new URL(oauthUrl).hostname.toLowerCase();
+      isGoogleAuth = oauthHost === 'accounts.google.com' || oauthHost === 'google.com' || oauthHost.endsWith('.google.com');
+    } catch {}
 
     // Google OAuth：Google 官方全面禁止嵌入式 WebView
     // 遵循官方安全规范：系统浏览器授权 + 线上已登记的 Callback 桥接回传至客户端本地 Loopback HTTP 服务
@@ -1863,8 +1897,6 @@ export class WindowManager {
         let targetUrl = oauthUrl;
         try {
           const parsed = new URL(oauthUrl);
-          const siteUrl = APP_CONFIG.siteUrl || APP_CONFIG.productionUrl || 'https://app.shortvideo.ca';
-          const validRedirectUri = `${siteUrl.replace(/\/$/, '')}/oauth/callback`;
 
           // GCP 控制台已授权 http://127.0.0.1:39281/callback，直接回调至本地监听的 Loopback 服务
           const localRedirectUri = `http://127.0.0.1:${port}/callback`;
@@ -1994,7 +2026,7 @@ export class WindowManager {
     const checkAndSyncAuth = async (currentUrl: string): Promise<boolean> => {
       if (isSyncing || authWin.isDestroyed()) return false;
       try {
-        const isShortVideo = currentUrl.includes('shortvideo.ca');
+        const isShortVideo = isOwnSiteUrl(currentUrl);
         if (!isShortVideo) return false;
 
         // 从当前弹窗中提取 token 与 user 信息
@@ -2063,21 +2095,21 @@ export class WindowManager {
     };
 
     authWin.webContents.on('did-navigate', (_e, url) => {
-      if (url.includes('/oauth/callback') || url.includes('shortvideo.ca')) {
+      if (url.includes('/oauth/callback') || isOwnSiteUrl(url)) {
         startPollingCheck();
         checkAndSyncAuth(url).catch(() => { });
       }
     });
 
     authWin.webContents.on('did-navigate-in-page', (_e, url) => {
-      if (url.includes('/oauth/callback') || url.includes('shortvideo.ca')) {
+      if (url.includes('/oauth/callback') || isOwnSiteUrl(url)) {
         startPollingCheck();
         checkAndSyncAuth(url).catch(() => { });
       }
     });
 
     authWin.webContents.on('did-redirect-navigation', (_e, url) => {
-      if (url.includes('/oauth/callback') || url.includes('shortvideo.ca')) {
+      if (url.includes('/oauth/callback') || isOwnSiteUrl(url)) {
         startPollingCheck();
         checkAndSyncAuth(url).catch(() => { });
       }
@@ -2085,7 +2117,7 @@ export class WindowManager {
 
     authWin.webContents.on('dom-ready', () => {
       const url = authWin.webContents.getURL() || '';
-      if (url.includes('/oauth/callback') || url.includes('shortvideo.ca')) {
+      if (url.includes('/oauth/callback') || isOwnSiteUrl(url)) {
         checkAndSyncAuth(url).catch(() => { });
       }
     });
@@ -2123,17 +2155,29 @@ export class WindowManager {
    * 优先使用独立原生 HTML5 弹窗秒开播放，支持空格播放/暂停、Esc 退出及一键调用系统播放器
    */
   public openExternalVideoWindow(videoUrlOrPath: string, customTitle?: string): BrowserWindow | null {
-    if (!videoUrlOrPath) return null;
+    if (!videoUrlOrPath || typeof videoUrlOrPath !== 'string') return null;
 
     let targetUrl = String(videoUrlOrPath).trim().replace(/^["']|["']$/g, '');
+    if (!targetUrl || /[\x00-\x1F\x7F]/.test(targetUrl)) return null;
+
     let isLocalFile = false;
     let localAbsPath = '';
 
-    // 检测是否为本地文件路径
-    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+    // 校验远程协议或解析安全的本地媒体文件路径
+    const isHttpRemote = /^https?:\/\//i.test(targetUrl);
+    if (!isHttpRemote) {
+      // 拒绝危险自定义协议（如 javascript:, data:, vbscript: 等）与 UNC 网络共享路径
+      if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(targetUrl) && !/^file:/i.test(targetUrl) && !/^[a-zA-Z]:[\\/]/.test(targetUrl)) {
+        console.warn('[WindowManager] 拒绝打开非安全协议链接:', targetUrl);
+        return null;
+      }
       const rawPath = targetUrl.replace(/^file:\/\/\/?/i, '');
+      if (rawPath.startsWith('\\\\') || rawPath.startsWith('//')) {
+        console.warn('[WindowManager] 拒绝打开 UNC 网络路径:', rawPath);
+        return null;
+      }
       const normalized = path.normalize(rawPath);
-      if (fs.existsSync(normalized)) {
+      if (fs.existsSync(normalized) && fs.statSync(normalized).isFile()) {
         isLocalFile = true;
         localAbsPath = normalized;
         try {
@@ -2142,84 +2186,159 @@ export class WindowManager {
           const forwardSlashPath = normalized.replace(/\\/g, '/');
           targetUrl = forwardSlashPath.startsWith('/') ? `file://${forwardSlashPath}` : `file:///${forwardSlashPath}`;
         }
+      } else {
+        console.warn('[WindowManager] 本地文件不存在或无效，拒绝打开:', normalized);
+        return null;
+      }
+    } else {
+      try {
+        const parsed = new URL(targetUrl);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          return null;
+        }
+        targetUrl = parsed.toString();
+      } catch {
+        return null;
       }
     }
 
     const isDirectMedia = isLocalFile || /\.(mp4|webm|ogg|m4v|mp3|wav|m4a|aac|flac)(\?.*)?$/i.test(targetUrl);
     const cleanName = localAbsPath ? path.basename(localAbsPath) : (path.basename(targetUrl.split('?')[0]) || 'Video');
     const displayName = customTitle || cleanName;
-    const playerTitle = isDirectMedia ? `🎬 ${displayName} - ${APP_CONFIG.appName}` : `${APP_CONFIG.appName} - Video Player`;
-
     const playerHtmlPath = this.getVideoPlayerHtmlPath();
-    const query = {
-      src: targetUrl,
-      title: displayName,
-      localPath: localAbsPath,
-      lang: this.currentLanguage || 'zh',
-    };
+    const parentWin = this.mainWindow && !this.mainWindow.isDestroyed() ? this.mainWindow : undefined;
 
-    // 若视频播放窗口已存在且未销毁，直接切换媒体播放并置顶激活
-    if (this.videoPlayerWindow && !this.videoPlayerWindow.isDestroyed()) {
-      this.videoPlayerWindow.setTitle(playerTitle);
-      if (isDirectMedia && fs.existsSync(playerHtmlPath)) {
+    // 1. 直接媒体流或本地媒体文件：使用专用的本地播放器窗口（严格锁死只加载本地 playerHtmlPath）
+    if (isDirectMedia && fs.existsSync(playerHtmlPath)) {
+      const playerTitle = `🎬 ${displayName} - ${APP_CONFIG.appName}`;
+      const query = {
+        src: targetUrl,
+        title: displayName,
+        localPath: localAbsPath,
+        lang: this.currentLanguage || 'zh',
+      };
+
+      if (this.videoPlayerWindow && !this.videoPlayerWindow.isDestroyed()) {
+        this.videoPlayerWindow.setTitle(playerTitle);
         this.videoPlayerWindow.loadFile(playerHtmlPath, { query }).catch((err) => {
           console.warn('[WindowManager] 加载视频播放页面失败:', err?.message || err);
         });
-      } else {
-        this.videoPlayerWindow.loadURL(targetUrl).catch((err) => {
-          console.warn('[WindowManager] 加载视频播放页面失败:', err?.message || err);
-        });
+        if (this.videoPlayerWindow.isMinimized()) this.videoPlayerWindow.restore();
+        this.videoPlayerWindow.show();
+        this.videoPlayerWindow.focus();
+        return this.videoPlayerWindow;
       }
-      if (this.videoPlayerWindow.isMinimized()) this.videoPlayerWindow.restore();
-      this.videoPlayerWindow.show();
-      this.videoPlayerWindow.focus();
-      return this.videoPlayerWindow;
+
+      const playerFileUrl = pathToFileURL(playerHtmlPath).href;
+      const videoWin = new BrowserWindow({
+        width: 1080,
+        height: 720,
+        center: true,
+        parent: parentWin,
+        modal: false,
+        title: playerTitle,
+        autoHideMenuBar: true,
+        backgroundColor: '#090D16',
+        webPreferences: {
+          nodeIntegration: true,
+          contextIsolation: false,
+          sandbox: false,
+          webSecurity: false, // 仅用于本地 video-player.html 解码本地 file:// 媒体流
+        },
+      });
+
+      this.videoPlayerWindow = videoWin;
+      videoWin.setMenuBarVisibility(false);
+      videoWin.webContents.setUserAgent(APP_CONFIG.userAgent);
+
+      // 安全隔离：严禁特权本地播放器窗口导航到外部不受信任的网页
+      videoWin.webContents.on('will-navigate', (event, navUrl) => {
+        if (!navUrl.startsWith(playerFileUrl)) {
+          event.preventDefault();
+          if (/^https?:\/\//i.test(navUrl)) {
+            shell.openExternal(navUrl).catch(() => { });
+          }
+        }
+      });
+
+      videoWin.webContents.setWindowOpenHandler(({ url }) => {
+        if (/^https?:\/\//i.test(url)) {
+          shell.openExternal(url).catch(() => { });
+        }
+        return { action: 'deny' };
+      });
+
+      videoWin.on('closed', () => {
+        this.videoPlayerWindow = null;
+      });
+
+      videoWin.loadFile(playerHtmlPath, { query }).catch((err) => {
+        console.warn('[WindowManager] 加载视频播放器失败:', err?.message || err);
+      });
+
+      return videoWin;
     }
 
-    const parentWin = this.mainWindow && !this.mainWindow.isDestroyed() ? this.mainWindow : undefined;
-    const videoWin = new BrowserWindow({
+    // 2. 外部网页链接（仅限 http/https）：必须在完全沙箱隔离、禁用 nodeIntegration 的独立窗口中加载
+    if (!/^https?:\/\//i.test(targetUrl)) {
+      return null;
+    }
+
+    const webTitle = `${APP_CONFIG.appName} - Video Player`;
+    if (this.externalWebWindow && !this.externalWebWindow.isDestroyed()) {
+      this.externalWebWindow.setTitle(webTitle);
+      this.externalWebWindow.loadURL(targetUrl).catch((err) => {
+        console.warn('[WindowManager] 加载外部网页失败:', err?.message || err);
+      });
+      if (this.externalWebWindow.isMinimized()) this.externalWebWindow.restore();
+      this.externalWebWindow.show();
+      this.externalWebWindow.focus();
+      return this.externalWebWindow;
+    }
+
+    const webWin = new BrowserWindow({
       width: 1080,
       height: 720,
       center: true,
       parent: parentWin,
       modal: false,
-      title: playerTitle,
+      title: webTitle,
       autoHideMenuBar: true,
       backgroundColor: '#090D16',
       webPreferences: {
-        nodeIntegration: true,
-        contextIsolation: false,
-        sandbox: false,
-        webSecurity: false, // 放行本地媒体资源 file://，保证原生 HTML5 video 顺畅解码播放
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: true,
+        webSecurity: true,
       },
     });
 
-    this.videoPlayerWindow = videoWin;
-    videoWin.setMenuBarVisibility(false);
-    videoWin.webContents.setUserAgent(APP_CONFIG.userAgent);
+    this.externalWebWindow = webWin;
+    webWin.setMenuBarVisibility(false);
+    webWin.webContents.setUserAgent(APP_CONFIG.userAgent);
 
-    videoWin.webContents.setWindowOpenHandler(({ url }) => {
-      if (url.startsWith('http://') || url.startsWith('https://')) {
+    webWin.webContents.on('will-navigate', (event, navUrl) => {
+      if (!/^https?:\/\//i.test(navUrl)) {
+        event.preventDefault();
+      }
+    });
+
+    webWin.webContents.setWindowOpenHandler(({ url }) => {
+      if (/^https?:\/\//i.test(url)) {
         shell.openExternal(url).catch(() => { });
       }
       return { action: 'deny' };
     });
 
-    videoWin.on('closed', () => {
-      this.videoPlayerWindow = null;
+    webWin.on('closed', () => {
+      this.externalWebWindow = null;
     });
 
-    if (isDirectMedia && fs.existsSync(playerHtmlPath)) {
-      videoWin.loadFile(playerHtmlPath, { query }).catch((err) => {
-        console.warn('[WindowManager] 加载视频播放器失败:', err?.message || err);
-      });
-    } else {
-      videoWin.loadURL(targetUrl).catch((err) => {
-        console.warn('[WindowManager] 加载视频播放页面失败:', err?.message || err);
-      });
-    }
+    webWin.loadURL(targetUrl).catch((err) => {
+      console.warn('[WindowManager] 加载外部网页失败:', err?.message || err);
+    });
 
-    return videoWin;
+    return webWin;
   }
 
   /**
@@ -2275,6 +2394,13 @@ export class WindowManager {
         this.videoPlayerWindow.close();
       } catch { }
       this.videoPlayerWindow = null;
+    }
+
+    if (this.externalWebWindow && !this.externalWebWindow.isDestroyed()) {
+      try {
+        this.externalWebWindow.close();
+      } catch { }
+      this.externalWebWindow = null;
     }
 
     this.mainWindow = null;

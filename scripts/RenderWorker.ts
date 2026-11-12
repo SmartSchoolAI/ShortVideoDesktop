@@ -223,7 +223,7 @@ function extractAuthToken(): string {
   return '';
 }
 
-function decryptStoredToken(raw: string): string {
+export function decryptStoredToken(raw: string): string {
   if (!raw || typeof raw !== 'string') return '';
   const trimmed = raw.trim();
   // 1. 若本身即为标准 JWT Token (xxx.yyy.zzz)，直接返回
@@ -252,7 +252,7 @@ function decryptStoredToken(raw: string): string {
       }
     }
   } catch (_) {}
-  return trimmed;
+  return '';
 }
 
 const CURRENT_AUTH_TOKEN = decryptStoredToken(extractAuthToken());
@@ -5202,7 +5202,7 @@ async function processApCalculusFRQTask(
   if (updateSuccess) {
     log(localizeScriptLog(`🎉 [微积分 FRQ] 任务 [${taskId}] 全部渲染与上传完成!`), 'green');
   } else {
-    log(localizeScriptLog(`⚠️ [微积分 FRQ] 任务 [${taskId}] 视频已生成，但更新服务端状态失败`), 'yellow');
+    throw new Error(localizeScriptLog(`⚠️ [微积分 FRQ] 任务 [${taskId}] 视频已生成，但更新服务端状态失败`));
   }
 }
 
@@ -5471,7 +5471,7 @@ async function processApCalculusTask(
   if (updateSuccess) {
     log(localizeScriptLog(`🎉 [微积分 MCQ] 任务 [${taskId}] 全部渲染与上传完成!`), 'green');
   } else {
-    log(localizeScriptLog(`⚠️ [微积分 MCQ] 任务 [${taskId}] 视频已生成，但更新服务端状态失败`), 'yellow');
+    throw new Error(localizeScriptLog(`⚠️ [微积分 MCQ] 任务 [${taskId}] 视频已生成，但更新服务端状态失败`));
   }
 }
 
@@ -5562,9 +5562,7 @@ async function processSingleTask(
   }
 
   if (!summaryData || !Array.isArray(summaryData.segments) || summaryData.segments.length === 0) {
-    log(localizeScriptLog(`❌ 素材缺失: 未能获取到有效的文字段落数据 (segments 为空)，拦截渲染以保护质量。`), 'red');
-    await updateTaskStatus(baseUrl, taskId, 'waiting_render', undefined, task.folderPath, undefined, undefined, CURRENT_AUTH_TOKEN, 'compare-english-word');
-    return;
+    throw new Error(localizeScriptLog(`❌ 素材缺失: 未能获取到有效的文字段落数据 (segments 为空)，拦截渲染以保护质量。`));
   }
 
   // 2)
@@ -5578,9 +5576,7 @@ async function processSingleTask(
   const audioDownloaded = await downloadFile(rawAudioUrl, localAudioPath, 5000);
 
   if (!audioDownloaded && !fs.existsSync(localAudioPath)) {
-    log(localizeScriptLog(`❌ 音频素材准备失败: 无法下载或音频文件无效 (${rawAudioUrl})`), 'red');
-    await updateTaskStatus(baseUrl, taskId, 'waiting_render', undefined, task.folderPath, undefined, undefined, CURRENT_AUTH_TOKEN, 'compare-english-word');
-    return;
+    throw new Error(localizeScriptLog(`❌ 音频素材准备失败: 无法下载或音频文件无效 (${rawAudioUrl})`));
   }
 
   // ( )
@@ -5679,9 +5675,7 @@ async function processSingleTask(
   }
 
   if (!img1Ok || !img2Ok) {
-    log(localizeScriptLog(`❌ 图片素材准备失败: 01.png 或 02.png 无法下载或损坏，拦截渲染。`), 'red');
-    await updateTaskStatus(baseUrl, taskId, 'waiting_render', undefined, task.folderPath, undefined, undefined, CURRENT_AUTH_TOKEN, 'compare-english-word');
-    return;
+    throw new Error(localizeScriptLog(`❌ 图片素材准备失败: 01.png 或 02.png 无法下载或损坏，拦截渲染。`));
   }
 
   const style = summaryData?.meta?.style || task.style || 'style01';
@@ -5814,19 +5808,10 @@ async function processSingleTask(
     };
 
     const langStartTime = Date.now();
-    try {
-      await renderVideoWithRemotion(langOutputFile, langRenderProps, options.concurrency);
-    } catch (renderErr: any) {
-      log(localizeScriptLog(`❌ 【${label}】渲染失败: ${renderErr.message}`), 'red');
-      // waiting_render
-      await updateTaskStatus(baseUrl, taskId, 'waiting_render', undefined, task.folderPath, undefined, undefined, CURRENT_AUTH_TOKEN, 'compare-english-word');
-      return;
-    }
+    await renderVideoWithRemotion(langOutputFile, langRenderProps, options.concurrency);
 
     if (!fs.existsSync(langOutputFile)) {
-      log(localizeScriptLog(`❌ 【${label}】渲染流程完成但未在本地找到目标 MP4 文件: ${langOutputFile}`), 'red');
-      await updateTaskStatus(baseUrl, taskId, 'waiting_render', undefined, task.folderPath, undefined, undefined, CURRENT_AUTH_TOKEN, 'compare-english-word');
-      return;
+      throw new Error(localizeScriptLog(`❌ 【${label}】渲染流程完成但未在本地找到目标 MP4 文件: ${langOutputFile}`));
     }
 
     const stats = fs.statSync(langOutputFile);
@@ -5906,7 +5891,6 @@ async function processSingleTask(
     log(localizeScriptLog(`\n☁️ 检测到本地开发 R2 密钥配置，正在通过【本地直传通道】上传 ${renderedVideos.length} 个多语言视频至 Cloudflare R2...`), 'yellow');
   }
 
-  try {
     for (let i = 0; i < renderedVideos.length; i++) {
       const item = renderedVideos[i];
       const isLast = i === renderedVideos.length - 1;
@@ -5980,11 +5964,8 @@ async function processSingleTask(
     if (updateSuccess) {
       log(localizeScriptLog(`🏆 任务 [${taskId}] ${renderedVideos.length} 个多语言视频全部处理并发布完成!\n`), 'green');
     } else {
-      log(localizeScriptLog(`⚠️ 任务 [${taskId}] 视频已上传成功，但状态回写遇到网络波动，请人工核查`), 'yellow');
+      throw new Error(localizeScriptLog(`⚠️ 任务 [${taskId}] 视频已上传成功，但状态回写遇到网络波动，请人工核查`));
     }
-  } catch (uploadErr: any) {
-    log(localizeScriptLog(`❌ 视频上传或回写状态失败: ${uploadErr.message}`), 'red');
-  }
 }
 
 // ── 5. 渲染任务队列与同类错误熔断机制 ──────────────────────────────────────
@@ -5997,12 +5978,48 @@ let consecutiveSameErrorCount = 0;
 let lastErrorCategory: string | null = null;
 const MAX_CONSECUTIVE_SAME_ERROR = 3;
 let isCircuitBreakerTripped = false;
+const activeSseControllers = new Set<AbortController>();
+let pollSleepWakeup: (() => void) | null = null;
 
-function resetErrorCircuitBreaker() {
+function triggerCircuitBreakerAbort() {
+  for (const ctrl of Array.from(activeSseControllers)) {
+    try {
+      ctrl.abort();
+    } catch (_) {}
+  }
+  activeSseControllers.clear();
+  if (pollSleepWakeup) {
+    const wake = pollSleepWakeup;
+    pollSleepWakeup = null;
+    wake();
+  }
+}
+
+function interruptibleSleep(ms: number): Promise<void> {
+  if (isCircuitBreakerTripped) return Promise.resolve();
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (pollSleepWakeup === finish) pollSleepWakeup = null;
+      resolve();
+    };
+    const timer = setTimeout(finish, ms);
+    pollSleepWakeup = finish;
+  });
+}
+
+export function resetErrorCircuitBreaker() {
   if (consecutiveSameErrorCount > 0 || lastErrorCategory !== null) {
     consecutiveSameErrorCount = 0;
     lastErrorCategory = null;
   }
+}
+
+export function isWorkerCircuitBreakerTripped(): boolean {
+  return isCircuitBreakerTripped;
 }
 
 export function extractErrorCategory(err: any): string {
@@ -6122,6 +6139,7 @@ export async function handleTaskErrorWithCircuitBreaker(task: any, baseUrl: stri
     isCircuitBreakerTripped = true;
     log(localizeScriptLog(`\n🛑 [熔断机制触发] 同类型错误 [${currentCategory}] 已连续出现 3 次，为防止系统无限死循环重试，立即停止执行后续渲染操作！`), 'red');
     pendingQueue.length = 0;
+    triggerCircuitBreakerAbort();
   }
 }
 
@@ -6165,7 +6183,7 @@ async function triggerQueue(
           const taskDesc = nextTask.__module === 'ap-calculus-frq' || nextTask.__module === 'ap-calculus-mcq'
             ? `${nextTask.title || nextTask.folderPath || nextTask.id}`
             : `${nextTask.wordA} vs ${nextTask.wordB}`;
-          log(`\n⚡ [流水线接续抢单] 成功锁定待渲染任务: ${modName} [${nextTask.videoId || nextTask.id}] ${taskDesc}`, 'green');
+          log(localizeScriptLog(`\n⚡ [流水线接续抢单] 成功锁定待渲染任务: ${modName} [${nextTask.videoId || nextTask.id}] ${taskDesc}`), 'green');
           task = nextTask;
         } else {
           break;
@@ -6205,6 +6223,8 @@ async function listenSSEForModule(
 
   while (true) {
     if (isCircuitBreakerTripped) return;
+    const sseAbortController = new AbortController();
+    activeSseControllers.add(sseAbortController);
     try {
       log(localizeScriptLog(`📡 正在建立 [${modLabel}] SSE 实时任务下发长连接: ${eventsUrl}...`), 'blue');
       const clientScope = options.scope || activeClientScope;
@@ -6216,7 +6236,7 @@ async function listenSSEForModule(
         CURRENT_AUTH_TOKEN,
         clientScope
       );
-      const res = await fetch(eventsUrl, { headers });
+      const res = await fetch(eventsUrl, { headers, signal: sseAbortController.signal });
 
       if (!res.ok || !res.body) {
         throw new Error(localizeScriptLog(`无法建立 SSE 连接 (HTTP ${res.status})`));
@@ -6256,6 +6276,14 @@ async function listenSSEForModule(
           }
 
           if (eventName === 'new_task' && dataStr) {
+            if (isCircuitBreakerTripped) {
+              try { await reader.cancel(); } catch (_) {}
+              return;
+            }
+            if (isProcessingQueue || pendingQueue.length > 0 || currentRunningTaskId != null) {
+              log(localizeScriptLog(`\n🔔 [${modLabel} SSE 通知] 当前正在渲染任务 [${currentRunningTaskId ?? 'queue'}]，跳过多余预抢占（完成后将自动无缝接续）`), 'gray');
+              continue;
+            }
             try {
               const claimedTask = await claimNextTask(baseUrl, CURRENT_AUTH_TOKEN, clientScope, module);
               if (claimedTask) {
@@ -6276,10 +6304,16 @@ async function listenSSEForModule(
         }
       }
     } catch (err: any) {
+      if (isCircuitBreakerTripped || sseAbortController.signal.aborted) {
+        return;
+      }
       log(localizeScriptLog(`[${modLabel}] SSE 长连接中断: ${err.message}，5秒后自动重连...`), 'yellow');
+    } finally {
+      activeSseControllers.delete(sseAbortController);
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+    if (isCircuitBreakerTripped) return;
+    await interruptibleSleep(5000);
   }
 }
 
@@ -6415,14 +6449,14 @@ async function main() {
       }
 
       const adaptiveInterval = Math.min(60000, POLL_INTERVAL_MS + Math.min(idlePollCount, 6) * 5000);
-      await new Promise((resolve) => setTimeout(resolve, adaptiveInterval));
+      await interruptibleSleep(adaptiveInterval);
     } catch (e: any) {
       if (isCircuitBreakerTripped) {
         log(localizeScriptLog(`🛑 渲染器已触发同类错误 3 次熔断机制并停止，请排查原因修复后重新启动。`), 'red');
         process.exit(1);
       }
       log(localizeScriptLog(`轮询异常: ${e.message}`), 'red');
-      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+      await interruptibleSleep(POLL_INTERVAL_MS);
     }
   }
 }

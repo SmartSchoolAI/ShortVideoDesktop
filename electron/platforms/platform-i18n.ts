@@ -79,6 +79,9 @@ export interface PlatformI18nEntry {
   waitingTranscode: string;
   waitingTranscodeTick: string;
   publishSuccessDetected: string;
+  publishActionError: string;
+  formFilledAwaitingManualClick: string;
+  formFilledAwaitingManualConfirm: string;
 }
 
 export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry> = {
@@ -151,7 +154,10 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     clickedPublishBtn: '🖱️ 已成功点击【{btn}】按钮，正在监控转码与最终发表结果...',
     waitingTranscode: '⏳ 正在等待平台转码处理并确认发布完成...',
     waitingTranscodeTick: '⏳ 正在等待转码处理 ({elapsed}s)...',
-    publishSuccessDetected: '🎉 检测到发布成功提示！短视频已顺利发布到【{platform}】！'
+    publishSuccessDetected: '🎉 检测到发布成功提示！短视频已顺利发布到【{platform}】！',
+    publishActionError: '发布操作异常: {error}',
+    formFilledAwaitingManualClick: '⚠️ 表单已自动填充完成，请手动点击【发表/发布】按钮',
+    formFilledAwaitingManualConfirm: '表单已自动填充完成，等待人工确认发布'
   },
 
   en: {
@@ -223,7 +229,10 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     clickedPublishBtn: '🖱️ Clicked [{btn}] button, monitoring transcoding and final result...',
     waitingTranscode: '⏳ Waiting for platform transcoding & final confirmation...',
     waitingTranscodeTick: '⏳ Waiting for transcoding ({elapsed}s)...',
-    publishSuccessDetected: '🎉 Success detected! Short video has been published to [{platform}]!'
+    publishSuccessDetected: '🎉 Success detected! Short video has been published to [{platform}]!',
+    publishActionError: 'Publish action error: {error}',
+    formFilledAwaitingManualClick: '⚠️ Form filled, awaiting manual publish click',
+    formFilledAwaitingManualConfirm: 'Form filled, awaiting manual confirmation'
   },
 
   ja: {
@@ -295,7 +304,10 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     clickedPublishBtn: '🖱️ 【{btn}】ボタンをクリックしました。変換と結果を監視中...',
     waitingTranscode: '⏳ プラットフォームの動画変換と完了確認を待機中...',
     waitingTranscodeTick: '⏳ 動画変換を待機中 ({elapsed}秒)...',
-    publishSuccessDetected: '🎉 投稿成功を検出！ショート動画が【{platform}】に投稿されました！'
+    publishSuccessDetected: '🎉 投稿成功を検出！ショート動画が【{platform}】に投稿されました！',
+    publishActionError: '投稿操作エラー: {error}',
+    formFilledAwaitingManualClick: '⚠️ フォーム入力完了、手動で投稿ボタンをクリックしてください',
+    formFilledAwaitingManualConfirm: 'フォーム入力完了、手動での投稿確認待ちです'
   },
 
   ko: {
@@ -367,7 +379,10 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     clickedPublishBtn: '🖱️ 【{btn}】 버튼 클릭 완료, 인코딩 및 결과를 모니터링 중...',
     waitingTranscode: '⏳ 플랫폼 인코딩 및 최종 완료 대기 중...',
     waitingTranscodeTick: '⏳ 인코딩 대기 중 ({elapsed}초)...',
-    publishSuccessDetected: '🎉 게시 성공 감지! 【{platform}】에 동영상이 성공적으로 게시되었습니다!'
+    publishSuccessDetected: '🎉 게시 성공 감지! 【{platform}】에 동영상이 성공적으로 게시되었습니다!',
+    publishActionError: '게시 작업 오류: {error}',
+    formFilledAwaitingManualClick: '⚠️ 양식 입력 완료, 수동으로 게시 버튼을 클릭해 주세요',
+    formFilledAwaitingManualConfirm: '양식 입력 완료, 수동 확인 대기 중'
   },
 
   vi: {
@@ -439,7 +454,10 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     clickedPublishBtn: '🖱️ Đã nhấp nút 【{btn}】, đang theo dõi quá trình chuyển mã và kết quả...',
     waitingTranscode: '⏳ Đang chờ nền tảng chuyển mã và xác nhận hoàn tất...',
     waitingTranscodeTick: '⏳ Đang chờ chuyển mã ({elapsed}s)...',
-    publishSuccessDetected: '🎉 Phát hiện xuất bản thành công! Video đã được đăng lên 【{platform}】!'
+    publishSuccessDetected: '🎉 Phát hiện xuất bản thành công! Video đã được đăng lên 【{platform}】!',
+    publishActionError: 'Lỗi thao tác xuất bản: {error}',
+    formFilledAwaitingManualClick: '⚠️ Đã điền biểu mẫu, vui lòng nhấp nút xuất bản thủ công',
+    formFilledAwaitingManualConfirm: 'Đã điền biểu mẫu, đang chờ xác nhận thủ công'
   },
 
   th: {
@@ -511,7 +529,10 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     clickedPublishBtn: '🖱️ คลิกปุ่ม 【{btn}】 แล้ว กำลังตรวจสอบการแปลงรหัสและผลลัพธ์...',
     waitingTranscode: '⏳ กำลังรอแพลตฟอร์มแปลงรหัสและยืนยันผลลัพธ์...',
     waitingTranscodeTick: '⏳ กำลังรอการแปลงรหัส ({elapsed} วินาที)...',
-    publishSuccessDetected: '🎉 ตรวจพบการเผยแพร่สำเร็จ! เผยแพร่วิดีโอสั้นไปยัง 【{platform}】 แล้ว!'
+    publishSuccessDetected: '🎉 ตรวจพบการเผยแพร่สำเร็จ! เผยแพร่วิดีโอสั้นไปยัง 【{platform}】 แล้ว!',
+    publishActionError: 'ข้อผิดพลาดขณะเผยแพร่: {error}',
+    formFilledAwaitingManualClick: '⚠️ กรอกแบบฟอร์มเสร็จแล้ว รอการคลิกปุ่มเผยแพร่ด้วยตนเอง',
+    formFilledAwaitingManualConfirm: 'กรอกแบบฟอร์มเสร็จแล้ว รอการยืนยันด้วยตนเอง'
   },
 
   id: {
@@ -583,7 +604,10 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     clickedPublishBtn: '🖱️ Mengklik tombol 【{btn}】, memantau transcode dan hasil akhir...',
     waitingTranscode: '⏳ Menunggu platform menyelesaikan transcode dan konfirmasi akhir...',
     waitingTranscodeTick: '⏳ Menunggu proses transcode ({elapsed} detik)...',
-    publishSuccessDetected: '🎉 Publikasi berhasil terdeteksi! Video telah dipublikasikan ke 【{platform}】!'
+    publishSuccessDetected: '🎉 Publikasi berhasil terdeteksi! Video telah dipublikasikan ke 【{platform}】!',
+    publishActionError: 'Kesalahan tindakan publikasi: {error}',
+    formFilledAwaitingManualClick: '⚠️ Formulir terisi, menunggu klik publikasi manual',
+    formFilledAwaitingManualConfirm: 'Formulir terisi, menunggu konfirmasi manual'
   },
 
   es: {
@@ -655,7 +679,10 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     clickedPublishBtn: '🖱️ Clic en el botón 【{btn}】 realizado, monitoreando transcodificación y resultado...',
     waitingTranscode: '⏳ Esperando transcodificación de la plataforma y confirmación final...',
     waitingTranscodeTick: '⏳ Esperando transcodificación ({elapsed}s)...',
-    publishSuccessDetected: '🎉 ¡Publicación exitosa detectada! ¡El video se ha publicado en 【{platform}】!'
+    publishSuccessDetected: '🎉 ¡Publicación exitosa detectada! ¡El video se ha publicado en 【{platform}】!',
+    publishActionError: 'Error al intentar publicar: {error}',
+    formFilledAwaitingManualClick: '⚠️ Formulario completado, esperando clic manual de publicación',
+    formFilledAwaitingManualConfirm: 'Formulario completado, esperando confirmación manual'
   },
 
   fr: {
@@ -727,7 +754,10 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     clickedPublishBtn: '🖱️ Clic sur 【{btn}】 effectué, suivi du transcodage et du résultat final...',
     waitingTranscode: '⏳ En attente du transcodage et de la confirmation finale...',
     waitingTranscodeTick: '⏳ En attente du transcodage ({elapsed}s)...',
-    publishSuccessDetected: '🎉 Publication réussie détectée ! La vidéo a été publiée sur 【{platform}】 !'
+    publishSuccessDetected: '🎉 Publication réussie détectée ! La vidéo a été publiée sur 【{platform}】 !',
+    publishActionError: 'Erreur lors de la publication : {error}',
+    formFilledAwaitingManualClick: '⚠️ Formulaire rempli, en attente du clic manuel de publication',
+    formFilledAwaitingManualConfirm: 'Formulaire rempli, en attente de confirmation manuelle'
   },
 
   pt: {
@@ -799,7 +829,10 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     clickedPublishBtn: '🖱️ Botão 【{btn}】 clicado, monitorando transcodificação e resultado...',
     waitingTranscode: '⏳ Aguardando transcodificação e confirmação final...',
     waitingTranscodeTick: '⏳ Aguardando transcodificação ({elapsed}s)...',
-    publishSuccessDetected: '🎉 Publicação bem-sucedida! O vídeo foi postado no 【{platform}】!'
+    publishSuccessDetected: '🎉 Publicação bem-sucedida! O vídeo foi postado no 【{platform}】!',
+    publishActionError: 'Erro na ação de publicação: {error}',
+    formFilledAwaitingManualClick: '⚠️ Formulário preenchido, aguardando clique manual para publicar',
+    formFilledAwaitingManualConfirm: 'Formulário preenchido, aguardando confirmação manual'
   },
 
   de: {
@@ -871,7 +904,10 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     clickedPublishBtn: '🖱️ Klick auf 【{btn}】 ausgeführt, Transkodierung wird überwacht...',
     waitingTranscode: '⏳ Warten auf Transkodierung und finale Bestätigung...',
     waitingTranscodeTick: '⏳ Warten auf Transkodierung ({elapsed}s)...',
-    publishSuccessDetected: '🎉 Erfolgreiche Veröffentlichung erkannt! Video wurde auf 【{platform}】 veröffentlicht!'
+    publishSuccessDetected: '🎉 Erfolgreiche Veröffentlichung erkannt! Video wurde auf 【{platform}】 veröffentlicht!',
+    publishActionError: 'Fehler bei der Veröffentlichungsaktion: {error}',
+    formFilledAwaitingManualClick: '⚠️ Formular ausgefüllt, warte auf manuellen Veröffentlichungsklick',
+    formFilledAwaitingManualConfirm: 'Formular ausgefüllt, warte auf manuelle Bestätigung'
   },
 
   it: {
@@ -943,7 +979,10 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     clickedPublishBtn: '🖱️ Clic su 【{btn}】 effettuato, monitoraggio della transcodifica in corso...',
     waitingTranscode: '⏳ In attesa della transcodifica e della conferma finale...',
     waitingTranscodeTick: '⏳ In attesa della transcodifica ({elapsed}s)...',
-    publishSuccessDetected: '🎉 Pubblicazione riuscita! Il video è stato pubblicato su 【{platform}】!'
+    publishSuccessDetected: '🎉 Pubblicazione riuscita! Il video è stato pubblicato su 【{platform}】!',
+    publishActionError: 'Errore azione di pubblicazione: {error}',
+    formFilledAwaitingManualClick: '⚠️ Modulo compilato, in attesa di clic manuale per pubblicare',
+    formFilledAwaitingManualConfirm: 'Modulo compilato, in attesa di conferma manuale'
   },
 
   ru: {
@@ -1015,7 +1054,10 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     clickedPublishBtn: '🖱️ Кнопка 【{btn}】 нажата, мониторинг кодирования и результата...',
     waitingTranscode: '⏳ Ожидание кодирования платформой и финального подтверждения...',
     waitingTranscodeTick: '⏳ Ожидание кодирования ({elapsed} сек.)...',
-    publishSuccessDetected: '🎉 Успешная публикация обнаружена! Видео опубликовано на 【{platform}】!'
+    publishSuccessDetected: '🎉 Успешная публикация обнаружена! Видео опубликовано на 【{platform}】!',
+    publishActionError: 'Ошибка при публикации: {error}',
+    formFilledAwaitingManualClick: '⚠️ Форма заполнена, ожидание ручного нажатия кнопки публикации',
+    formFilledAwaitingManualConfirm: 'Форма заполнена, ожидание ручного подтверждения'
   },
 
   tr: {
@@ -1087,7 +1129,10 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     clickedPublishBtn: '🖱️ 【{btn}】 düğmesine tıklandı, dönüştürme ve sonuç izleniyor...',
     waitingTranscode: '⏳ Platform kod dönüştürme ve nihai onay bekleniyor...',
     waitingTranscodeTick: '⏳ Kod dönüştürme bekleniyor ({elapsed} sn)...',
-    publishSuccessDetected: '🎉 Başarılı yayınlama algılandı! Video 【{platform}】 üzerinde yayınlandı!'
+    publishSuccessDetected: '🎉 Başarılı yayınlama algılandı! Video 【{platform}】 üzerinde yayınlandı!',
+    publishActionError: 'Yayınlama işlemi hatası: {error}',
+    formFilledAwaitingManualClick: '⚠️ Form dolduruldu, manuel yayınlama tıklaması bekleniyor',
+    formFilledAwaitingManualConfirm: 'Form dolduruldu, manuel onay bekleniyor'
   }
 };
 
@@ -1130,533 +1175,476 @@ const PLATFORM_TERM_RULES: Array<{ regex: RegExp; translations: Partial<Record<S
   {
     regex: /\[位置\]\s*正在物理点击【不显示位置】选项.*/g,
     translations: {
-      "zh": "[位置]s*正在物理点击【不显示位置】选项.*",
-      "en": "[Location] Clicking [Do Not Show Location] option...",
-      "ja": "[] 「をしない」のをクリック...",
-      "ko": "[위치] \\\"위치 표시 안 함\\\" 옵션 클릭 중...",
-      "vi": "[Vị trí] Đang nhấp vào tùy chọn [Không hiển thị vị trí]...",
-      "th": "[ตำแหน่ง] กำลังคลิกตัวเลือก [ไม่แสดงตำแหน่ง]...",
-      "id": "[Lokasi] Mengklik opsi [Jangan Tampilkan Lokasi]...",
-      "es": "[Ubicación] Haciendo clic en la opción [No mostrar ubicación]...",
-      "fr": "[Localisation] Clic sur l'option [Ne pas afficher la localisation]...",
-      "pt": "[Localização] Clicando na opção [Não mostrar localização]...",
-      "de": "[Standort] Klick auf die Option [Standort nicht anzeigen]...",
-      "it": "[Posizione] Clic sull'opzione [Non mostrare posizione]...",
-      "ru": "[Местоположение] Клик по опции [Не показывать местоположение]...",
-      "tr": "[Konum] [Konumu gösterme] seçeneğine tıklanıyor...",
+      zh: '[位置] 正在物理点击【不显示位置】选项...',
+      en: '[Location] Clicking [Do Not Show Location] option...',
+      ja: '[位置] 「位置を表示しない」オプションをクリック中...',
+      ko: '[위치] 「위치 표시 안 함」 옵션 클릭 중...',
+      vi: '[Vị trí] Đang nhấp vào tùy chọn [Không hiển thị vị trí]...',
+      th: '[ตำแหน่ง] กำลังคลิกตัวเลือก [ไม่แสดงตำแหน่ง]...',
+      id: '[Lokasi] Mengklik opsi [Jangan Tampilkan Lokasi]...',
+      es: '[Ubicación] Haciendo clic en [No mostrar ubicación]...',
+      fr: '[Localisation] Clic sur [Ne pas afficher la localisation]...',
+      pt: '[Localização] Clicando em [Não mostrar localização]...',
+      de: '[Standort] Klick auf [Standort nicht anzeigen]...',
+      it: '[Posizione] Clic su [Non mostrare posizione]...',
+      ru: '[Местоположение] Клик по опции [Не показывать местоположение]...',
+      tr: '[Konum] [Konumu gösterme] seçeneğine tıklanıyor...'
     }
   },
   {
-    regex: /\[位置\]\s*当前位置为[:：]?\s*【(.*?)】,\s*正在点击展开位置选项菜单.*/g,
+    regex: /\[位置\]\s*当前位置为[:：]?\s*【(.*?)】[,，]\s*正在点击展开位置选项菜单.*/g,
     translations: {
-      "zh": "[位置]s*当前位置为[:：]?s*【(.*?)】,s*正在点击展开位置选项菜单.*",
-      "en": "[Location] Current location: [$1], opening location menu...",
-      "ja": "[] の: 【$1】、メニューを...",
-      "ko": "[위치] 현재 위치: 【$1】, 위치 메뉴 펼치는 중...",
-      "vi": "[Vị trí] Vị trí hiện tại: [$1], đang mở menu vị trí...",
-      "th": "[ตำแหน่ง] ตำแหน่งปัจจุบัน: [$1] กำลังเปิดเมนูตำแหน่ง...",
-      "id": "[Lokasi] Lokasi saat ini: [$1], membuka menu lokasi...",
-      "es": "[Ubicación] Ubicación actual: [$1], abriendo menú de ubicación...",
-      "fr": "[Localisation] Emplacement actuel : [$1], ouverture du menu...",
-      "pt": "[Localização] Localização atual: [$1], abrindo menu de localização...",
-      "de": "[Standort] Aktueller Standort: [$1], Standortmenü wird geöffnet...",
-      "it": "[Posizione] Posizione attuale: [$1], apertura menu posizione...",
-      "ru": "[Местоположение] Текущее местоположение: [$1], открытие меню...",
-      "tr": "[Konum] Mevcut konum: [$1], konum menüsü açılıyor...",
+      zh: '[位置] 当前位置为: 【$1】，正在点击展开位置选项菜单...',
+      en: '[Location] Current location: [$1], opening location menu...',
+      ja: '[位置] 現在の位置: 【$1】、位置メニューを開いています...',
+      ko: '[위치] 현재 위치: 【$1】, 위치 메뉴 펼치는 중...',
+      vi: '[Vị trí] Vị trí hiện tại: [$1], đang mở menu vị trí...',
+      th: '[ตำแหน่ง] ตำแหน่งปัจจุบัน: [$1], กำลังเปิดเมนูตำแหน่ง...',
+      id: '[Lokasi] Lokasi saat ini: [$1], membuka menu lokasi...',
+      es: '[Ubicación] Ubicación actual: [$1], abriendo menú de ubicación...',
+      fr: '[Localisation] Emplacement actuel : [$1], ouverture du menu...',
+      pt: '[Localização] Localização atual: [$1], abrindo menu de localização...',
+      de: '[Standort] Aktueller Standort: [$1], Standortmenü wird geöffnet...',
+      it: '[Posizione] Posizione attuale: [$1], apertura menu posizione...',
+      ru: '[Местоположение] Текущее местоположение: [$1], открытие меню...',
+      tr: '[Konum] Mevcut konum: [$1], konum menüsü açılıyor...'
     }
   },
   {
     regex: /\[添加到合集\]\s*点击展开合集下拉框.*/g,
     translations: {
-      "zh": "[添加到合集]s*点击展开合集下拉框.*",
-      "en": "[Collection] Opening collection dropdown menu...",
-      "ja": "[コレクション] コレクションドロップダウンを...",
-      "ko": "[컬렉션] 컬렉션 드롭다운 메뉴 펼치는 중...",
-      "vi": "[Bộ sưu tập] Đang mở menu bộ sưu tập...",
-      "th": "[คอลเลกชัน] กำลังเปิดเมนูคอลเลกชัน...",
-      "id": "[Koleksi] Membuka menu dropdown koleksi...",
-      "es": "[Colección] Abriendo menú desplegable de colecciones...",
-      "fr": "[Collection] Ouverture du menu déroulant de la collection...",
-      "pt": "[Coleção] Abrindo menu suspenso de coleções...",
-      "de": "[Sammlung] Dropdown-Menü der Sammlung wird geöffnet...",
-      "it": "[Raccolta] Apertura menu a discesa della raccolta...",
-      "ru": "[Коллекция] Открытие выпадающего меню коллекции...",
-      "tr": "[Koleksiyon] Koleksiyon açılır menüsü açılıyor...",
+      zh: '[添加到合集] 点击展开合集下拉框...',
+      en: '[Collection] Opening collection dropdown menu...',
+      ja: '[コレクション] コレクションのドロップダウンを開いています...',
+      ko: '[컬렉션] 컬렉션 드롭다운 메뉴 펼치는 중...',
+      vi: '[Bộ sưu tập] Đang mở menu bộ sưu tập...',
+      th: '[คอลเลกชัน] กำลังเปิดเมนูคอลเลกชัน...',
+      id: '[Koleksi] Membuka menu dropdown koleksi...',
+      es: '[Colección] Abriendo menú desplegable de colecciones...',
+      fr: '[Collection] Ouverture du menu déroulant de la collection...',
+      pt: '[Coleção] Abrindo menu suspenso de coleções...',
+      de: '[Sammlung] Sammlungs-Dropdown wird geöffnet...',
+      it: '[Raccolta] Apertura menu a discesa della raccolta...',
+      ru: '[Коллекция] Открытие выпадающего меню коллекции...',
+      tr: '[Koleksiyon] Koleksiyon açılır menüsü açılıyor...'
     }
   },
   {
     regex: /\[添加到合集\]\s*接口数据已就绪.*/g,
     translations: {
-      "zh": "[添加到合集]s*接口数据已就绪.*",
-      "en": "[Collection] API data ready, selecting collection...",
-      "ja": "[コレクション] APIデータ、コレクションを...",
-      "ko": "[컬렉션] API 데이터 준비 완료, 컬렉션 선택 중...",
-      "vi": "[Bộ sưu tập] Dữ liệu API đã sẵn sàng, đang chọn bộ sưu tập...",
-      "th": "[คอลเลกชัน] ข้อมูล API พร้อมแล้ว กำลังเลือกคอลเลกชัน...",
-      "id": "[Koleksi] Data API siap, memilih koleksi...",
-      "es": "[Colección] Datos de API listos, seleccionando colección...",
-      "fr": "[Collection] Données API prêtes, sélection de la collection...",
-      "pt": "[Coleção] Dados da API prontos, selecionando coleção...",
-      "de": "[Sammlung] API-Daten bereit, Sammlung wird ausgewählt...",
-      "it": "[Raccolta] Dati API pronti, selezione della raccolta...",
-      "ru": "[Коллекция] Данные API готовы, выбор коллекции...",
-      "tr": "[Koleksiyon] API verileri hazır, koleksiyon seçiliyor...",
+      zh: '[添加到合集] 接口数据已就绪...',
+      en: '[Collection] API data ready, selecting collection...',
+      ja: '[コレクション] APIデータ準備完了、コレクションを選択中...',
+      ko: '[컬렉션] API 데이터 준비 완료, 컬렉션 선택 중...',
+      vi: '[Bộ sưu tập] Dữ liệu API đã sẵn sàng, đang chọn bộ sưu tập...',
+      th: '[คอลเลกชัน] ข้อมูล API พร้อมแล้ว กำลังเลือกคอลเลกชัน...',
+      id: '[Koleksi] Data API siap, memilih koleksi...',
+      es: '[Colección] Datos de API listos, seleccionando colección...',
+      fr: '[Collection] Données API prêtes, sélection de la collection...',
+      pt: '[Coleção] Dados da API prontos, selecionando coleção...',
+      de: '[Sammlung] API-Daten bereit, Sammlung wird ausgewählt...',
+      it: '[Raccolta] Dati API pronti, selezione della raccolta...',
+      ru: '[Коллекция] Данные API готовы, выбор коллекции...',
+      tr: '[Koleksiyon] API verileri hazır, koleksiyon seçiliyor...'
+    }
+  },
+  {
+    regex: /(?:⚡\s*)?\[定时发表\]\s*未指定计划发布时间[，,]\s*保持【立即发表】模式/g,
+    translations: {
+      zh: '⚡ [定时发表] 未指定计划发布时间，保持【立即发表】模式',
+      en: '⚡ [Scheduled Publish] No schedule specified, keeping [Publish Immediately] mode',
+      ja: '⚡ [予約投稿] 予約日時が未指定のため【即時投稿】モードを維持します',
+      ko: '⚡ [예약 게시] 예약 시간이 지정되지 않아 [즉시 게시] 모드를 유지합니다',
+      vi: '⚡ [Đăng định kỳ] Không chỉ định thời gian hẹn, giữ chế độ [Đăng ngay]',
+      th: '⚡ [กำหนดเวลาเผยแพร่] ไม่ได้ระบุเวลา คงโหมด [เผยแพร่ทันที]',
+      id: '⚡ [Publikasi Terjadwal] Jadwal tidak ditentukan, tetap di mode [Publikasikan Segera]',
+      es: '⚡ [Publicación programada] Sin hora programada, se mantiene [Publicar ahora]',
+      fr: '⚡ [Publication programmée] Aucune date définie, maintien du mode [Publier maintenant]',
+      pt: '⚡ [Publicação agendada] Nenhum horário definido, mantendo modo [Publicar agora]',
+      de: '⚡ [Geplante Veröffentlichung] Keine Zeit angegeben, Modus [Sofort veröffentlichen]',
+      it: '⚡ [Pubblicazione programmata] Nessun orario impostato, modalità [Pubblica ora]',
+      ru: '⚡ [Отложенная публикация] Время не указано, режим [Опубликовать сразу]',
+      tr: '⚡ [Zamanlanmış Yayın] Tarih belirtilmedi, [Hemen Yayınla] modu korunuyor'
+    }
+  },
+  {
+    regex: /(?:✅\s*)?\[定时发表\]\s*已成功设置为[:：]\s*(.+)/g,
+    translations: {
+      zh: '✅ [定时发表] 已成功设置为: $1',
+      en: '✅ [Scheduled Publish] Successfully set to: $1',
+      ja: '✅ [予約投稿] 予約日時を設定しました: $1',
+      ko: '✅ [예약 게시] 예약 시간이 설정되었습니다: $1',
+      vi: '✅ [Đăng định kỳ] Đã đặt lịch thành công: $1',
+      th: '✅ [กำหนดเวลาเผยแพร่] ตั้งค่าสำเร็จเป็น: $1',
+      id: '✅ [Publikasi Terjadwal] Berhasil disetel ke: $1',
+      es: '✅ [Publicación programada] Configurado correctamente para: $1',
+      fr: '✅ [Publication programmée] Configuré avec succès sur : $1',
+      pt: '✅ [Publicação agendada] Configurado com sucesso para: $1',
+      de: '✅ [Geplante Veröffentlichung] Erfolgreich eingestellt auf: $1',
+      it: '✅ [Pubblicazione programmata] Impostato su: $1',
+      ru: '✅ [Отложенная публикация] Успешно установлено: $1',
+      tr: '✅ [Zamanlanmış Yayın] Başarıyla ayarlandı: $1'
+    }
+  },
+  {
+    regex: /\[定时发表\]\s*(?:⚠️\s*)?未能确认定时单选激活状态.*/g,
+    translations: {
+      zh: '[定时发表] ⚠️ 未能确认定时单选激活状态，继续尝试后续步骤...',
+      en: '[Scheduled Publish] ⚠️ Could not confirm scheduled toggle state, continuing...',
+      ja: '[予約投稿] ⚠️ 予約ラジオボタンの状態を確認できませんでした、続行します...',
+      ko: '[예약 게시] ⚠️ 예약 라디오 활성화 상태를 확인하지 못해 다음 단계로 진행합니다...',
+      vi: '[Đăng định kỳ] ⚠️ Không thể xác nhận trạng thái hẹn giờ, tiếp tục thử...',
+      th: '[กำหนดเวลาเผยแพร่] ⚠️ ไม่สามารถยืนยันสถานะตัวเลือกเวลา กำลังดำเนินการต่อ...',
+      id: '[Publikasi Terjadwal] ⚠️ Gagal memastikan status opsi terjadwal, melanjutkan...',
+      es: '[Publicación programada] ⚠️ No se pudo confirmar el selector de horario, continuando...',
+      fr: '[Publication programmée] ⚠️ Impossible de confirmer l’état programmé, poursuite...',
+      pt: '[Publicação agendada] ⚠️ Não foi possível confirmar o seletor de horário, continuando...',
+      de: '[Geplante Veröffentlichung] ⚠️ Zeitauswahl-Status unklar, fahre fort...',
+      it: '[Pubblicazione programmata] ⚠️ Impossibile confermare lo stato programmato, proseguo...',
+      ru: '[Отложенная публикация] ⚠️ Не удалось подтвердить выбор таймера, продолжаем...',
+      tr: '[Zamanlanmış Yayın] ⚠️ Zamanlama seçimi doğrulanamadı, devam ediliyor...'
     }
   },
   {
     regex: /\[定时发表\]\s*正在物理点击【定时】.*/g,
     translations: {
-      "zh": "[定时发表]s*正在物理点击【定时】.*",
-      "en": "[Scheduled Publish] Clicking [Schedule] option...",
-      "ja": "[] 「」ラジオボタンをクリック...",
-      "ko": "[예약 게시] \\\"예약\\\" 옵션 클릭 중...",
-      "vi": "[Đăng định kỳ] Đang nhấp vào tùy chọn [Hẹn giờ]...",
-      "th": "[กำหนดเวลา] กำลังคลิกตัวเลือก [ตั้งเวลา]...",
-      "id": "[Publikasi Terjadwal] Mengklik opsi [Jadwal]...",
-      "es": "[Publicación programada] Haciendo clic en opción de programación...",
-      "fr": "[Publication programmée] Clic sur l'option de programmation...",
-      "pt": "[Publicação agendada] Clicando na opção de agendamento...",
-      "de": "[Geplante Veröffentlichung] Klick auf die Option [Geplant]...",
-      "it": "[Pubblicazione programmata] Clic sull'opzione di programmazione...",
-      "ru": "[Отложенная публикация] Клик по опции отложенной публикации...",
-      "tr": "[Zamanlanmış Yayınlama] [Zamanla] seçeneğine tıklanıyor...",
+      zh: '[定时发表] 正在物理点击【定时】...',
+      en: '[Scheduled Publish] Clicking [Schedule] option...',
+      ja: '[予約投稿] 「予約投稿」ラジオボタンをクリック中...',
+      ko: '[예약 게시] 「예약」 옵션 클릭 중...',
+      vi: '[Đăng định kỳ] Đang nhấp vào tùy chọn [Hẹn giờ]...',
+      th: '[กำหนดเวลา] กำลังคลิกตัวเลือก [ตั้งเวลา]...',
+      id: '[Publikasi Terjadwal] Mengklik opsi [Jadwal]...',
+      es: '[Publicación programada] Haciendo clic en opción de programación...',
+      fr: '[Publication programmée] Clic sur l’option de programmation...',
+      pt: '[Publicação agendada] Clicando na opção de agendamento...',
+      de: '[Geplante Veröffentlichung] Klick auf die Option [Geplant]...',
+      it: '[Pubblicazione programmata] Clic sull’opzione di programmazione...',
+      ru: '[Отложенная публикация] Клик по опции отложенной публикации...',
+      tr: '[Zamanlanmış Yayınlama] [Zamanla] seçeneğine tıklanıyor...'
     }
   },
   {
     regex: /\[定时发表\]\s*日历面板已展开.*/g,
     translations: {
-      "zh": "[定时发表]s*日历面板已展开.*",
-      "en": "[Scheduled Publish] Calendar panel opened",
-      "ja": "[] カレンダーパネルがきました",
-      "ko": "[예약 게시] 달력 패널이 펼쳐졌습니다",
-      "vi": "[Đăng định kỳ] Bảng lịch đã được mở",
-      "th": "[กำหนดเวลา] แผงปฏิทินเปิดแล้ว",
-      "id": "[Publikasi Terjadwal] Panel kalender telah terbuka",
-      "es": "[Publicación programada] Panel de calendario abierto",
-      "fr": "[Publication programmée] Panneau de calendrier ouvert",
-      "pt": "[Publicação agendada] Painel de calendário aberto",
-      "de": "[Geplante Veröffentlichung] Kalenderfeld geöffnet",
-      "it": "[Pubblicazione programmata] Pannello calendario aperto",
-      "ru": "[Отложенная публикация] Панель календаря открыта",
-      "tr": "[Zamanlanmış Yayınlama] Takvim paneli açıldı",
+      zh: '[定时发表] 日历面板已展开',
+      en: '[Scheduled Publish] Calendar panel opened',
+      ja: '[予約投稿] カレンダーパネルが開きました',
+      ko: '[예약 게시] 달력 패널이 펼쳐졌습니다',
+      vi: '[Đăng định kỳ] Bảng lịch đã được mở',
+      th: '[กำหนดเวลา] แผงปฏิทินเปิดแล้ว',
+      id: '[Publikasi Terjadwal] Panel kalender telah terbuka',
+      es: '[Publicación programada] Panel de calendario abierto',
+      fr: '[Publication programmée] Panneau de calendrier ouvert',
+      pt: '[Publicação agendada] Painel de calendário aberto',
+      de: '[Geplante Veröffentlichung] Kalenderfeld geöffnet',
+      it: '[Pubblicazione programmata] Pannello calendario aperto',
+      ru: '[Отложенная публикация] Панель календаря открыта',
+      tr: '[Zamanlanmış Yayınlama] Takvim paneli açıldı'
     }
   },
   {
     regex: /\[定时发表\]\s*时分选择面板已展开.*/g,
     translations: {
-      "zh": "[定时发表]s*时分选择面板已展开.*",
-      "en": "[Scheduled Publish] Time picker panel opened",
-      "ja": "[] パネルがきました",
-      "ko": "[예약 게시] 시간 선택 패널이 펼쳐졌습니다",
-      "vi": "[Đăng định kỳ] Bảng chọn giờ đã được mở",
-      "th": "[กำหนดเวลา] แผงเลือกเวลาเปิดแล้ว",
-      "id": "[Publikasi Terjadwal] Panel pemilih waktu telah terbuka",
-      "es": "[Publicación programada] Panel de selección de hora abierto",
-      "fr": "[Publication programmée] Panneau de sélection d'heure ouvert",
-      "pt": "[Publicação agendada] Painel de seleção de hora aberto",
-      "de": "[Geplante Veröffentlichung] Zeitauswahlfeld geöffnet",
-      "it": "[Pubblicazione programmata] Pannello selezione ora aperto",
-      "ru": "[Отложенная публикация] Панель выбора времени открыта",
-      "tr": "[Zamanlanmış Yayınlama] Saat seçici paneli açıldı",
+      zh: '[定时发表] 時分选择面板已展开'.replace('時分', '时分'),
+      en: '[Scheduled Publish] Time picker panel opened',
+      ja: '[予約投稿] 時刻選択パネルが開きました',
+      ko: '[예약 게시] 시간 선택 패널이 펼쳐졌습니다',
+      vi: '[Đăng định kỳ] Bảng chọn giờ đã được mở',
+      th: '[กำหนดเวลา] แผงเลือกเวลาเปิดแล้ว',
+      id: '[Publikasi Terjadwal] Panel pemilih waktu telah terbuka',
+      es: '[Publicación programada] Panel de selección de hora abierto',
+      fr: '[Publication programmée] Panneau de sélection d’heure ouvert',
+      pt: '[Publicação agendada] Painel de seleção de hora aberto',
+      de: '[Geplante Veröffentlichung] Zeitauswahlfeld geöffnet',
+      it: '[Pubblicazione programmata] Pannello selezione ora aperto',
+      ru: '[Отложенная публикация] Панель выбора времени открыта',
+      tr: '[Zamanlanmış Yayınlama] Saat seçici paneli açıldı'
     }
   },
   {
-    regex: /已点击【声明原创】复选框,\s*正在等待【原创权益】弹窗呈现\.\.\./g,
+    regex: /\[定时发表\]\s*处理略过[:：]\s*(.+)/g,
     translations: {
-      "zh": "已点击【声明原创】复选框,s*正在等待【原创权益】弹窗呈现...",
-      "en": "Clicked Original Statement checkbox, waiting for terms modal...",
-      "ja": "【オリジナル】のチェックボックスをクリック、モーダルのを...",
-      "ko": "【오리지널 선언】 체크박스를 클릭함, 이용안내 팝업 대기 중...",
-      "vi": "Đã nhấp vào ô tuyên bố bản quyền, đang chờ hộp thoại điều khoản...",
-      "th": "คลิกช่องประกาศผลงานต้นฉบับแล้ว กำลังรอหน้าต่างข้อกำหนด...",
-      "id": "Mengklik kotak centang pernyataan orisinal, menunggu pop-up syarat...",
-      "es": "Casilla de originalidad marcada, esperando ventana de términos...",
-      "fr": "Case de déclaration d'originalité cochée, en attente de la fenêtre modale...",
-      "pt": "Caixa de declaração de originalidade marcada, aguardando janela...",
-      "de": "Originalitäts-Kontrollkästchen angeklickt, Warten auf das Hinweis-Fenster...",
-      "it": "Casella di controllo dichiarazione di originalità selezionata, in attesa della finestra modale...",
-      "ru": "Флажок заявления об авторстве отмечен, ожидание всплывающего окна...",
-      "tr": "Özgünlük bildirimi onay kutusu tıklandı, şartlar penceresi bekleniyor...",
+      zh: '[定时发表] 处理略过: $1',
+      en: '[Scheduled Publish] Skipped: $1',
+      ja: '[予約投稿] スキップしました: $1',
+      ko: '[예약 게시] 건너뜀: $1',
+      vi: '[Đăng định kỳ] Đã bỏ qua: $1',
+      th: '[กำหนดเวลาเผยแพร่] ข้ามขั้นตอนนี้: $1',
+      id: '[Publikasi Terjadwal] Dilewati: $1',
+      es: '[Publicación programada] Omitido: $1',
+      fr: '[Publication programmée] Ignoré : $1',
+      pt: '[Publicação agendada] Ignorado: $1',
+      de: '[Geplante Veröffentlichung] Übersprungen: $1',
+      it: '[Pubblicazione programmata] Ignorato: $1',
+      ru: '[Отложенная публикация] Пропущено: $1',
+      tr: '[Zamanlanmış Yayın] Atlandı: $1'
+    }
+  },
+  {
+    regex: /(?:🎉\s*)?\[声明原创\]\s*✅\s*弹窗中成功确认【声明原创】[，,]\s*弹窗已关闭[！!]?/g,
+    translations: {
+      zh: '🎉 [声明原创] ✅ 弹窗中成功确认【声明原创】，弹窗已关闭！',
+      en: '🎉 [Original Declaration] ✅ Confirmed original rights in modal, closed dialog!',
+      ja: '🎉 [オリジナル宣言] ✅ モーダルでオリジナル権利を確認し、ウィンドウを閉じました！',
+      ko: '🎉 [오리지널 선언] ✅ 팝업에서 오리지널 선언을 확인하고 창을 닫았습니다!',
+      vi: '🎉 [Tuyên bố bản quyền] ✅ Đã xác nhận trong hộp thoại, đã đóng cửa sổ!',
+      th: '🎉 [ประกาศต้นฉบับ] ✅ ยืนยันสิทธิ์ผลงานต้นฉบับแล้ว ปิดหน้าต่างเรียบร้อย!',
+      id: '🎉 [Pernyataan Orisinal] ✅ Dikonfirmasi di jendela pop-up, dialog ditutup!',
+      es: '🎉 [Originalidad] ✅ Confirmado en el modal, ventana cerrada!',
+      fr: '🎉 [Originalité] ✅ Confirmé dans la fenêtre modale, boîte fermée !',
+      pt: '🎉 [Originalidade] ✅ Confirmado na janela modal, diálogo fechado!',
+      de: '🎉 [Originalität] ✅ Im Dialog bestätigt, Fenster geschlossen!',
+      it: '🎉 [Originalità] ✅ Confermato nel modale, finestra chiusa!',
+      ru: '🎉 [Авторство] ✅ Подтверждено во всплывающем окне, диалог закрыт!',
+      tr: '🎉 [Özgünlük] ✅ Pencereden onaylandı, iletişim kutusu kapatıldı!'
+    }
+  },
+  {
+    regex: /已点击【声明原创】复选框[,，]\s*正在等待【原创权益】弹窗呈现.*/g,
+    translations: {
+      zh: '已点击【声明原创】复选框, 正在等待【原创权益】弹窗呈现...',
+      en: 'Clicked [Declare Original] checkbox, waiting for rights modal...',
+      ja: '【オリジナル宣言】チェックボックスをクリックし、権利案内モーダルを待機中...',
+      ko: '【오리지널 선언】 체크박스를 클릭함, 이용안내 팝업 대기 중...',
+      vi: 'Đã nhấp ô [Tuyên bố bản quyền], đang chờ hộp thoại điều khoản...',
+      th: 'คลิกช่อง [ประกาศต้นฉบับ] แล้ว กำลังรอหน้าต่างข้อกำหนด...',
+      id: 'Mengklik kotak [Pernyataan Orisinal], menunggu pop-up syarat...',
+      es: 'Casilla de originalidad marcada, esperando ventana de términos...',
+      fr: 'Case d’originalité cochée, en attente de la fenêtre modale...',
+      pt: 'Caixa de originalidade marcada, aguardando janela de termos...',
+      de: 'Originalitäts-Checkbox geklickt, warte auf Hinweis-Dialog...',
+      it: 'Casella originalità selezionata, in attesa del modale...',
+      ru: 'Флажок авторства отмечен, ожидание всплывающего окна...',
+      tr: 'Özgünlük kutusu tıklandı, şartlar penceresi bekleniyor...'
+    }
+  },
+  {
+    regex: /(?:✅\s*)?\[声明原创\]\s*复选框已勾选生效/g,
+    translations: {
+      zh: '✅ [声明原创] 复选框已勾选生效',
+      en: '✅ [Original Declaration] Checkbox checked and active',
+      ja: '✅ [オリジナル宣言] チェックボックスが有効になりました',
+      ko: '✅ [오리지널 선언] 체크박스가 선택되어 적용됨',
+      vi: '✅ [Tuyên bố bản quyền] Đã đánh dấu thành công',
+      th: '✅ [ประกาศต้นฉบับ] เลือกช่องทำเครื่องหมายเรียบร้อย',
+      id: '✅ [Pernyataan Orisinal] Kotak centang aktif',
+      es: '✅ [Originalidad] Casilla marcada y activa',
+      fr: '✅ [Originalité] Case cochée et activée',
+      pt: '✅ [Originalidade] Caixa marcada e ativa',
+      de: '✅ [Originalität] Kontrollkästchen aktiviert',
+      it: '✅ [Originalità] Casella selezionata e attiva',
+      ru: '✅ [Авторство] Флажок успешно отмечен',
+      tr: '✅ [Özgünlük] Onay kutusu işaretlendi'
+    }
+  },
+  {
+    regex: /(?:✅\s*)?\[声明原创\]\s*当前已处于原创勾选状态/g,
+    translations: {
+      zh: '✅ [声明原创] 当前已处于原创勾选状态',
+      en: '✅ [Original Declaration] Already checked as original',
+      ja: '✅ [オリジナル宣言] 既にチェック済みです',
+      ko: '✅ [오리지널 선언] 이미 선택된 상태입니다',
+      vi: '✅ [Tuyên bố bản quyền] Đã được chọn sẵn',
+      th: '✅ [ประกาศต้นฉบับ] ถูกเลือกไว้แล้ว',
+      id: '✅ [Pernyataan Orisinal] Sudah dalam keadaan tercentang',
+      es: '✅ [Originalidad] Ya marcado como original',
+      fr: '✅ [Originalité] Déjà coché comme original',
+      pt: '✅ [Originalidade] Já marcado como original',
+      de: '✅ [Originalität] Bereits als Original markiert',
+      it: '✅ [Originalità] Già contrassegnato come originale',
+      ru: '✅ [Авторство] Уже отмечено как оригинал',
+      tr: '✅ [Özgünlük] Zaten özgün olarak işaretli'
+    }
+  },
+  {
+    regex: /\[视频标注\]\s*(?:ℹ️\s*)?尝试第\s*(\d+)\s*次定位组件.*/g,
+    translations: {
+      zh: '[视频标注] ℹ️ 尝试第 $1 次定位组件...',
+      en: '[Video Label] ℹ️ Attempt #$1 locating component...',
+      ja: '[動画ラベル] ℹ️ コンポーネント位置特定を試行中 (第 $1 回)...',
+      ko: '[동영상 라벨] ℹ️ 구성 요소 위치 탐색 시도 #$1...',
+      vi: '[Nhãn video] ℹ️ Đang thử định vị thành phần lần #$1...',
+      th: '[ป้ายกำกับวิดีโอ] ℹ️ กำลังค้นหาองค์ประกอบครั้งที่ $1...',
+      id: '[Label Video] ℹ️ Percobaan ke-$1 menemukan komponen...',
+      es: '[Etiqueta de video] ℹ️ Intento #$1 localizando componente...',
+      fr: '[Étiquette vidéo] ℹ️ Tentative #$1 de localisation du composant...',
+      pt: '[Rótulo do vídeo] ℹ️ Tentativa #$1 localizando componente...',
+      de: '[Video-Kennzeichnung] ℹ️ Versuch #$1 Komponente zu finden...',
+      it: '[Etichetta video] ℹ️ Tentativo #$1 localizzazione componente...',
+      ru: '[Метка видео] ℹ️ Попытка #$1 поиска компонента...',
+      tr: '[Video Etiketi] ℹ️ Bileşen konumlandırma denemesi #$1...'
     }
   },
   {
     regex: /\[视频标注\]\s*点击展开选项列表.*/g,
     translations: {
-      "zh": "[视频标注]s*点击展开选项列表.*",
-      "en": "[Video Label] Opening option dropdown menu...",
-      "ja": "[ラベル] オプションドロップダウンを...",
-      "ko": "[동영상 라벨] 옵션 드롭다운 메뉴 펼치는 중...",
-      "vi": "[Nhãn video] Đang mở menu tùy chọn...",
-      "th": "[ป้ายกำกับวิดีโอ] กำลังเปิดเมนูตัวเลือก...",
-      "id": "[Label Video] Membuka menu dropdown opsi...",
-      "es": "[Etiqueta de video] Abriendo menú desplegable de opciones...",
-      "fr": "[Étiquette vidéo] Ouverture du menu déroulant des options...",
-      "pt": "[Rótulo do vídeo] Abrindo menu suspenso de opções...",
-      "de": "[Video-Kennzeichnung] Dropdown-Menü der Optionen wird geöffnet...",
-      "it": "[Etichetta video] Apertura menu a discesa delle opzioni...",
-      "ru": "[Метка видео] Открытие выпадающего меню опций...",
-      "tr": "[Video Etiketi] Seçenek açılır menüsü açılıyor...",
+      zh: '[视频标注] 点击展开选项列表...',
+      en: '[Video Label] Opening option dropdown menu...',
+      ja: '[動画ラベル] オプション一覧を開いています...',
+      ko: '[동영상 라벨] 옵션 드롭다운 메뉴 펼치는 중...',
+      vi: '[Nhãn video] Đang mở menu tùy chọn...',
+      th: '[ป้ายกำกับวิดีโอ] กำลังเปิดเมนูตัวเลือก...',
+      id: '[Label Video] Membuka menu dropdown opsi...',
+      es: '[Etiqueta de video] Abriendo menú desplegable de opciones...',
+      fr: '[Étiquette vidéo] Ouverture du menu déroulant des options...',
+      pt: '[Rótulo do vídeo] Abrindo menu suspenso de opções...',
+      de: '[Video-Kennzeichnung] Dropdown-Menü der Optionen wird geöffnet...',
+      it: '[Etichetta video] Apertura menu a discesa delle opzioni...',
+      ru: '[Метка видео] Открытие выпадающего меню опций...',
+      tr: '[Video Etiketi] Seçenek açılır menüsü açılıyor...'
     }
   },
   {
     regex: /\[视频标注\]\s*物理点击目标选项.*/g,
     translations: {
-      "zh": "[视频标注]s*物理点击目标选项.*",
-      "en": "[Video Label] Clicking target option...",
-      "ja": "[ラベル] のオプションをクリック...",
-      "ko": "[동영상 라벨] 대상 옵션 클릭 중...",
-      "vi": "[Nhãn video] Đang nhấp vào tùy chọn mục tiêu...",
-      "th": "[ป้ายกำกับวิดีโอ] กำลังคลิกตัวเลือกเป้าหมาย...",
-      "id": "[Label Video] Mengklik opsi target...",
-      "es": "[Etiqueta de video] Haciendo clic en la opción de destino...",
-      "fr": "[Étiquette vidéo] Clic sur l'option cible...",
-      "pt": "[Rótulo do vídeo] Clicando na opção alvo...",
-      "de": "[Video-Kennzeichnung] Klick auf die Zieloption...",
-      "it": "[Etichetta video] Clic sull'opzione di destinazione...",
-      "ru": "[Метка видео] Клик по целевой опции...",
-      "tr": "[Video Etiketi] Hedef seçeneğe tıklanıyor...",
+      zh: '[视频标注] 物理点击目标选项...',
+      en: '[Video Label] Clicking target option...',
+      ja: '[動画ラベル] 対象オプションをクリックしています...',
+      ko: '[동영상 라벨] 대상 옵션 클릭 중...',
+      vi: '[Nhãn video] Đang nhấp vào tùy chọn mục tiêu...',
+      th: '[ป้ายกำกับวิดีโอ] กำลังคลิกตัวเลือกเป้าหมาย...',
+      id: '[Label Video] Mengklik opsi target...',
+      es: '[Etiqueta de video] Haciendo clic en la opción de destino...',
+      fr: '[Étiquette vidéo] Clic sur l’option cible...',
+      pt: '[Rótulo do vídeo] Clicando na opção alvo...',
+      de: '[Video-Kennzeichnung] Klick auf die Zieloption...',
+      it: '[Etichetta video] Clic sull’opzione di destinazione...',
+      ru: '[Метка видео] Клик по целевой опции...',
+      tr: '[Video Etiketi] Hedef seçeneğe tıklanıyor...'
+    }
+  },
+  {
+    regex: /(?:⏳\s*)?视频正在上传或转码中\s*[(（]([^)）]+)[)）][，,]\s*持续等待上传成功.*/g,
+    translations: {
+      zh: '⏳ 视频正在上传或转码中 ($1)，持续等待上传成功...',
+      en: '⏳ Video uploading/transcoding ($1), waiting for completion...',
+      ja: '⏳ 動画をアップロード・変換中 ($1)、完了を待機しています...',
+      ko: '⏳ 동영상 업로드 또는 인코딩 중 ($1), 완료 대기 중...',
+      vi: '⏳ Video đang tải lên/chuyển mã ($1), đang chờ hoàn tất...',
+      th: '⏳ กำลังอัปโหลดหรือแปลงไฟล์วิดีโอ ($1), รอให้เสร็จสมบูรณ์...',
+      id: '⏳ Video sedang diunggah/ditranskode ($1), menunggu selesai...',
+      es: '⏳ Subiendo/transcodificando video ($1), esperando finalización...',
+      fr: '⏳ Envoi/transcodage vidéo ($1), en attente de fin...',
+      pt: '⏳ Enviando/transcodificando vídeo ($1), aguardando conclusão...',
+      de: '⏳ Video wird hochgeladen/transkodiert ($1), warte auf Abschluss...',
+      it: '⏳ Caricamento/transcodifica video ($1), in attesa del completamento...',
+      ru: '⏳ Загрузка/транскодирование видео ($1), ожидание завершения...',
+      tr: '⏳ Video yükleniyor/kodlanıyor ($1), tamamlanması bekleniyor...'
+    }
+  },
+  {
+    regex: /(?:⏳\s*)?微信正在提交视频素材与发表数据中.*/g,
+    translations: {
+      zh: '⏳ 微信正在提交视频素材与发表数据中...',
+      en: '⏳ Submitting video asset and post metadata to WeChat Channels...',
+      ja: '⏳ WeChat Channels に動画素材と投稿データを送信中...',
+      ko: '⏳ 위챗 채널에 동영상 및 게시 데이터를 제출하는 중...',
+      vi: '⏳ Đang gửi video và dữ liệu xuất bản lên WeChat Channels...',
+      th: '⏳ กำลังส่งข้อมูลวิดีโอและโพสต์ไปยัง WeChat Channels...',
+      id: '⏳ Mengirim aset video dan data publikasi ke WeChat Channels...',
+      es: '⏳ Enviando video y metadatos a WeChat Channels...',
+      fr: '⏳ Envoi de la vidéo et des métadonnées vers WeChat Channels...',
+      pt: '⏳ Enviando vídeo e dados da publicação para o WeChat Channels...',
+      de: '⏳ Video und Veröffentlichungsdaten werden an WeChat Channels gesendet...',
+      it: '⏳ Invio video e dati di pubblicazione su WeChat Channels...',
+      ru: '⏳ Отправка видео и данных публикации в WeChat Channels...',
+      tr: '⏳ WeChat Channels’a video ve yayın verileri gönderiliyor...'
+    }
+  },
+  {
+    regex: /(?:❌\s*)?微信视频上传失败（网络出错，请稍后重试），已坚决终止发表操作，避免提交空内容[！!]?/g,
+    translations: {
+      zh: '❌ 微信视频上传失败（网络出错，请稍后重试），已坚决终止发表操作，避免提交空内容！',
+      en: '❌ WeChat video upload failed (network error). Publication aborted to prevent empty post!',
+      ja: '❌ WeChat 動画のアップロードに失敗しました（ネットワークエラー）。空投稿防止のため公開を中止しました！',
+      ko: '❌ 위챗 동영상 업로드 실패(네트워크 오류). 빈 게시물 방지를 위해 발행을 중단했습니다!',
+      vi: '❌ Tải video WeChat thất bại (lỗi mạng). Đã hủy đăng để tránh bài viết trống!',
+      th: '❌ อัปโหลดวิดีโอ WeChat ล้มเหลว (ปัญหาเครือข่าย) ยกเลิกการเผยแพร่แล้ว!',
+      id: '❌ Unggah video WeChat gagal (kesalahan jaringan). Publikasi dibatalkan agar tidak kosong!',
+      es: '❌ Falló la subida de video en WeChat (error de red). ¡Publicación abortada!',
+      fr: '❌ Échec du téléversement vidéo WeChat (erreur réseau). Publication annulée !',
+      pt: '❌ Falha no envio do vídeo no WeChat (erro de rede). Publicação abortada!',
+      de: '❌ WeChat-Video-Upload fehlgeschlagen (Netzwerkfehler). Veröffentlichung abgebrochen!',
+      it: '❌ Caricamento video WeChat fallito (errore di rete). Pubblicazione annullata!',
+      ru: '❌ Ошибка загрузки видео WeChat (сбой сети). Публикация отменена!',
+      tr: '❌ WeChat video yüklemesi başarısız (ağ hatası). Boş paylaşımı önlemek için yayın durduruldu!'
+    }
+  },
+  {
+    regex: /(?:❌\s*)?\[发布终止\]\s*高级发布选项未达标已强制中止发布[:：]\s*(.+)/g,
+    translations: {
+      zh: '❌ [发布终止] 高级发布选项未达标已强制中止发布: $1',
+      en: '❌ [Publish Aborted] Advanced publish options failed verification: $1',
+      ja: '❌ [公開中止] 詳細設定の検証に失敗したため公開を強制中止しました: $1',
+      ko: '❌ [게시 중단] 고급 게시 옵션 검증 실패로 발행을 강제 중단했습니다: $1',
+      vi: '❌ [Hủy đăng] Tùy chọn nâng cao không đạt yêu cầu, đã buộc dừng: $1',
+      th: '❌ [ยกเลิกเผยแพร่] ตัวเลือกขั้นสูงไม่ผ่านเกณฑ์ จึงระงับการเผยแพร่: $1',
+      id: '❌ [Publikasi Dihentikan] Opsi lanjutan gagal diverifikasi: $1',
+      es: '❌ [Publicación abortada] Opciones avanzadas no verificadas: $1',
+      fr: '❌ [Publication annulée] Échec des options avancées : $1',
+      pt: '❌ [Publicação abortada] Opções avançadas não verificadas: $1',
+      de: '❌ [Veröffentlichung abgebrochen] Erweiterte Optionen nicht erfüllt: $1',
+      it: '❌ [Pubblicazione interrotta] Verifica opzioni avanzate fallita: $1',
+      ru: '❌ [Публикация прервана] Расширенные настройки не прошли проверку: $1',
+      tr: '❌ [Yayın Durduruldu] Gelişmiş yayın seçenekleri doğrulanamadı: $1'
     }
   },
   {
     regex: /成功建立专属页面 CDP WebSocket 连接/g,
     translations: {
-      "zh": "成功建立专属页面 CDP WebSocket 连接",
-      "en": "Successfully established CDP WebSocket connection for page",
-      "ja": "ページ CDP WebSocket のにsuccessしました",
-      "ko": "페이지 전용 CDP WebSocket 연결 성공",
-      "vi": "Đã thiết lập kết nối CDP WebSocket cho trang thành công",
-      "th": "สถาปนาการเชื่อมต่อ CDP WebSocket สำหรับหน้าเพจสำเร็จแล้ว",
-      "id": "Berhasil membangun koneksi CDP WebSocket untuk halaman",
-      "es": "Conexión CDP WebSocket para la página establecida con éxito",
-      "fr": "Connexion CDP WebSocket établie avec succès pour la page",
-      "pt": "Conexão CDP WebSocket estabelecida com sucesso para a página",
-      "de": "CDP WebSocket-Verbindung für die Seite erfolgreich hergestellt",
-      "it": "Connessione CDP WebSocket per la pagina stabilita con successo",
-      "ru": "Успешно установлено подключение CDP WebSocket для страницы",
-      "tr": "Sayfa için CDP WebSocket bağlantısı başarıyla kuruldu",
+      zh: '成功建立专属页面 CDP WebSocket 连接',
+      en: 'Successfully established dedicated page CDP WebSocket connection',
+      ja: '専用ページ CDP WebSocket 接続を確立しました',
+      ko: '페이지 전용 CDP WebSocket 연결 성공',
+      vi: 'Đã thiết lập kết nối CDP WebSocket cho trang thành công',
+      th: 'เชื่อมต่อ CDP WebSocket สำหรับหน้าเพจสำเร็จแล้ว',
+      id: 'Berhasil membangun koneksi CDP WebSocket halaman',
+      es: 'Conexión CDP WebSocket establecida con éxito',
+      fr: 'Connexion CDP WebSocket établie avec succès',
+      pt: 'Conexão CDP WebSocket estabelecida com sucesso',
+      de: 'CDP-WebSocket-Verbindung erfolgreich hergestellt',
+      it: 'Connessione CDP WebSocket stabilita con successo',
+      ru: 'Подключение CDP WebSocket успешно установлено',
+      tr: 'Sayfa için CDP WebSocket bağlantısı başarıyla kuruldu'
+    }
+  },
+  {
+    regex: /已回到底部发表区域[，,]\s*准备监测转码与校验按钮/g,
+    translations: {
+      zh: '已回到底部发表区域，准备监测转码与校验按钮',
+      en: 'Returned to publish area at bottom, monitoring transcoding & verifying button',
+      ja: '下部の公開エリアに戻り、変換と公開ボタンの監視を開始します',
+      ko: '하단 게시 영역으로 이동 완료, 인코딩 및 게시 버튼 검증 준비 중',
+      vi: 'Đã trở lại khu vực xuất bản cuối trang, chuẩn bị theo dõi chuyển mã',
+      th: 'กลับไปยังพื้นที่เผยแพร่ด้านล่างแล้ว เตรียมตรวจสอบการแปลงรหัส',
+      id: 'Kembali ke area publikasi bawah, memantau transcode & tombol',
+      es: 'De vuelta al área de publicación, preparando monitoreo de transcodificación',
+      fr: 'Retour à la zone de publication, surveillance du transcodage en cours',
+      pt: 'Voltou para a área de publicação, preparando monitoramento',
+      de: 'Zurück zum Veröffentlichungsbereich, Transkodierung wird überwacht',
+      it: 'Tornato all’area di pubblicazione, monitoraggio transcodifica pronto',
+      ru: 'Возврат к области публикации, подготовка мониторинга транскодирования',
+      tr: 'Alt yayın alanına dönüldü, kod dönüştürme ve düğme doğrulaması hazırlanıyor'
     }
   },
   {
     regex: /\[步骤\s*(\d+)(?:\/|分之)(\d+)\]/g,
     translations: {
-      "zh": "[步骤 $1/$2]",
-      "en": "[Step $1/$2] Monitoring video upload transcode status & checking publish button...",
-      "ja": "[ステップ $1/$2] のアップロード・をし、ボタンを...",
-      "ko": "[단계 $1/$2] 동영상 인코딩 상태 모니터링 및 게시 버튼 활성화 검증 중...",
-      "vi": "[Bước $1/$2] Đang theo dõi trạng thái chuyển mã video và xác thực nút xuất bản...",
-      "th": "[ขั้นตอน $1/$2] กำลังตรวจสอบสถานะการแปลงรหัสวิดีโอและยืนยันปุ่มเผยแพร่...",
-      "id": "[Langkah $1/$2] Memantau status transcode video & menguji tombol publikasi...",
-      "es": "[Paso $1/$2] Monitoreando transcodificación de video y verificando botón de publicación...",
-      "fr": "[Étape $1/$2] Suivi du transcodage vidéo et vérification du bouton de publication...",
-      "pt": "[Etapa $1/$2] Monitorando transcodificação de vídeo e verificando botão de publicação...",
-      "de": "[Schritt $1/$2] Videotranskodierung überwachen und Veröffentlichungsschaltfläche prüfen...",
-      "it": "[Passaggio $1/$2] Monitoraggio transcodifica video e verifica pulsante di pubblicazione...",
-      "ru": "[Шаг $1/$2] Мониторинг состояния транскодирования видео и проверка кнопки...",
-      "tr": "[Adım $1/$2] Video kod dönüştürme durumu izleniyor ve yayınlama düğmesi doğrulanıyor...",
-    }
-  },
-  {
-    regex: /已回到底部发表区域，准备监测转码与校验按钮/g,
-    translations: {
-      "zh": "已回到底部发表区域，准备监测转码与校验按钮",
-      "en": "Returned to publish area at bottom, preparing to monitor transcoding & verify button",
-      "ja": "ページのエリアにりました。とボタンのを",
-      "ko": "하단 게시 영역으로 이동 완료, 인코딩 및 게시 버튼 검증 준비 중",
-      "vi": "Đã trở lại khu vực xuất bản ở cuối trang, chuẩn bị theo dõi chuyển mã và xác thực nút",
-      "th": "กลับไปยังพื้นที่เผยแพร่ด้านล่างแล้ว กำลังเตรียมตรวจสอบการแปลงรหัสและปุ่ม",
-      "id": "Kembali ke area publikasi di bagian bawah, bersiap memantau transcode & tombol",
-      "es": "De vuelta al área de publicación al final, preparando para monitorear transcodificación y botón",
-      "fr": "Retour à la zone de publication en bas, préparation du suivi du transcodage et validation du bouton",
-      "pt": "Voltado para a área de publicação no final, preparando para monitorar transcodificação e botão",
-      "de": "Zurück zum Veröffentlichungsbereich unten, Überwachung der Transkodierung und Schaltflächenprüfung vorbereiten",
-      "it": "Tornato all'area di pubblicazione in basso, preparazione monitoraggio transcodifica e pulsante",
-      "ru": "Возврат в область публикации внизу, подготовка к мониторингу транскодирования и проверке кнопки",
-      "tr": "Alt kısımdaki yayınlama alanına dönüldü, kod dönüştürme ve düğme doğrulaması izlemeye hazırlanılıyor",
-    }
-  },
-  {
-    regex: /\[步骤\s*(\d+)(?:\/|分之)(\d+)\]/g,
-    translations: {
-      "zh": "[步骤 $1/$2]",
-      "en": "[Step $1/$2]",
-      "ja": "[ステップ $1/$2]",
-      "ko": "[단계 $1/$2]",
-      "vi": "[Bước $1/$2]",
-      "th": "[ขั้นตอน $1/$2]",
-      "id": "[Langkah $1/$2]",
-      "es": "[Paso $1/$2]",
-      "fr": "[Étape $1/$2]",
-      "pt": "[Etapa $1/$2]",
-      "de": "[Schritt $1/$2]",
-      "it": "[Passaggio $1/$2]",
-      "ru": "[Шаг $1/$2]",
-      "tr": "[Adım $1/$2]",
-    }
-  },
-  {
-    regex: /\[视频标注\]\ ℹ️\ 尝试第\ \$\{mTry\ \+\ 1\}\ 次定位组件\.\.\./g,
-    translations: {
-      "zh": "[视频标注] ℹ️ 尝试第 ${mTry + 1} 次定位组件...",
-      "en": "[] ℹ️ ${mTry + 1} ...",
-      "ja": "[] ℹ️ ${mTry + 1} ...",
-      "ko": "[] ℹ️ ${mTry + 1} ...",
-      "vi": "[] ℹ️ ${mTry + 1} ...",
-      "th": "[] ℹ️ ${mTry + 1} ...",
-      "id": "[] ℹ️ ${mTry + 1} ...",
-      "es": "[] ℹ️ ${mTry + 1} ...",
-      "fr": "[] ℹ️ ${mTry + 1} ...",
-      "pt": "[] ℹ️ ${mTry + 1} ...",
-      "de": "[] ℹ️ ${mTry + 1} ...",
-      "it": "[] ℹ️ ${mTry + 1} ...",
-      "ru": "[] ℹ️ ${mTry + 1} ...",
-      "tr": "[] ℹ️ ${mTry + 1} ...",
-    }
-  },
-  {
-    regex: /⏳\ 微信正在提交视频素材与发表数据中\.\.\./g,
-    translations: {
-      "zh": "⏳ 微信正在提交视频素材与发表数据中...",
-      "en": "⏳ ...",
-      "ja": "⏳ ...",
-      "ko": "⏳ ...",
-      "vi": "⏳ ...",
-      "th": "⏳ ...",
-      "id": "⏳ ...",
-      "es": "⏳ ...",
-      "fr": "⏳ ...",
-      "pt": "⏳ ...",
-      "de": "⏳ ...",
-      "it": "⏳ ...",
-      "ru": "⏳ ...",
-      "tr": "⏳ ...",
-    }
-  },
-  {
-    regex: /⚡\ \[定时发表\]\ 未指定计划发布时间，保持【立即发表】模式/g,
-    translations: {
-      "zh": "⚡ [定时发表] 未指定计划发布时间，保持【立即发表】模式",
-      "en": "⚡ Automated process running: [Scheduled publish] ，【】",
-      "ja": "⚡ : [Scheduled publish] ，【】",
-      "ko": "⚡ 자동화 프로세스 실행 중: [Scheduled publish] ，【】",
-      "vi": "⚡ Quy trình tự động đang chạy: [Scheduled publish] ，【】",
-      "th": "⚡ กำลังประมวลผลอัตโนมัติ: [Scheduled publish] ，【】",
-      "id": "⚡ Proses otomatis berjalan: [Scheduled publish] ，【】",
-      "es": "⚡ Proceso automatizado en ejecución: [Scheduled publish] ，【】",
-      "fr": "⚡ Processus automatisé en cours : [Scheduled publish] ，【】",
-      "pt": "⚡ Processo automatizado em execução: [Scheduled publish] ，【】",
-      "de": "⚡ Automatisierter Prozess läuft: [Scheduled publish] ，【】",
-      "it": "⚡ Processo automatizzato in corso: [Scheduled publish] ，【】",
-      "ru": "⚡ Автоматический процесс выполняется: [Scheduled publish] ，【】",
-      "tr": "⚡ Otomatik işlem çalışıyor: [Scheduled publish] ，【】",
-    }
-  },
-  {
-    regex: /✅\ \[定时发表\]\ 已成功设置为:\ \$\{finalCheck\.inputVal\}/g,
-    translations: {
-      "zh": "✅ [定时发表] 已成功设置为: ${finalCheck.inputVal}",
-      "en": "✅ [Scheduled publish] successfully set to: ${finalCheck.inputVal}",
-      "ja": "✅ [Scheduled publish] successfully set to: ${finalCheck.inputVal}",
-      "ko": "✅ [Scheduled publish] successfully set to: ${finalCheck.inputVal}",
-      "vi": "✅ [Scheduled publish] successfully set to: ${finalCheck.inputVal}",
-      "th": "✅ [Scheduled publish] successfully set to: ${finalCheck.inputVal}",
-      "id": "✅ [Scheduled publish] successfully set to: ${finalCheck.inputVal}",
-      "es": "✅ [Scheduled publish] successfully set to: ${finalCheck.inputVal}",
-      "fr": "✅ [Scheduled publish] successfully set to: ${finalCheck.inputVal}",
-      "pt": "✅ [Scheduled publish] successfully set to: ${finalCheck.inputVal}",
-      "de": "✅ [Scheduled publish] successfully set to: ${finalCheck.inputVal}",
-      "it": "✅ [Scheduled publish] successfully set to: ${finalCheck.inputVal}",
-      "ru": "✅ [Scheduled publish] successfully set to: ${finalCheck.inputVal}",
-      "tr": "✅ [Scheduled publish] successfully set to: ${finalCheck.inputVal}",
-    }
-  },
-  {
-    regex: /✅\ \[声明原创\]\ 复选框已勾选生效/g,
-    translations: {
-      "zh": "✅ [声明原创] 复选框已勾选生效",
-      "en": "✅ []",
-      "ja": "✅ []",
-      "ko": "✅ []",
-      "vi": "✅ []",
-      "th": "✅ []",
-      "id": "✅ []",
-      "es": "✅ []",
-      "fr": "✅ []",
-      "pt": "✅ []",
-      "de": "✅ []",
-      "it": "✅ []",
-      "ru": "✅ []",
-      "tr": "✅ []",
-    }
-  },
-  {
-    regex: /\[定时发表\]\ 处理略过:\ \$\{e\.message\}/g,
-    translations: {
-      "zh": "[定时发表] 处理略过: ${e.message}",
-      "en": "[Scheduled publish] : ${e.message}",
-      "ja": "[Scheduled publish] : ${e.message}",
-      "ko": "[Scheduled publish] : ${e.message}",
-      "vi": "[Scheduled publish] : ${e.message}",
-      "th": "[Scheduled publish] : ${e.message}",
-      "id": "[Scheduled publish] : ${e.message}",
-      "es": "[Scheduled publish] : ${e.message}",
-      "fr": "[Scheduled publish] : ${e.message}",
-      "pt": "[Scheduled publish] : ${e.message}",
-      "de": "[Scheduled publish] : ${e.message}",
-      "it": "[Scheduled publish] : ${e.message}",
-      "ru": "[Scheduled publish] : ${e.message}",
-      "tr": "[Scheduled publish] : ${e.message}",
-    }
-  },
-  {
-    regex: /\[定时发表\]\ 时分选择面板已展开/g,
-    translations: {
-      "zh": "[定时发表] 时分选择面板已展开",
-      "en": "[Scheduled publish]",
-      "ja": "[Scheduled publish]",
-      "ko": "[Scheduled publish]",
-      "vi": "[Scheduled publish]",
-      "th": "[Scheduled publish]",
-      "id": "[Scheduled publish]",
-      "es": "[Scheduled publish]",
-      "fr": "[Scheduled publish]",
-      "pt": "[Scheduled publish]",
-      "de": "[Scheduled publish]",
-      "it": "[Scheduled publish]",
-      "ru": "[Scheduled publish]",
-      "tr": "[Scheduled publish]",
-    }
-  },
-  {
-    regex: /❌\ 微信视频上传失败（网络出错，请稍后重试），已坚决终止发表操作，避免提交空内容！/g,
-    translations: {
-      "zh": "❌ 微信视频上传失败（网络出错，请稍后重试），已坚决终止发表操作，避免提交空内容！",
-      "en": "❌ Automated process running: Video uploadfailed（，），，！",
-      "ja": "❌ : Video uploadfailed（，），，！",
-      "ko": "❌ 자동화 프로세스 실행 중: Video uploadfailed（，），，！",
-      "vi": "❌ Quy trình tự động đang chạy: Video uploadfailed（，），，！",
-      "th": "❌ กำลังประมวลผลอัตโนมัติ: Video uploadfailed（，），，！",
-      "id": "❌ Proses otomatis berjalan: Video uploadfailed（，），，！",
-      "es": "❌ Proceso automatizado en ejecución: Video uploadfailed（，），，！",
-      "fr": "❌ Processus automatisé en cours : Video uploadfailed（，），，！",
-      "pt": "❌ Processo automatizado em execução: Video uploadfailed（，），，！",
-      "de": "❌ Automatisierter Prozess läuft: Video uploadfailed（，），，！",
-      "it": "❌ Processo automatizzato in corso: Video uploadfailed（，），，！",
-      "ru": "❌ Автоматический процесс выполняется: Video uploadfailed（，），，！",
-      "tr": "❌ Otomatik işlem çalışıyor: Video uploadfailed（，），，！",
-    }
-  },
-  {
-    regex: /✅\ \[定时发表\]\ 已成功设置为:\ \$\{finalCheck\.dtText\}/g,
-    translations: {
-      "zh": "✅ [定时发表] 已成功设置为: ${finalCheck.dtText}",
-      "en": "✅ [Scheduled publish] successfully set to: ${finalCheck.dtText}",
-      "ja": "✅ [Scheduled publish] successfully set to: ${finalCheck.dtText}",
-      "ko": "✅ [Scheduled publish] successfully set to: ${finalCheck.dtText}",
-      "vi": "✅ [Scheduled publish] successfully set to: ${finalCheck.dtText}",
-      "th": "✅ [Scheduled publish] successfully set to: ${finalCheck.dtText}",
-      "id": "✅ [Scheduled publish] successfully set to: ${finalCheck.dtText}",
-      "es": "✅ [Scheduled publish] successfully set to: ${finalCheck.dtText}",
-      "fr": "✅ [Scheduled publish] successfully set to: ${finalCheck.dtText}",
-      "pt": "✅ [Scheduled publish] successfully set to: ${finalCheck.dtText}",
-      "de": "✅ [Scheduled publish] successfully set to: ${finalCheck.dtText}",
-      "it": "✅ [Scheduled publish] successfully set to: ${finalCheck.dtText}",
-      "ru": "✅ [Scheduled publish] successfully set to: ${finalCheck.dtText}",
-      "tr": "✅ [Scheduled publish] successfully set to: ${finalCheck.dtText}",
-    }
-  },
-  {
-    regex: /✅\ \[声明原创\]\ 当前已处于原创勾选状态/g,
-    translations: {
-      "zh": "✅ [声明原创] 当前已处于原创勾选状态",
-      "en": "✅ []",
-      "ja": "✅ []",
-      "ko": "✅ []",
-      "vi": "✅ []",
-      "th": "✅ []",
-      "id": "✅ []",
-      "es": "✅ []",
-      "fr": "✅ []",
-      "pt": "✅ []",
-      "de": "✅ []",
-      "it": "✅ []",
-      "ru": "✅ []",
-      "tr": "✅ []",
-    }
-  },
-  {
-    regex: /🎉\ \[声明原创\]\ ✅\ 弹窗中成功确认【声明原创】，弹窗已关闭！/g,
-    translations: {
-      "zh": "🎉 [声明原创] ✅ 弹窗中成功确认【声明原创】，弹窗已关闭！",
-      "en": "🎉 Automated process running: [] ✅ success【】，！",
-      "ja": "🎉 : [] ✅ success【】，！",
-      "ko": "🎉 자동화 프로세스 실행 중: [] ✅ success【】，！",
-      "vi": "🎉 Quy trình tự động đang chạy: [] ✅ success【】，！",
-      "th": "🎉 กำลังประมวลผลอัตโนมัติ: [] ✅ success【】，！",
-      "id": "🎉 Proses otomatis berjalan: [] ✅ success【】，！",
-      "es": "🎉 Proceso automatizado en ejecución: [] ✅ success【】，！",
-      "fr": "🎉 Processus automatisé en cours : [] ✅ success【】，！",
-      "pt": "🎉 Processo automatizado em execução: [] ✅ success【】，！",
-      "de": "🎉 Automatisierter Prozess läuft: [] ✅ success【】，！",
-      "it": "🎉 Processo automatizzato in corso: [] ✅ success【】，！",
-      "ru": "🎉 Автоматический процесс выполняется: [] ✅ success【】，！",
-      "tr": "🎉 Otomatik işlem çalışıyor: [] ✅ success【】，！",
-    }
-  },
-  {
-    regex: /\[定时发表\]\ ⚠️\ 未能确认定时单选激活状态，继续尝试后续步骤\.\.\./g,
-    translations: {
-      "zh": "[定时发表] ⚠️ 未能确认定时单选激活状态，继续尝试后续步骤...",
-      "en": "Automated process running: [Scheduled publish] ⚠️ ，Step...",
-      "ja": ": [Scheduled publish] ⚠️ ，Step...",
-      "ko": "자동화 프로세스 실행 중: [Scheduled publish] ⚠️ ，Step...",
-      "vi": "Quy trình tự động đang chạy: [Scheduled publish] ⚠️ ，Step...",
-      "th": "กำลังประมวลผลอัตโนมัติ: [Scheduled publish] ⚠️ ，Step...",
-      "id": "Proses otomatis berjalan: [Scheduled publish] ⚠️ ，Step...",
-      "es": "Proceso automatizado en ejecución: [Scheduled publish] ⚠️ ，Step...",
-      "fr": "Processus automatisé en cours : [Scheduled publish] ⚠️ ，Step...",
-      "pt": "Processo automatizado em execução: [Scheduled publish] ⚠️ ，Step...",
-      "de": "Automatisierter Prozess läuft: [Scheduled publish] ⚠️ ，Step...",
-      "it": "Processo automatizzato in corso: [Scheduled publish] ⚠️ ，Step...",
-      "ru": "Автоматический процесс выполняется: [Scheduled publish] ⚠️ ，Step...",
-      "tr": "Otomatik işlem çalışıyor: [Scheduled publish] ⚠️ ，Step...",
-    }
-  },
-  {
-    regex: /⏳\ 视频正在上传或转码中\ \(\$\{currentProgress\}\)，持续等待上传成功\.\.\./g,
-    translations: {
-      "zh": "⏳ 视频正在上传或转码中 (${currentProgress})，持续等待上传成功...",
-      "en": "⏳ (${currentProgress})，...",
-      "ja": "⏳ (${currentProgress})，...",
-      "ko": "⏳ (${currentProgress})，...",
-      "vi": "⏳ (${currentProgress})，...",
-      "th": "⏳ (${currentProgress})，...",
-      "id": "⏳ (${currentProgress})，...",
-      "es": "⏳ (${currentProgress})，...",
-      "fr": "⏳ (${currentProgress})，...",
-      "pt": "⏳ (${currentProgress})，...",
-      "de": "⏳ (${currentProgress})，...",
-      "it": "⏳ (${currentProgress})，...",
-      "ru": "⏳ (${currentProgress})，...",
-      "tr": "⏳ (${currentProgress})，...",
-    }
-  },
-  {
-    regex: /❌\ \[发布终止\]\ 高级发布选项未达标已强制中止发布:\ \$\{optErr\.message\}/g,
-    translations: {
-      "zh": "❌ [发布终止] 高级发布选项未达标已强制中止发布: ${optErr.message}",
-      "en": "❌ [] : ${optErr.message}",
-      "ja": "❌ [] : ${optErr.message}",
-      "ko": "❌ [] : ${optErr.message}",
-      "vi": "❌ [] : ${optErr.message}",
-      "th": "❌ [] : ${optErr.message}",
-      "id": "❌ [] : ${optErr.message}",
-      "es": "❌ [] : ${optErr.message}",
-      "fr": "❌ [] : ${optErr.message}",
-      "pt": "❌ [] : ${optErr.message}",
-      "de": "❌ [] : ${optErr.message}",
-      "it": "❌ [] : ${optErr.message}",
-      "ru": "❌ [] : ${optErr.message}",
-      "tr": "❌ [] : ${optErr.message}",
+      zh: '[步骤 $1/$2]',
+      en: '[Step $1/$2]',
+      ja: '[ステップ $1/$2]',
+      ko: '[단계 $1/$2]',
+      vi: '[Bước $1/$2]',
+      th: '[ขั้นตอน $1/$2]',
+      id: '[Langkah $1/$2]',
+      es: '[Paso $1/$2]',
+      fr: '[Étape $1/$2]',
+      pt: '[Etapa $1/$2]',
+      de: '[Schritt $1/$2]',
+      it: '[Passaggio $1/$2]',
+      ru: '[Шаг $1/$2]',
+      tr: '[Adım $1/$2]'
     }
   }
 ];
@@ -1673,15 +1661,27 @@ export function localizePlatformLog(rawText: string, lang?: string | null): stri
 
   // 1. 先尝试直接从字典匹配核心预设文本
   for (const [k, v] of Object.entries(PLATFORM_I18N_LOCALES.zh)) {
-    const rawPattern = v.replace(/\{(\w+)\}/g, '(.*?)');
+    const varNames: string[] = [];
+    const escapedParts: string[] = [];
+    let lastIdx = 0;
+    const placeholderRe = /\{(\w+)\}/g;
+    let phMatch: RegExpExecArray | null;
+    while ((phMatch = placeholderRe.exec(v)) !== null) {
+      const literalPart = v.slice(lastIdx, phMatch.index).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      escapedParts.push(literalPart, '(.*?)');
+      varNames.push(phMatch[1]);
+      lastIdx = phMatch.index + phMatch[0].length;
+    }
+    escapedParts.push(v.slice(lastIdx).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const rawPattern = escapedParts.join('');
     try {
       const match = rawText.match(new RegExp(`^${rawPattern}$`));
       if (match) {
         let targetTpl = (loc as any)[k] || v;
         for (let i = 1; i < match.length; i++) {
-          const varNameMatch = Object.keys(PLATFORM_I18N_LOCALES.zh[k as keyof PlatformI18nEntry] || {})[i - 1];
-          if (varNameMatch) {
-            targetTpl = targetTpl.replace(`{${varNameMatch}}`, match[i]);
+          const varName = varNames[i - 1];
+          if (varName) {
+            targetTpl = targetTpl.split(`{${varName}}`).join(match[i]);
           }
         }
         return targetTpl;
@@ -1693,7 +1693,10 @@ export function localizePlatformLog(rawText: string, lang?: string | null): stri
   let text = rawText;
   for (const rule of PLATFORM_TERM_RULES) {
     const targetTpl = rule.translations[currentLang] || rule.translations.en;
-    if (targetTpl && rule.regex.test(text)) {
+    if (!targetTpl) continue;
+    if (rule.regex.global) rule.regex.lastIndex = 0;
+    if (text.search(rule.regex) !== -1) {
+      if (rule.regex.global) rule.regex.lastIndex = 0;
       text = text.replace(rule.regex, targetTpl);
     }
   }

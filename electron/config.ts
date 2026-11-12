@@ -94,11 +94,24 @@ export function isOwnSiteUrl(url: string): boolean {
   const root = getConfiguredRootDomain();
   if (!root) return false;
   try {
-    const host = new URL(url).hostname.toLowerCase();
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+    const host = parsed.hostname.toLowerCase();
     return host === root || host.endsWith('.' + root);
   } catch {
-    return url.toLowerCase().includes(root);
+    return false;
   }
+}
+
+export function getChromiumVersionInfo(): { major: string; full: string; uaChrome: string } {
+  const raw = (typeof process !== 'undefined' && process.versions?.chrome) ? String(process.versions.chrome).trim() : '';
+  const validFull = /^\d+\.\d+\.\d+\.\d+$/.test(raw) ? raw : '130.0.6723.191';
+  const major = validFull.split('.')[0] || '130';
+  return {
+    major,
+    full: validFull,
+    uaChrome: `${major}.0.0.0`,
+  };
 }
 
 export function getAppTagVersion(): string {
@@ -247,18 +260,19 @@ export const APP_CONFIG = {
       loginDetectionUrl: 'https://creator.xiaohongshu.com/',
     },
   },
-  // 根据运行平台动态返回对应 UserAgent（必须与底层 OS 严格匹配，杜绝风控与 OAuth 检测）
+  // 根据运行平台动态返回对应 UserAgent（必须与底层 OS 及内置 Chromium 内核版本严格匹配，杜绝风控与 OAuth 检测）
   userAgent: (() => {
+    const chromeVer = getChromiumVersionInfo().uaChrome;
     const platform = process.platform;
     if (platform === 'darwin') {
       // macOS: 模拟 macOS Chrome
-      return 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+      return `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
     } else if (platform === 'linux') {
       // Linux: 模拟 X11 Linux Chrome
-      return 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+      return `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
     }
     // Windows (win32): 标准 Windows Chrome
-    return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+    return `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
   })(),
   window: {
     width: 1440,

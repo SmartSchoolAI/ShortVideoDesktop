@@ -329,7 +329,7 @@
   <script>
     const { ipcRenderer, shell } = require('electron');
 
-    // 覆盖全量 9 种语言字典
+    // 覆盖全量 14 种核心语言字典
     const I18N = {
       "zh": {
             "titlebar": "ShortVideo 系统说明与关于",
@@ -646,7 +646,7 @@
 
     let curLang = 'zh';
     let currentAppInfo = null;
-    let currentAppTagVersion = 'v0.1.6';
+    let currentAppTagVersion = 'v0.1.19';
     let currentUpdateStatus = 'idle'; // 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'not-available' | 'error'
     let lastUpdateState = null;
 
@@ -795,9 +795,9 @@
           applyLanguage(info.language);
         }
 
-        let ver = info.version || 'v0.1.6';
+        let ver = info.version || 'v0.1.19';
         if (ver.includes(process.versions.electron) || ver === '33.4.11') {
-          ver = 'v0.1.6';
+          ver = 'v0.1.19';
         }
         currentAppTagVersion = ver.startsWith('v') ? ver : `v${ver}`;
         document.getElementById('val-version').textContent = currentAppTagVersion;

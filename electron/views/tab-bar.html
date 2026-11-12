@@ -940,7 +940,7 @@
         <span id="btn-app-update-text">🚀 发现新版本</span>
       </button>
 
-      <!-- 多语言切换选择器 (覆盖全量 9 种语言) -->
+      <!-- 多语言切换选择器 (覆盖全量 14 种核心语言) -->
       <button class="badge-btn badge-btn-lang" id="btn-language-selector" title="切换应用与主站语言 / Switch Language">
         <span class="lang-icon">🌐</span>
         <span id="btn-current-lang-text">中文</span>
@@ -1981,12 +1981,20 @@
 
         item.title = tabTitle;
 
-        const closeTitle = config.closeTab || '关闭标签';
-        const closeHtml = tab.closable ? `<span class="tab-close" data-close-id="${tab.id}" title="${closeTitle}">✕</span>` : '';
+        const escapeHtml = (str) => String(str ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+        const safeTabId = escapeHtml(tab.id);
+        const safeTabTitle = escapeHtml(tabTitle);
+        const closeTitle = escapeHtml(config.closeTab || '关闭标签');
+        const closeHtml = tab.closable ? `<span class="tab-close" data-close-id="${safeTabId}" title="${closeTitle}">✕</span>` : '';
 
         item.innerHTML = `
           <div class="tab-icon">${iconHtml}</div>
-          <span class="tab-title">${tabTitle}</span>
+          <span class="tab-title">${safeTabTitle}</span>
           ${closeHtml}
         `;
 
@@ -2005,7 +2013,7 @@
       updatePipelineForActiveTab();
     }
 
-    // 覆盖全量 9 种语言的操作指引字典与界面文案
+    // 覆盖全量 14 种核心语言的操作指引字典与界面文案
     // I18N_CONFIG moved to top of script
 
     function setLanguage(lang) {
@@ -2201,10 +2209,16 @@
         const item = document.createElement('div');
         item.className = `step-item ${stepStatus}`;
 
+        const escapeHtmlStep = (str) => String(str ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
         item.innerHTML = `
           <div class="step-node">
-            <span class="step-badge">${badgeContent}</span>
-            <span class="step-label">${name}</span>
+            <span class="step-badge">${escapeHtmlStep(badgeContent)}</span>
+            <span class="step-label">${escapeHtmlStep(name)}</span>
           </div>
           ${i < steps.length - 1 ? `<div class="step-line ${i < curIdx ? 'done' : ''}"></div>` : ''}
         `;

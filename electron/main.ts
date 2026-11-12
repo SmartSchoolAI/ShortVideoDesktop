@@ -10,7 +10,7 @@ import { XiaohongshuPlatform } from './platforms/xiaohongshu';
 import { PublishPayload } from './platforms/base-platform';
 import { localizePlatformLog } from './platforms/platform-i18n';
 import { injectPlatformToast } from './utils/toast-helper';
-import { APP_CONFIG } from './config';
+import { APP_CONFIG, isOwnSiteUrl } from './config';
 import { localScheduler } from './services/scheduler';
 import { sessionKeeper } from './services/session-keeper';
 import { setupConsoleLogger, systemLogger } from './utils/logger';
@@ -198,7 +198,6 @@ function setupApplicationMenu(): void {
 }
 
 // 实例化各平台驱动
-// 实例化各平台驱动
 const platforms = {
   wechat: new WechatChannelsPlatform(),
   xiaohongshu: new XiaohongshuPlatform(),
@@ -360,8 +359,78 @@ async function executePlatformPublishCore(
  * 注册 IPC 接口通信处理器
  */
 function registerIpcHandlers(): void {
+  const ALLOWED_LOCAL_MEDIA_EXTS = new Set([
+    '.mp4', '.webm', '.ogg', '.m4v', '.mov', '.mkv',
+    '.mp3', '.wav', '.m4a', '.aac', '.flac', '.log', '.txt',
+  ]);
+
+  const BUILTIN_VIEW_NAMES = new Set([
+    'loading-screen.html',
+    'log-viewer.html',
+    'render-viewer.html',
+    'system-info.html',
+    'tab-bar.html',
+    'video-player.html',
+  ]);
+
+  const isTrustedIpcSender = (event: Electron.IpcMainInvokeEvent): boolean => {
+    try {
+      const senderUrl = event?.senderFrame?.url || event?.sender?.getURL?.() || '';
+      if (!senderUrl) return false;
+      if (senderUrl.startsWith('file://')) {
+        const parsed = new URL(senderUrl);
+        let decodedPath = decodeURIComponent(parsed.pathname || '');
+        if (/^\/[A-Za-z]:/.test(decodedPath)) decodedPath = decodedPath.slice(1);
+        const normPath = path.resolve(decodedPath);
+        const baseName = path.basename(normPath);
+        const parentName = path.basename(path.dirname(normPath)).toLowerCase();
+        return parentName === 'views' && BUILTIN_VIEW_NAMES.has(baseName);
+      }
+      return isOwnSiteUrl(senderUrl);
+    } catch {
+      return false;
+    }
+  };
+
+  const resolveAllowedLocalMediaPath = (
+    filePath: string
+  ): { ok: true; cleanPath: string } | { ok: false; message: string } => {
+    if (!filePath || typeof filePath !== 'string') {
+      return { ok: false, message: 'Path is required' };
+    }
+    let raw = String(filePath).trim().replace(/^["']|["']$/g, '');
+    if (/[\x00-\x1F\x7F]/.test(raw)) {
+      return { ok: false, message: 'Invalid path characters' };
+    }
+    if (/^file:/i.test(raw)) {
+      try {
+        raw = decodeURIComponent(raw.replace(/^file:\/\/\/?/i, ''));
+      } catch {
+        raw = raw.replace(/^file:\/\/\/?/i, '');
+      }
+    }
+    if (raw.startsWith('\\\\') || raw.startsWith('//')) {
+      return { ok: false, message: 'UNC network paths are not permitted' };
+    }
+    const cleanPath = path.resolve(path.normalize(raw));
+    const ext = path.extname(cleanPath).toLowerCase();
+    if (!ALLOWED_LOCAL_MEDIA_EXTS.has(ext)) {
+      return { ok: false, message: `Unsupported file type: ${ext || '(none)'}` };
+    }
+    if (!fs.existsSync(cleanPath) || !fs.statSync(cleanPath).isFile()) {
+      return { ok: false, message: `File does not exist: ${cleanPath}` };
+    }
+    return { ok: true, cleanPath };
+  };
+
   // 1. 在当前窗口打开平台 Tab 标签页
-  ipcMain.handle('platform:open-window', async (_event, platform: 'wechat' | 'xiaohongshu') => {
+  ipcMain.handle('platform:open-window', async (event, platform: 'wechat' | 'xiaohongshu') => {
+    if (!isTrustedIpcSender(event)) {
+      return { success: false, error: 'Untrusted IPC sender' };
+    }
+    if (platform !== 'wechat' && platform !== 'xiaohongshu') {
+      return { success: false, error: 'Unsupported platform' };
+    }
     try {
       windowManager.openPlatformTab(platform);
       return { success: true };
@@ -374,7 +443,16 @@ function registerIpcHandlers(): void {
   // 2. 自动化发布短视频与文案
   ipcMain.handle(
     'platform:publish',
-    async (_event, { platform, payload }: { platform: 'wechat' | 'xiaohongshu'; payload: PublishPayload }) => {
+    async (event, { platform, payload }: { platform: 'wechat' | 'xiaohongshu'; payload: PublishPayload }) => {
+      if (!isTrustedIpcSender(event)) {
+        return { success: false, platform, message: 'Untrusted IPC sender' };
+      }
+      if (platform !== 'wechat' && platform !== 'xiaohongshu') {
+        return { success: false, platform, message: 'Unsupported platform' };
+      }
+      if (!payload || typeof payload !== 'object') {
+        return { success: false, platform, message: 'Invalid publish payload' };
+      }
       console.log(`[IPC platform:publish] 收到 ${platform} 自动化发布指令:`, {
         title: payload?.title,
         videoUrl: payload?.videoUrl,
@@ -387,7 +465,13 @@ function registerIpcHandlers(): void {
   );
 
   // 3. 接收直接传入的整体页面平滑刷新指令
-  ipcMain.handle('platform:reload', async (_event, { platform, force }: { platform: 'wechat' | 'xiaohongshu'; force?: boolean }) => {
+  ipcMain.handle('platform:reload', async (event, { platform, force }: { platform: 'wechat' | 'xiaohongshu'; force?: boolean }) => {
+    if (!isTrustedIpcSender(event)) {
+      return { success: false, error: 'Untrusted IPC sender' };
+    }
+    if (platform !== 'wechat' && platform !== 'xiaohongshu') {
+      return { success: false, error: 'Unsupported platform' };
+    }
     try {
       const ok = sessionKeeper.reloadPlatform(platform, force);
       return { success: ok };
@@ -398,21 +482,39 @@ function registerIpcHandlers(): void {
   });
 
   // 4. 定时发布调度器 (Scheduler) 管理
-  ipcMain.handle('scheduler:add-tasks', (_event, tasks: any[]) => {
+  ipcMain.handle('scheduler:add-tasks', (event, tasks: any[]) => {
+    if (!isTrustedIpcSender(event)) {
+      return { success: false, error: 'Untrusted IPC sender' };
+    }
+    if (!Array.isArray(tasks)) {
+      return { success: false, error: 'Invalid tasks payload' };
+    }
     return localScheduler.addTasks(tasks);
   });
-  ipcMain.handle('scheduler:get-tasks', () => {
+  ipcMain.handle('scheduler:get-tasks', (event) => {
+    if (!isTrustedIpcSender(event)) {
+      return [];
+    }
     return localScheduler.getAllTasks();
   });
-  ipcMain.handle('scheduler:cancel-task', (_event, id: string) => {
-    return localScheduler.cancelTask(id);
+  ipcMain.handle('scheduler:cancel-task', (event, id: string) => {
+    if (!isTrustedIpcSender(event) || typeof id !== 'string' || !id.trim()) {
+      return false;
+    }
+    return localScheduler.cancelTask(id.trim());
   });
-  ipcMain.handle('scheduler:retry-failed', () => {
+  ipcMain.handle('scheduler:retry-failed', (event) => {
+    if (!isTrustedIpcSender(event)) {
+      return 0;
+    }
     return localScheduler.retryFailedTasks();
   });
 
   // 5. 获取应用信息
-  ipcMain.handle('app:get-info', () => {
+  ipcMain.handle('app:get-info', (event) => {
+    if (!isTrustedIpcSender(event)) {
+      return null;
+    }
     return {
       name: APP_CONFIG.appName,
       version: APP_CONFIG.version,
@@ -425,41 +527,105 @@ function registerIpcHandlers(): void {
   });
 
   // 6. 打开或切换到系统运行日志 Tab 标签页
-  ipcMain.handle('app:open-logs', () => {
+  ipcMain.handle('app:open-logs', (event) => {
+    if (!isTrustedIpcSender(event)) {
+      return { success: false, message: 'Untrusted IPC sender' };
+    }
     windowManager.openLogsTab();
     return { success: true };
   });
 
   // 7. 打开外部独立视频/网页弹窗（如 YouTube 视频播放页或远程 MP4 直链）
-  ipcMain.handle('app:open-external-url', (_event, url: string) => {
-    if (!url) return { success: false };
-    windowManager.openExternalVideoWindow(url);
-    return { success: true };
+  ipcMain.handle('app:open-external-url', (event, url: string) => {
+    if (!isTrustedIpcSender(event)) {
+      return { success: false, message: 'Untrusted IPC sender' };
+    }
+    if (!url || typeof url !== 'string') return { success: false, message: 'URL is required' };
+    try {
+      const parsed = new URL(url.trim());
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return { success: false, message: 'Only HTTP/HTTPS URLs are allowed' };
+      }
+      const win = windowManager.openExternalVideoWindow(parsed.toString());
+      return { success: Boolean(win) };
+    } catch {
+      return { success: false, message: 'Invalid URL' };
+    }
   });
 
   // 8. 打开本地视频/音频文件（优先使用内置独立弹窗秒开播放，支持一键切换系统播放器与自动降级保障）
-  ipcMain.handle('app:open-local-file', async (_event, filePath: string) => {
-    if (!filePath) return { success: false, message: 'Path is required' };
-    try {
-      let cleanPath = String(filePath).trim().replace(/^["']|["']$/g, '');
-      cleanPath = cleanPath.replace(/^file:\/\/\/?/i, '');
-      cleanPath = path.normalize(cleanPath);
-      if (!fs.existsSync(cleanPath)) {
-        console.warn('[WindowManager] 本地媒体文件不存在:', cleanPath);
-        return { success: false, message: `File does not exist: ${cleanPath}` };
+  ipcMain.handle('app:open-local-file', async (event, filePath: string) => {
+    if (!isTrustedIpcSender(event)) {
+      return { success: false, message: 'Untrusted IPC sender' };
+    }
+    const checked = resolveAllowedLocalMediaPath(filePath);
+    if (!checked.ok) {
+      if (checked.message.startsWith('File does not exist:')) {
+        console.warn('[WindowManager] 本地媒体文件不存在:', filePath);
       }
-      // 优先在内置原生独立弹窗播放器中播放
-      windowManager.openExternalVideoWindow(cleanPath);
+      return { success: false, message: checked.message };
+    }
+    const cleanPath = checked.cleanPath;
+    try {
+      const win = windowManager.openExternalVideoWindow(cleanPath);
+      if (!win) {
+        return { success: false, message: 'Unable to open internal player window' };
+      }
       return { success: true };
     } catch (err: any) {
       console.warn('[WindowManager] 内置弹窗播放异常，降级调起系统默认播放器:', err);
       try {
-        await shell.openPath(filePath);
+        await shell.openPath(cleanPath);
         return { success: true };
       } catch (fallbackErr: any) {
         return { success: false, message: fallbackErr?.message || String(fallbackErr) };
       }
     }
+  });
+
+  // 9. 调用系统默认播放器打开视频文件或安全远程媒体链接
+  ipcMain.handle('app:open-system-player', async (event, target: string) => {
+    if (!isTrustedIpcSender(event)) {
+      return { success: false, message: 'Untrusted IPC sender' };
+    }
+    if (!target || typeof target !== 'string') {
+      return { success: false, message: 'Target is required' };
+    }
+    const trimmed = target.trim();
+    if (/^https?:\/\//i.test(trimmed)) {
+      try {
+        const parsed = new URL(trimmed);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          return { success: false, message: 'Only HTTP/HTTPS URLs are allowed' };
+        }
+        await shell.openExternal(parsed.toString());
+        return { success: true };
+      } catch {
+        return { success: false, message: 'Invalid URL' };
+      }
+    }
+    const checked = resolveAllowedLocalMediaPath(trimmed);
+    if (!checked.ok) {
+      return { success: false, message: checked.message };
+    }
+    const openErr = await shell.openPath(checked.cleanPath);
+    if (openErr) {
+      return { success: false, message: openErr };
+    }
+    return { success: true };
+  });
+
+  // 10. 在系统文件管理器中定位白名单媒体/日志文件
+  ipcMain.handle('app:show-in-folder', (event, filePath: string) => {
+    if (!isTrustedIpcSender(event)) {
+      return { success: false, message: 'Untrusted IPC sender' };
+    }
+    const checked = resolveAllowedLocalMediaPath(filePath);
+    if (!checked.ok) {
+      return { success: false, message: checked.message };
+    }
+    shell.showItemInFolder(checked.cleanPath);
+    return { success: true };
   });
 }
 
@@ -505,12 +671,6 @@ if (!gotTheLock) {
       'google.com',
       'gstatic.com',
       'googleusercontent.com',
-    ];
-    const GOOGLE_OAUTH_PREFIXES = [
-      'https://accounts.google.com',
-      'https://myaccount.google.com',
-      'https://oauth2.googleapis.com',
-      'https://signin.google.com',
     ];
     app.on('web-contents-created', (_event, contents) => {
       try {
@@ -611,6 +771,12 @@ if (!gotTheLock) {
     } catch { }
     oauthBridge.destroy();
     await cdpBridge.disconnect();
+  });
+
+  process.on('exit', () => {
+    try {
+      renderManager.stopRender();
+    } catch { }
   });
 
   app.on('window-all-closed', () => {

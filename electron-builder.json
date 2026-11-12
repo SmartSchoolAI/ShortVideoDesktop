@@ -28,6 +28,9 @@
     "!**/.env.*.local",
     "!**/.env.production",
     "!**/.env.development",
+    "!**/.env.test",
+    "!**/.env.staging",
+    "!**/.env.preview",
     "!**/*.pem",
     "!**/*.key"
   ],

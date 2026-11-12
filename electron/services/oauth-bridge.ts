@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { app, net } from 'electron';
-import { APP_CONFIG } from '../config';
+import { APP_CONFIG, isOwnSiteUrl } from '../config';
 
 export interface OAuthTokenPayload {
   token: string;
@@ -120,7 +120,7 @@ class OAuthBridgeService {
       }
 
       try {
-        const siteUrl = APP_CONFIG.siteUrl || APP_CONFIG.productionUrl || 'https://app.shortvideo.ca';
+        const siteUrl = (APP_CONFIG.siteUrl || APP_CONFIG.productionUrl || '').replace(/\/+$/, '');
         const exchangeEndpoint = `${siteUrl}/api/desktop/exchange`;
 
         const res = await net.fetch(exchangeEndpoint, {
@@ -251,9 +251,20 @@ class OAuthBridgeService {
   }
 
   /**
-   * 渲染统一的高品质认证结果静态 HTML（多语言跟随浏览器语言动态显示，支持 9 种核心语言）
+   * 渲染统一的高品质认证结果静态 HTML（多语言跟随浏览器语言动态显示，支持 14 种核心语言）
    */
+  private escapeHtmlText(str?: string): string {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   private renderAuthResultHtml(success: boolean, fallbackTitle?: string, fallbackDesc?: string): string {
+    const safeTitle = this.escapeHtmlText(fallbackTitle);
+    const safeDescHtml = this.escapeHtmlText(fallbackDesc).replace(/\n/g, '<br>');
     const icon = success ? '🎉' : '⚠️';
     const accentColor = success ? '#10b981' : '#ef4444';
     const badgeBg = success ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)';
@@ -366,8 +377,8 @@ class OAuthBridgeService {
 <body>
   <div class="card">
     <div class="icon">${icon}</div>
-    <h1 id="title">${fallbackTitle || (success ? '登录成功' : '授权未完成')}</h1>
-    <p id="desc">${fallbackDesc || (success ? '登录凭证已自动同步至 ShortVideo 桌面客户端！您可以安全关闭当前浏览器窗口。' : '授权未完成，请返回客户端重新尝试。')}</p>
+    <h1 id="title">${safeTitle || (success ? '登录成功' : '授权未完成')}</h1>
+    <p id="desc">${safeDescHtml || (success ? '登录凭证已自动同步至 ShortVideo 桌面客户端！您可以安全关闭当前浏览器窗口。' : '授权未完成，请返回客户端重新尝试。')}</p>
     <div class="badge" id="badge">${success ? '✓ 客户端已就绪 / Client Ready' : '✗ 授权未完成 / Incomplete'}</div>
     ${success ? `
     <div>
@@ -381,7 +392,7 @@ class OAuthBridgeService {
   <script>
     (function() {
       var isSuccess = ${success ? 'true' : 'false'};
-      var customDesc = ${fallbackDesc ? JSON.stringify(fallbackDesc) : 'null'};
+      var customDesc = ${fallbackDesc ? JSON.stringify(fallbackDesc).replace(/</g, '\\u003c') : 'null'};
 
       var I18N = {
         zh: {
@@ -444,16 +455,7 @@ class OAuthBridgeService {
           fail_badge: '✗ ไม่เสร็จสมบูรณ์',
           fail_tip: 'คุณสามารถปิดหน้าต่างนี้และลองใหม่ในแอป'
         },
-        bn: {
-          success_title: 'লগইন সফল হয়েছে',
-          success_desc: 'লগইন তথ্য স্বয়ংক্রিয়ভাবে ShortVideo ডেস্কটপ ক্লায়েন্টে সিঙ্ক হয়েছে! আপনি নিরাপদে এই উইন্ডো বন্ধ করতে পারেন।',
-          success_badge: '✓ ক্লায়েন্ট প্রস্তুত',
-          success_tip: 'শংসাপত্র সফলভাবে যোগ করা হয়েছে। এই ট্যাবটি স্বয়ংক্রিয়ভাবে বন্ধ না হলে ম্যানুয়ালি বন্ধ করুন।',
-          fail_title: 'অনুমোদন অসম্পূর্ণ',
-          fail_desc: 'তৃতীয় পক্ষের অনুমোদন ব্যর্থ হয়েছে বা বাতিল হয়েছে। ক্লায়েন্টে ফিরে আবার চেষ্টা করুন।',
-          fail_badge: '✗ অসম্পূর্ণ',
-          fail_tip: 'আপনি এই উইন্ডো বন্ধ করে ক্লায়েন্টে পুনরায় চেষ্টা করতে পারেন।'
-        },
+
         id: {
           success_title: 'Login Berhasil',
           success_desc: 'Kredensial login telah disinkronkan secara otomatis ke ShortVideo Desktop! Anda dapat menutup jendela ini dengan aman.',
@@ -631,14 +633,29 @@ class OAuthBridgeService {
         if (badgeEl) badgeEl.textContent = dict.fail_badge;
         if (tipEl) tipEl.textContent = dict.fail_tip;
         document.title = 'ShortVideo - ' + dict.fail_title;
-        if (langCode === 'ur') {
-          document.documentElement.dir = 'rtl';
-        }
+
       }
     })();
   </script>
 </body>
 </html>`;
+  }
+
+  private isAllowedBridgeOrigin(originHeader?: string): boolean {
+    if (!originHeader || typeof originHeader !== 'string') return false;
+    if (isOwnSiteUrl(originHeader)) return true;
+    try {
+      const parsed = new URL(originHeader);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+      const host = parsed.hostname.toLowerCase();
+      return host === '127.0.0.1' || host === 'localhost' || host === '[::1]';
+    } catch {
+      return false;
+    }
+  }
+
+  private isJwtFormat(token: string): boolean {
+    return typeof token === 'string' && /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token.trim());
   }
 
   /**
@@ -648,23 +665,24 @@ class OAuthBridgeService {
     if (this.isListening || this.server) return;
 
     this.server = http.createServer(async (req, res) => {
-      const origin = req.headers.origin || '*';
-      res.setHeader('Access-Control-Allow-Origin', origin);
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', '*');
-      res.setHeader('Access-Control-Allow-Private-Network', 'true');
-      res.setHeader('Access-Control-Max-Age', '86400');
-      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      const reqOrigin = typeof req.headers.origin === 'string' ? req.headers.origin.trim() : '';
+      const originAllowed = reqOrigin ? this.isAllowedBridgeOrigin(reqOrigin) : true;
+      if (reqOrigin && originAllowed) {
+        res.setHeader('Access-Control-Allow-Origin', reqOrigin);
+        res.setHeader('Vary', 'Origin');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        res.setHeader('Access-Control-Allow-Private-Network', 'true');
+        res.setHeader('Access-Control-Max-Age', '86400');
+      }
 
       if (req.method === 'OPTIONS') {
-        res.writeHead(204, {
-          'Access-Control-Allow-Origin': origin,
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': '*',
-          'Access-Control-Allow-Private-Network': 'true',
-          'Access-Control-Max-Age': '86400',
-          'Cross-Origin-Resource-Policy': 'cross-origin',
-        });
+        if (!originAllowed) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Forbidden origin' }));
+          return;
+        }
+        res.writeHead(204);
         res.end();
         return;
       }
@@ -686,7 +704,7 @@ class OAuthBridgeService {
           const errorHtml = this.renderAuthResultHtml(
             false,
             '授权未完成',
-            `第三方平台返回错误: ${error}。<br>请返回 ShortVideo 客户端重新点击登录。`
+            `第三方平台返回错误: ${error}。\n请返回 ShortVideo 客户端重新点击登录。`
           );
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           res.end(errorHtml);
@@ -695,13 +713,15 @@ class OAuthBridgeService {
 
         // 2. 原生方案一核心：直接捕获 Google 等授权中心返回的 authorization_code
         if (code) {
-          // 安全校验：校验 state 参数防止 CSRF 攻击或仿冒请求
-          if (state && !this.isValidState(state)) {
-            console.warn('[OAuthBridge] State 校验不匹配，已拒绝非法的授权回调请求:', state);
+          // 安全校验：当本地曾注册过预期 state 或存在待完成 PKCE 流程时，必须严格匹配 state 参数防止 CSRF 攻击
+          this.cleanExpiredStates();
+          const hasPendingSession = this.pendingStates.size > 0 || Boolean(this.loadPendingAuth());
+          if (hasPendingSession && (!state || !this.isValidState(state))) {
+            console.warn('[OAuthBridge] State 校验不匹配或缺失，已拒绝非法的授权回调请求:', state);
             const csrfHtml = this.renderAuthResultHtml(
               false,
               '安全校验失败',
-              '授权状态 (State) 校验不匹配或已过期。<br>请返回 ShortVideo 客户端重新点击登录。'
+              '授权状态 (State) 校验不匹配或已过期。\n请返回 ShortVideo 客户端重新点击登录。'
             );
             res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8' });
             res.end(csrfHtml);
@@ -711,7 +731,7 @@ class OAuthBridgeService {
           this.resetIdleTimer();
           console.log('[OAuthBridge] ⚡ 本地 Loopback HTTP 成功捕获到授权码 (code)，开始请求后端换取 Token...');
           try {
-            const siteUrl = APP_CONFIG.siteUrl || APP_CONFIG.productionUrl || 'https://app.shortvideo.ca';
+            const siteUrl = (APP_CONFIG.siteUrl || APP_CONFIG.productionUrl || '').replace(/\/+$/, '');
             const exchangeEndpoint = `${siteUrl}/api/auth/oauth-callback`;
             const redirectUri = `http://127.0.0.1:${this.port}/callback`;
 
@@ -739,6 +759,7 @@ class OAuthBridgeService {
               console.log('[OAuthBridge] 🎉 授权码兑换成功！开始同步至桌面客户端主窗口...');
               this.stopPolling();
               this.clearPendingAuth();
+              if (state) this.pendingStates.delete(state);
               if (this.onTokenReceived) {
                 Promise.resolve(this.onTokenReceived({ token: responseData.token, user: responseData.user })).catch(() => {});
               }
@@ -746,7 +767,7 @@ class OAuthBridgeService {
               const successHtml = this.renderAuthResultHtml(
                 true,
                 '登录成功',
-                '登录凭证已自动同步至 ShortVideo 桌面客户端！<br>您可以安全关闭当前浏览器窗口。'
+                '登录凭证已自动同步至 ShortVideo 桌面客户端！\n您可以安全关闭当前浏览器窗口。'
               );
               res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
               res.end(successHtml);
@@ -761,7 +782,7 @@ class OAuthBridgeService {
             const failHtml = this.renderAuthResultHtml(
               false,
               '换取凭证失败',
-              `认证响应: ${errorDetail}。<br>请关闭后返回客户端重新登录。`
+              `认证响应: ${errorDetail}。\n请关闭后返回客户端重新登录。`
             );
             res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
             res.end(failHtml);
@@ -781,6 +802,30 @@ class OAuthBridgeService {
 
         // 3. 兼容通道：直接传入已兑换好的 token（如来自线上 callback 页面跳转）
         if (token) {
+          this.cleanExpiredStates();
+          const pending = this.loadPendingAuth();
+          const stateOk = Boolean(
+            (state && this.isValidState(state)) ||
+            (state && pending && pending.state === state)
+          );
+          if (!stateOk && (this.pendingStates.size > 0 || !pending)) {
+            console.warn('[OAuthBridge] Token 直传回调缺少有效 State/PendingAuth，拒绝跨站会话注入');
+            const csrfHtml = this.renderAuthResultHtml(
+              false,
+              '安全校验失败',
+              '登录状态已失效或缺少合法授权校验，请返回客户端重新发起登录。'
+            );
+            res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8' });
+            res.end(csrfHtml);
+            return;
+          }
+          if (!this.isJwtFormat(token)) {
+            const invalidHtml = this.renderAuthResultHtml(false, '凭证格式无效', '回调返回的认证凭证格式异常，请重新登录。');
+            res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
+            res.end(invalidHtml);
+            return;
+          }
+
           let user: any = undefined;
           if (userRaw) {
             try {
@@ -793,14 +838,15 @@ class OAuthBridgeService {
           console.log('[OAuthBridge] ✅ Loopback HTTP 成功接收到浏览器回传的 Token 凭证！');
           this.stopPolling();
           this.clearPendingAuth();
+          if (state) this.pendingStates.delete(state);
           if (this.onTokenReceived) {
-            Promise.resolve(this.onTokenReceived({ token, user })).catch(() => {});
+            Promise.resolve(this.onTokenReceived({ token: token.trim(), user })).catch(() => {});
           }
 
           const successHtml = this.renderAuthResultHtml(
             true,
             '登录成功',
-            '登录凭证已自动同步至 ShortVideo 桌面客户端！<br>您可以安全关闭当前浏览器窗口。'
+            '登录凭证已自动同步至 ShortVideo 桌面客户端！\n您可以安全关闭当前浏览器窗口。'
           );
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           res.end(successHtml);
@@ -820,8 +866,14 @@ class OAuthBridgeService {
         return;
       }
 
-      // ── 兼容通道：POST 接口接收外部直传 Token ──
+      // ── 兼容通道：POST 接口接收外部直传 Token（仅限自家站点/回环来源或携带匹配 pending state）──
       if (req.method === 'POST' && (pathname === '/oauth-token' || pathname === '/oauth-sync' || pathname.startsWith('/oauth'))) {
+        if (!originAllowed) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Forbidden origin' }));
+          return;
+        }
+
         let body = '';
         req.on('data', (chunk) => {
           body += chunk;
@@ -833,13 +885,28 @@ class OAuthBridgeService {
         req.on('end', async () => {
           try {
             const data = JSON.parse(body);
-            if (data && data.token) {
-              console.log('[OAuthBridge] 本地 HTTP 接口成功接收到外部广播的 Token');
+            const dataState = typeof data?.state === 'string' ? data.state.trim() : '';
+            const pending = this.loadPendingAuth();
+            const isOriginOwnSite = Boolean(reqOrigin && isOwnSiteUrl(reqOrigin));
+            const hasValidPendingState = Boolean(
+              (dataState && (this.isValidState(dataState) || (pending && pending.state === dataState))) ||
+              (!reqOrigin && (pending || this.pendingStates.size > 0))
+            );
+
+            if (!isOriginOwnSite && !hasValidPendingState) {
+              res.writeHead(403, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: false, error: 'Missing valid origin or pending auth state' }));
+              return;
+            }
+
+            if (data && this.isJwtFormat(data.token)) {
+              console.log('[OAuthBridge] 本地 HTTP 接口成功接收到授权来源同步的 Token');
               this.stopPolling();
               this.clearPendingAuth();
+              if (dataState) this.pendingStates.delete(dataState);
               if (this.onTokenReceived) {
                 await this.onTokenReceived({
-                  token: data.token,
+                  token: data.token.trim(),
                   user: data.user,
                 });
               }

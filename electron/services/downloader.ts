@@ -136,6 +136,14 @@ export function findExistingLocalVideo(inputPathOrUrl: string): string | null {
 /**
  * 执行单次 HTTP/HTTPS 视频文件流下载
  */
+function safeUnlink(filePath: string): void {
+  try {
+    if (filePath && fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  } catch { }
+}
+
 function downloadFileStream(
   url: string,
   targetPath: string,
@@ -147,22 +155,44 @@ function downloadFileStream(
       return reject(new Error('下载视频重定向次数过多，已终止'));
     }
 
-    const fileStream = fs.createWriteStream(targetPath);
-    const client = url.startsWith('https://') ? https : http;
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+      if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+        return reject(new Error(`不支持的视频下载协议: ${parsedUrl.protocol}`));
+      }
+    } catch {
+      return reject(new Error(`无效的视频下载 URL: ${url}`));
+    }
 
-    const req = client.get(url, (res) => {
+    const fileStream = fs.createWriteStream(targetPath);
+    const client = parsedUrl.protocol === 'https:' ? https : http;
+
+    const req = client.get(parsedUrl.toString(), (res) => {
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.resume();
         fileStream.close();
-        if (fs.existsSync(targetPath)) fs.unlinkSync(targetPath);
-        downloadFileStream(res.headers.location, targetPath, onProgress, redirectCount + 1)
+        safeUnlink(targetPath);
+        let nextUrl: string;
+        try {
+          const resolved = new URL(res.headers.location, parsedUrl);
+          if (resolved.protocol !== 'http:' && resolved.protocol !== 'https:') {
+            return reject(new Error(`非法重定向协议: ${resolved.protocol}`));
+          }
+          nextUrl = resolved.toString();
+        } catch {
+          return reject(new Error(`无效的重定向地址: ${res.headers.location}`));
+        }
+        downloadFileStream(nextUrl, targetPath, onProgress, redirectCount + 1)
           .then(resolve)
           .catch(reject);
         return;
       }
 
       if (res.statusCode !== 200) {
+        res.resume();
         fileStream.close();
-        if (fs.existsSync(targetPath)) fs.unlinkSync(targetPath);
+        safeUnlink(targetPath);
         reject(new Error(`下载视频失败，HTTP 状态码: ${res.statusCode} (${url})`));
         return;
       }
@@ -184,27 +214,28 @@ function downloadFileStream(
       res.pipe(fileStream);
 
       fileStream.on('finish', () => {
-        fileStream.close();
-        if (!isValidVideoFile(targetPath)) {
-          if (fs.existsSync(targetPath)) fs.unlinkSync(targetPath);
-          reject(new Error('下载的文件非有效视频流（可能是远程返回了404错误网页）'));
-          return;
-        }
-        onProgress?.(downloadedBytes, totalBytes || downloadedBytes, '100%');
-        resolve(targetPath);
+        fileStream.close(() => {
+          if (!isValidVideoFile(targetPath)) {
+            safeUnlink(targetPath);
+            reject(new Error('下载的文件非有效视频流（可能是远程返回了404错误网页）'));
+            return;
+          }
+          onProgress?.(downloadedBytes, totalBytes || downloadedBytes, '100%');
+          resolve(targetPath);
+        });
       });
     });
 
     req.on('error', (err) => {
       fileStream.close();
-      if (fs.existsSync(targetPath)) fs.unlinkSync(targetPath);
+      safeUnlink(targetPath);
       reject(err);
     });
 
     req.setTimeout(90000, () => {
       req.destroy();
       fileStream.close();
-      if (fs.existsSync(targetPath)) fs.unlinkSync(targetPath);
+      safeUnlink(targetPath);
       reject(new Error('下载视频文件超时 (90s)'));
     });
   });
@@ -276,22 +307,26 @@ export async function ensureLocalVideoFile(
       const ext = path.extname(cleanPath) || '.mp4';
       const baseName = path.basename(cleanPath, ext);
       const rawBase = baseName.replace(/_[a-z]{2,5}$/i, '');
+      const fullSuffix = `${baseName}${ext}`;
+      const pathPrefix = cleanPath.endsWith(fullSuffix)
+        ? cleanPath.slice(0, cleanPath.length - fullSuffix.length)
+        : cleanPath.slice(0, Math.max(0, cleanPath.lastIndexOf('/') + 1));
 
       // 若原 URL 带有语言后缀（如 flat-studio_en.mp4），将去除后缀的无后缀根文件加入备选
       if (/_[a-z]{2,5}$/i.test(baseName)) {
-        const rootPath = cleanPath.replace(new RegExp(`${baseName}\\${ext}$`), `${rawBase}${ext}`);
+        const rootPath = `${pathPrefix}${rawBase}${ext}`;
         const rootUrl = `${urlObj.origin}${rootPath}${urlObj.search}`;
         if (!candidateUrls.includes(rootUrl)) {
           candidateUrls.push(rootUrl);
         }
       } else {
         // 若原 URL 不带语言后缀，优先追加 _zh 与 _en 备选项（针对多语言双版本视频架构）
-        const zhPath = cleanPath.replace(new RegExp(`${baseName}\\${ext}$`), `${baseName}_zh${ext}`);
+        const zhPath = `${pathPrefix}${baseName}_zh${ext}`;
         const zhUrl = `${urlObj.origin}${zhPath}${urlObj.search}`;
         if (!candidateUrls.includes(zhUrl)) {
           candidateUrls.push(zhUrl);
         }
-        const enPath = cleanPath.replace(new RegExp(`${baseName}\\${ext}$`), `${baseName}_en${ext}`);
+        const enPath = `${pathPrefix}${baseName}_en${ext}`;
         const enUrl = `${urlObj.origin}${enPath}${urlObj.search}`;
         if (!candidateUrls.includes(enUrl)) {
           candidateUrls.push(enUrl);

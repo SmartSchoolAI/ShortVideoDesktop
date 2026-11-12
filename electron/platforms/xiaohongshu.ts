@@ -2491,7 +2491,7 @@ export class XiaohongshuPlatform extends BasePlatform {
         if (err instanceof PublishAbortedError || err?.isAborted || signal.aborted || adapter.isClosed() || tracer.isAborted()) {
           throw err;
         }
-        await tracer.track(`Publish action error: ${err.message}`, err.stack, 'warn');
+        await tracer.track(this.t('publishActionError', activeLang, { error: err.message }), err.stack, 'warn');
         return {
           success: false,
           platform: 'xiaohongshu',
@@ -2504,11 +2504,11 @@ export class XiaohongshuPlatform extends BasePlatform {
       throw new PublishAbortedError(this.t('tabClosed', activeLang, { platform: this.getDisplayName(activeLang) }));
     }
 
-    await tracer.track('⚠️ Form filled, awaiting manual publish click', null, 'warn');
+    await tracer.track(this.t('formFilledAwaitingManualClick', activeLang), null, 'warn');
     return {
       success: false,
       platform: 'xiaohongshu',
-      message: 'Form filled, awaiting manual confirmation',
+      message: this.t('formFilledAwaitingManualConfirm', activeLang),
     };
     } catch (err: any) {
       if (err?.isAborted || err?.name === 'PublishAbortedError' || signal.aborted || adapter.isClosed()) {
