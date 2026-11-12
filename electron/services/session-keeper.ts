@@ -1,7 +1,5 @@
 import { WebContents } from 'electron';
 import { windowManager } from './window-manager';
-import { getLocale } from '../utils/i18n';
-import { localizePlatformLog } from '../platforms/platform-i18n';
 
 export interface KeepAliveOptions {
   reloadIntervalMs?: number;
@@ -99,24 +97,16 @@ export class PlatformSessionKeeper {
       return false;
     }
 
-    const lang = windowManager.getCurrentLanguage();
-    const loc = getLocale(lang);
-    const platformName =
-      platformId === 'wechat'
-        ? loc.platforms.wechat
-        : platformId === 'xiaohongshu'
-        ? loc.platforms.xiaohongshu
-        : platformId;
+    const platformName = platformId === 'wechat' ? '微信视频号' : (platformId === 'xiaohongshu' ? '小红书' : platformId);
     console.log(`[SessionKeeper] 收到指令：正在对 ${platformName} 执行整体页面重新加载...`);
 
     try {
       state.lastReloadTime = Date.now();
       state.webContents.reload();
 
-      const statusMsg = localizePlatformLog(`${platformName} 页面已成功触发重新加载`, lang);
       windowManager.broadcast('platform:status-update', {
         platform: platformId,
-        status: statusMsg,
+        status: `[页面刷新] ${platformName} 页面已成功触发重新加载`,
         type: 'info',
       });
       return true;

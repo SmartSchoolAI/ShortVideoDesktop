@@ -5,7 +5,6 @@ import { autoUpdater, UpdateInfo } from 'electron-updater';
 import { APP_CONFIG } from '../config';
 import { getLocale, formatI18n } from '../utils/i18n';
 import { windowManager } from './window-manager';
-import { isTrustedIpcSender } from '../utils/ipc-security';
 
 export interface UpdateStatusState {
   status: 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'not-available' | 'error';
@@ -32,7 +31,6 @@ export class UpdateManager {
   private isInitialized: boolean = false;
   private isManualCheck: boolean = false;
   private silentDialog: boolean = false;
-  private lastLoggedPercent: number = -1;
 
   public static getInstance(): UpdateManager {
     if (!UpdateManager.instance) {
@@ -277,10 +275,7 @@ export class UpdateManager {
       this.isManualCheck = false;
     });
 
-    autoUpdater.on('update-available', () => {
-      this.lastLoggedPercent = -1;
-    });
-
+    let lastLoggedPercent = -1;
     autoUpdater.on('download-progress', (progressObj) => {
       this.state.status = 'downloading';
       const pct = Math.round(progressObj.percent || 0);
@@ -291,20 +286,20 @@ export class UpdateManager {
       this.broadcastState();
 
       // 每跨越 25% 阶段输出一次系统日志，避免频繁刷屏的同时保证升级轨迹清晰留痕
-      if (pct === 0 && this.lastLoggedPercent < 0) {
-        this.lastLoggedPercent = 0;
+      if (pct === 0 && lastLoggedPercent < 0) {
+        lastLoggedPercent = 0;
         const totalMb = (progressObj.total / (1024 * 1024)).toFixed(2);
         console.log(`[UpdateManager] ⏬ 正在通过 [.blockmap] 差量下载新版本变动数据块 (待传输体积: ${totalMb} MB)...`);
-      } else if (pct >= 25 && this.lastLoggedPercent < 25) {
-        this.lastLoggedPercent = 25;
+      } else if (pct >= 25 && lastLoggedPercent < 25) {
+        lastLoggedPercent = 25;
         const speedMb = (progressObj.bytesPerSecond / (1024 * 1024)).toFixed(2);
         console.log(`[UpdateManager] ⏬ [.blockmap] 差量分块下载中 (进度: 25%, 速度: ${speedMb} MB/s)`);
-      } else if (pct >= 50 && this.lastLoggedPercent < 50) {
-        this.lastLoggedPercent = 50;
+      } else if (pct >= 50 && lastLoggedPercent < 50) {
+        lastLoggedPercent = 50;
         const speedMb = (progressObj.bytesPerSecond / (1024 * 1024)).toFixed(2);
         console.log(`[UpdateManager] ⏬ [.blockmap] 差量分块下载中 (进度: 50%, 速度: ${speedMb} MB/s)`);
-      } else if (pct >= 75 && this.lastLoggedPercent < 75) {
-        this.lastLoggedPercent = 75;
+      } else if (pct >= 75 && lastLoggedPercent < 75) {
+        lastLoggedPercent = 75;
         const speedMb = (progressObj.bytesPerSecond / (1024 * 1024)).toFixed(2);
         console.log(`[UpdateManager] ⏬ [.blockmap] 差量分块下载中 (进度: 75%, 速度: ${speedMb} MB/s)`);
       }
@@ -352,10 +347,7 @@ export class UpdateManager {
   }
 
   private registerIpc(): void {
-    ipcMain.handle('app:check-for-updates', async (event, options?: { silentDialog?: boolean }) => {
-      if (!isTrustedIpcSender(event)) {
-        return { success: false, status: 'error', message: 'Untrusted IPC sender' };
-      }
+    ipcMain.handle('app:check-for-updates', async (_event, options?: { silentDialog?: boolean }) => {
       try {
         return await this.checkForUpdates(true, options);
       } catch (err: any) {
@@ -363,24 +355,17 @@ export class UpdateManager {
       }
     });
 
-    ipcMain.handle('app:get-update-status', (event) => {
-      if (!isTrustedIpcSender(event)) {
-        return null;
-      }
+    ipcMain.handle('app:get-update-status', () => {
       return this.getState();
     });
 
-    ipcMain.handle('app:start-download-update', async (event) => {
-      if (!isTrustedIpcSender(event)) {
-        return { success: false, status: 'error', message: 'Untrusted IPC sender' };
-      }
+    ipcMain.handle('app:start-download-update', async () => {
       try {
         if (!app.isPackaged) {
           shell.openExternal(APP_CONFIG.downloadUrl);
           return { success: true, status: 'dev-mode' };
         }
         console.log('[UpdateManager] 用户主动触发新版本安装包下载...');
-        this.lastLoggedPercent = -1;
         this.state.status = 'downloading';
         this.broadcastState();
         await autoUpdater.downloadUpdate();
@@ -394,18 +379,12 @@ export class UpdateManager {
       }
     });
 
-    ipcMain.handle('app:quit-and-install', (event) => {
-      if (!isTrustedIpcSender(event)) {
-        return { success: false, message: 'Untrusted IPC sender' };
-      }
+    ipcMain.handle('app:quit-and-install', () => {
       this.quitAndInstall();
       return { success: true };
     });
 
-    ipcMain.on('app:quit-and-install', (event) => {
-      if (!isTrustedIpcSender(event)) {
-        return;
-      }
+    ipcMain.on('app:quit-and-install', () => {
       this.quitAndInstall();
     });
   }

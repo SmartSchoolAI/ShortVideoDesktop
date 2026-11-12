@@ -41,3 +41,4 @@ export function isTrustedIpcSender(event: IpcMainInvokeEvent | IpcMainEvent): bo
     return false;
   }
 }
+

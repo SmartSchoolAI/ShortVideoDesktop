@@ -370,7 +370,7 @@
   <div class="toast-msg" id="toast-msg">已复制到剪贴板</div>
 
   <script>
-    const { ipcRenderer } = require('electron');
+    const { ipcRenderer, shell } = require('electron');
 
     // 多语言字典（覆盖项目 14 种核心语言与兼容语种）
     const I18N = {
@@ -704,24 +704,32 @@
       }).catch(() => {});
     });
 
-    // 调起系统播放器（严格通过受信任主进程 IPC 白名单路径校验执行）
+    // 调起系统播放器
     async function openInSystemPlayer() {
       const target = localFilePath || rawSrc;
       if (!target) return;
       try {
         await ipcRenderer.invoke('app:open-system-player', target);
-      } catch {}
+      } catch (e) {
+        if (shell && shell.openPath && localFilePath) {
+          shell.openPath(localFilePath);
+        }
+      }
     }
 
     btnSystem.addEventListener('click', openInSystemPlayer);
     document.getElementById('btn-fallback-system').addEventListener('click', openInSystemPlayer);
 
-    // 在文件夹中定位（严格通过主进程白名单校验）
+    // 在文件夹中定位
     btnFolder.addEventListener('click', async () => {
       if (!localFilePath) return;
       try {
         await ipcRenderer.invoke('app:show-in-folder', localFilePath);
-      } catch {}
+      } catch (e) {
+        if (shell && shell.showItemInFolder) {
+          shell.showItemInFolder(localFilePath);
+        }
+      }
     });
 
     // 关闭按钮
