@@ -8,6 +8,7 @@ export interface PlatformI18nEntry {
 
   // 中止与异常
   publishAborted: string;
+  publishAlreadyRunning: string;
   tabClosed: string;
   fileNotFound: string;
   windowDestroyed: string;
@@ -90,6 +91,7 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     platformNameXhs: '小红书',
 
     publishAborted: '视频发布任务已由用户主动中止',
+    publishAlreadyRunning: '【{platform}】当前已有视频正在发布中，请等待当前任务完成后再试',
     tabClosed: '用户已关闭【{platform}】标签页，自动化发布任务已强行中止',
     fileNotFound: '本地待发布视频文件不存在: {path}',
     windowDestroyed: '目标窗口已销毁，无法继续执行发布',
@@ -165,6 +167,7 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     platformNameXhs: 'Xiaohongshu',
 
     publishAborted: 'Video publishing task was aborted by user',
+    publishAlreadyRunning: 'A publishing task is already running on [{platform}]. Please wait for it to finish.',
     tabClosed: 'User closed the [{platform}] tab, automated publishing task has been aborted',
     fileNotFound: 'Local video file does not exist: {path}',
     windowDestroyed: 'Target window is destroyed, cannot continue publishing',
@@ -240,6 +243,7 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     platformNameXhs: '小紅書 (RED)',
 
     publishAborted: '動画投稿タスクはユーザーによって中止されました',
+    publishAlreadyRunning: '【{platform}】では現在別の投稿タスクを実行中です。完了までお待ちください',
     tabClosed: 'ユーザーが【{platform}】タブを閉じたため、自動投稿タスクを中止しました',
     fileNotFound: 'ローカル動画ファイルが存在しません: {path}',
     windowDestroyed: '対象ウィンドウが破棄されたため、投稿を続行できません',
@@ -315,6 +319,7 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     platformNameXhs: '샤오홍슈 (Xiaohongshu)',
 
     publishAborted: '사용자에 의해 동영상 게시 작업이 중단되었습니다',
+    publishAlreadyRunning: '【{platform}】에서 이미 게시 작업이 진행 중입니다. 완료된 후 다시 시도해 주세요',
     tabClosed: '사용자가 【{platform}】 탭을 닫아 자동 게시 작업이 강제 중단되었습니다',
     fileNotFound: '게시할 로컬 동영상 파일이 존재하지 않습니다: {path}',
     windowDestroyed: '대상 창이 닫혀 게시를 계속할 수 없습니다',
@@ -390,6 +395,7 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     platformNameXhs: 'Xiaohongshu',
 
     publishAborted: 'Tác vụ xuất bản video đã bị người dùng hủy bỏ',
+    publishAlreadyRunning: 'Đang có tác vụ xuất bản chạy trên 【{platform}】, vui lòng đợi hoàn tất trước khi thử lại',
     tabClosed: 'Người dùng đã đóng tab 【{platform}】, tác vụ xuất bản tự động đã bị dừng',
     fileNotFound: 'Tệp video cục bộ không tồn tại: {path}',
     windowDestroyed: 'Cửa sổ mục tiêu đã bị đóng, không thể tiếp tục xuất bản',
@@ -465,6 +471,7 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     platformNameXhs: 'Xiaohongshu',
 
     publishAborted: 'งานเผยแพร่วิดีโอถูกยกเลิกโดยผู้ใช้',
+    publishAlreadyRunning: '【{platform}】กำลังดำเนินการเผยแพร่อยู่แล้ว โปรดรอให้เสร็จสิ้นก่อนลองใหม่',
     tabClosed: 'ผู้ใช้ปิดแท็บ 【{platform}】 งานเผยแพร่อัตโนมัติจึงถูกยกเลิก',
     fileNotFound: 'ไม่พบไฟล์วิดีโอในเครื่อง: {path}',
     windowDestroyed: 'หน้าต่างเป้าหมายถูกปิด ไม่สามารถดำเนินการเผยแพร่ต่อได้',
@@ -540,6 +547,7 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     platformNameXhs: 'Xiaohongshu',
 
     publishAborted: 'Tugas publikasi video dibatalkan oleh pengguna',
+    publishAlreadyRunning: 'Tugas publikasi sedang berjalan di 【{platform}】. Silakan tunggu hingga selesai.',
     tabClosed: 'Pengguna menutup tab 【{platform}】, tugas publikasi otomatis dihentikan',
     fileNotFound: 'File video lokal tidak ditemukan: {path}',
     windowDestroyed: 'Jendela target ditutup, tidak dapat melanjutkan publikasi',
@@ -615,6 +623,7 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     platformNameXhs: 'Xiaohongshu',
 
     publishAborted: 'La tarea de publicación de video fue cancelada por el usuario',
+    publishAlreadyRunning: 'Ya hay una tarea de publicación en curso en 【{platform}】. Por favor espere a que termine.',
     tabClosed: 'El usuario cerró la pestaña de 【{platform}】, la publicación automática fue abortada',
     fileNotFound: 'El archivo de video local no existe: {path}',
     windowDestroyed: 'La ventana de destino está cerrada, no se puede continuar la publicación',
@@ -690,6 +699,7 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     platformNameXhs: 'Xiaohongshu',
 
     publishAborted: 'La tâche de publication vidéo a été annulée par l\'utilisateur',
+    publishAlreadyRunning: 'Une publication est déjà en cours sur 【{platform}】. Veuillez patienter qu’elle se termine.',
     tabClosed: 'L\'utilisateur a fermé l\'onglet 【{platform}】, la publication automatique est annulée',
     fileNotFound: 'Le fichier vidéo local n\'existe pas : {path}',
     windowDestroyed: 'La fenêtre cible est fermée, impossible de continuer',
@@ -765,6 +775,7 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     platformNameXhs: 'Xiaohongshu',
 
     publishAborted: 'A publicação do vídeo foi cancelada pelo usuário',
+    publishAlreadyRunning: 'Já existe uma publicação em andamento em 【{platform}】. Aguarde a conclusão.',
     tabClosed: 'O usuário fechou a aba 【{platform}】, a publicação automática foi interrompida',
     fileNotFound: 'O arquivo de vídeo local não existe: {path}',
     windowDestroyed: 'A janela de destino foi fechada, não é possível continuar',
@@ -840,6 +851,7 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     platformNameXhs: 'Xiaohongshu',
 
     publishAborted: 'Die Videoveröffentlichung wurde vom Benutzer abgebrochen',
+    publishAlreadyRunning: 'Auf 【{platform}】 läuft bereits eine Veröffentlichung. Bitte warten Sie, bis sie abgeschlossen ist.',
     tabClosed: 'Der Benutzer hat den Tab 【{platform}】 geschlossen, die Veröffentlichung wurde abgebrochen',
     fileNotFound: 'Lokale Videodatei nicht gefunden: {path}',
     windowDestroyed: 'Zielfenster wurde geschlossen, Veröffentlichung kann nicht fortgesetzt werden',
@@ -915,6 +927,7 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     platformNameXhs: 'Xiaohongshu',
 
     publishAborted: 'La pubblicazione del video è stata annullata dall\'utente',
+    publishAlreadyRunning: 'È già in corso una pubblicazione su 【{platform}】. Attendi il completamento.',
     tabClosed: 'L\'utente ha chiuso la scheda 【{platform}】, la pubblicazione automatica è interrotta',
     fileNotFound: 'Il file video locale non esiste: {path}',
     windowDestroyed: 'La finestra di destinazione è stata chiusa, impossibile continuare',
@@ -990,6 +1003,7 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     platformNameXhs: 'Xiaohongshu',
 
     publishAborted: 'Публикация видео была отменена пользователем',
+    publishAlreadyRunning: 'На 【{platform}】 уже выполняется публикация. Пожалуйста, дождитесь завершения.',
     tabClosed: 'Пользователь закрыл вкладку 【{platform}】, публикация прервана',
     fileNotFound: 'Локальный видеофайл не найден: {path}',
     windowDestroyed: 'Целевое окно закрыто, невозможно продолжить публикацию',
@@ -1065,6 +1079,7 @@ export const PLATFORM_I18N_LOCALES: Record<SupportedLangCode, PlatformI18nEntry>
     platformNameXhs: 'Xiaohongshu',
 
     publishAborted: 'Video yayınlama görevi kullanıcı tarafından iptal edildi',
+    publishAlreadyRunning: '【{platform}】 üzerinde zaten bir yayınlama görevi çalışıyor. Lütfen bitmesini bekleyin.',
     tabClosed: 'Kullanıcı 【{platform}】 sekmesini kapattı, otomatik yayınlama iptal edildi',
     fileNotFound: 'Yerel video dosyası bulunamadı: {path}',
     windowDestroyed: 'Hedef pencere kapatıldı, yayınlamaya devam edilemiyor',
@@ -1645,6 +1660,272 @@ const PLATFORM_TERM_RULES: Array<{ regex: RegExp; translations: Partial<Record<S
       it: '[Passaggio $1/$2]',
       ru: '[Шаг $1/$2]',
       tr: '[Adım $1/$2]'
+    }
+  },
+  {
+    regex: /\[([^\]]+)\]\s*开始智能定位目标输入框.*/g,
+    translations: {
+      zh: '[$1] 开始智能定位目标输入框 (含 Shadow DOM 穿透)...',
+      en: '[$1] Locating target input field (including Shadow DOM)...',
+      ja: '[$1] 入力欄を特定中 (Shadow DOM 対応)...',
+      ko: '[$1] 대상 입력 필드 찾는 중 (Shadow DOM 포함)...',
+      vi: '[$1] Đang tìm ô nhập mục tiêu (hỗ trợ Shadow DOM)...',
+      th: '[$1] กำลังค้นหาช่องกรอกข้อมูล (รวม Shadow DOM)...',
+      id: '[$1] Mencari kolom input target (termasuk Shadow DOM)...',
+      es: '[$1] Localizando campo de entrada (incluido Shadow DOM)...',
+      fr: '[$1] Localisation du champ de saisie (Shadow DOM inclus)...',
+      pt: '[$1] Localizando campo de entrada (incluindo Shadow DOM)...',
+      de: '[$1] Eingabefeld wird lokalisiert (inkl. Shadow DOM)...',
+      it: '[$1] Ricerca campo di input (incluso Shadow DOM)...',
+      ru: '[$1] Поиск поля ввода (включая Shadow DOM)...',
+      tr: '[$1] Hedef giriş alanı bulunuyor (Shadow DOM dahil)...'
+    }
+  },
+  {
+    regex: /\[([^\]]+)\]\s*(?:✅\s*)?成功锁定输入框真实物理坐标\s*\(([^)]+)\)[！!]?/g,
+    translations: {
+      zh: '[$1] ✅ 成功锁定输入框真实物理坐标 ($2)！',
+      en: '[$1] ✅ Locked input coordinates ($2)',
+      ja: '[$1] ✅ 入力欄の物理座標を取得しました ($2)',
+      ko: '[$1] ✅ 입력 필드 물리 좌표 확보 ($2)',
+      vi: '[$1] ✅ Đã xác định tọa độ ô nhập ($2)',
+      th: '[$1] ✅ พบพิกัดช่องกรอกข้อมูลแล้ว ($2)',
+      id: '[$1] ✅ Koordinat kolom input dikunci ($2)',
+      es: '[$1] ✅ Coordenadas del campo fijadas ($2)',
+      fr: '[$1] ✅ Coordonnées du champ verrouillées ($2)',
+      pt: '[$1] ✅ Coordenadas do campo obtidas ($2)',
+      de: '[$1] ✅ Eingabefeld-Koordinaten erfasst ($2)',
+      it: '[$1] ✅ Coordinate campo rilevate ($2)',
+      ru: '[$1] ✅ Координаты поля определены ($2)',
+      tr: '[$1] ✅ Giriş alanı koordinatları kilitlendi ($2)'
+    }
+  },
+  {
+    regex: /\[([^\]]+)\]\s*(?:❌\s*)?持续扫描均未找到有效输入控件[！!]?/g,
+    translations: {
+      zh: '[$1] ❌ 持续扫描均未找到有效输入控件！',
+      en: '[$1] ❌ Valid input control not found after scanning!',
+      ja: '[$1] ❌ 有効な入力欄が見つかりませんでした！',
+      ko: '[$1] ❌ 유효한 입력 필드를 찾지 못했습니다!',
+      vi: '[$1] ❌ Không tìm thấy ô nhập hợp lệ sau khi quét!',
+      th: '[$1] ❌ ไม่พบช่องกรอกข้อมูลที่ใช้งานได้!',
+      id: '[$1] ❌ Kontrol input valid tidak ditemukan!',
+      es: '[$1] ❌ ¡No se encontró ningún campo de entrada válido!',
+      fr: '[$1] ❌ Aucun champ de saisie valide trouvé !',
+      pt: '[$1] ❌ Nenhum campo de entrada válido encontrado!',
+      de: '[$1] ❌ Kein gültiges Eingabefeld gefunden!',
+      it: '[$1] ❌ Nessun campo di input valido trovato!',
+      ru: '[$1] ❌ Не удалось найти поле ввода!',
+      tr: '[$1] ❌ Geçerli giriş alanı bulunamadı!'
+    }
+  },
+  {
+    regex: /\[([^\]]+)\]\s*正在物理点击输入框聚焦.*/g,
+    translations: {
+      zh: '[$1] 正在物理点击输入框聚焦 (拟人鼠标轨迹)...',
+      en: '[$1] Focusing input field with human-like click...',
+      ja: '[$1] 自然なマウス操作で入力欄をクリック中...',
+      ko: '[$1] 자연스러운 마우스 이동으로 입력창 클릭 중...',
+      vi: '[$1] Đang nhấp chuột tự nhiên vào ô nhập...',
+      th: '[$1] กำลังคลิกช่องกรอกข้อมูลแบบธรรมชาติ...',
+      id: '[$1] Mengklik kolom input secara alami...',
+      es: '[$1] Enfocando campo con clic natural...',
+      fr: '[$1] Focus sur le champ avec clic naturel...',
+      pt: '[$1] Focando campo com clique natural...',
+      de: '[$1] Eingabefeld wird menschlich fokussiert...',
+      it: '[$1] Clic naturale sul campo di input...',
+      ru: '[$1] Фокусировка на поле ввода естественным кликом...',
+      tr: '[$1] Doğal fare hareketiyle giriş alanına tıklanıyor...'
+    }
+  },
+  {
+    regex: /\[([^\]]+)\]\s*正在模拟人类键入录入文本.*/g,
+    translations: {
+      zh: '[$1] 正在模拟人类键入录入文本 (单次录入，含拟人化击键频率与微停顿)...',
+      en: '[$1] Typing text with natural human rhythm...',
+      ja: '[$1] 人間らしいタイピングリズムで入力中...',
+      ko: '[$1] 사람과 유사한 타자 리듬으로 입력 중...',
+      vi: '[$1] Đang nhập văn bản theo nhịp gõ tự nhiên...',
+      th: '[$1] กำลังพิมพ์ข้อความด้วยจังหวะธรรมชาติ...',
+      id: '[$1] Mengetik teks dengan ritme manusia alami...',
+      es: '[$1] Escribiendo texto con ritmo humano natural...',
+      fr: '[$1] Saisie du texte avec un rythme humain naturel...',
+      pt: '[$1] Digitando texto com ritmo humano natural...',
+      de: '[$1] Text wird im natürlichen Rhythmus eingegeben...',
+      it: '[$1] Digitazione testo con ritmo naturale...',
+      ru: '[$1] Ввод текста в естественном ритме...',
+      tr: '[$1] Doğal insan temposuyla metin yazılıyor...'
+    }
+  },
+  {
+    regex: /\[([^\]]+)\]\s*(?:✅\s*)?输入与核验完成！当前控件最终实际值[:：]\s*(.+)/g,
+    translations: {
+      zh: '[$1] ✅ 输入与核验完成！当前控件最终实际值: $2',
+      en: '[$1] ✅ Input verified! Final value: $2',
+      ja: '[$1] ✅ 入力と検証が完了しました！最終値: $2',
+      ko: '[$1] ✅ 입력 및 검증 완료! 최종 값: $2',
+      vi: '[$1] ✅ Nhập và xác minh hoàn tất! Giá trị cuối: $2',
+      th: '[$1] ✅ กรอกและตรวจสอบเสร็จสิ้น! ค่าล่าสุด: $2',
+      id: '[$1] ✅ Input selesai & terverifikasi! Nilai akhir: $2',
+      es: '[$1] ✅ ¡Entrada verificada! Valor final: $2',
+      fr: '[$1] ✅ Saisie vérifiée ! Valeur finale : $2',
+      pt: '[$1] ✅ Entrada verificada! Valor final: $2',
+      de: '[$1] ✅ Eingabe überprüft! Endwert: $2',
+      it: '[$1] ✅ Inserimento verificato! Valore finale: $2',
+      ru: '[$1] ✅ Ввод проверен! Итоговое значение: $2',
+      tr: '[$1] ✅ Giriş doğrulandı! Son değer: $2'
+    }
+  },
+  {
+    regex: /\[([^\]]+)\]\s*开始定位富文本编辑器.*/g,
+    translations: {
+      zh: '[$1] 开始定位富文本编辑器 (含 Shadow DOM 穿透)...',
+      en: '[$1] Locating rich-text editor (including Shadow DOM)...',
+      ja: '[$1] リッチテキストエディタを探索中 (Shadow DOM 対応)...',
+      ko: '[$1] 리치 텍스트 편집기 찾는 중 (Shadow DOM 포함)...',
+      vi: '[$1] Đang định vị trình soạn thảo văn bản...',
+      th: '[$1] กำลังค้นหากล่องแก้ไขข้อความ...',
+      id: '[$1] Mencari editor teks kaya (termasuk Shadow DOM)...',
+      es: '[$1] Localizando editor de texto enriquecido...',
+      fr: '[$1] Localisation de l’éditeur de texte riche...',
+      pt: '[$1] Localizando editor de texto rico...',
+      de: '[$1] Rich-Text-Editor wird lokalisiert...',
+      it: '[$1] Ricerca dell’editor di testo...',
+      ru: '[$1] Поиск текстового редактора...',
+      tr: '[$1] Zengin metin düzenleyici bulunuyor...'
+    }
+  },
+  {
+    regex: /\[([^\]]+)\]\s*(?:✅\s*)?成功锁定富文本编辑框物理坐标\s*\(([^)]+)\)[！!]?/g,
+    translations: {
+      zh: '[$1] ✅ 成功锁定富文本编辑框物理坐标 ($2)！',
+      en: '[$1] ✅ Locked rich-text editor coordinates ($2)',
+      ja: '[$1] ✅ エディタの物理座標を取得しました ($2)',
+      ko: '[$1] ✅ 편집기 물리 좌표 확보 ($2)',
+      vi: '[$1] ✅ Đã xác định tọa độ trình soạn thảo ($2)',
+      th: '[$1] ✅ พบพิกัดกล่องข้อความแล้ว ($2)',
+      id: '[$1] ✅ Koordinat editor dikunci ($2)',
+      es: '[$1] ✅ Coordenadas del editor fijadas ($2)',
+      fr: '[$1] ✅ Coordonnées de l’éditeur verrouillées ($2)',
+      pt: '[$1] ✅ Coordenadas do editor obtidas ($2)',
+      de: '[$1] ✅ Editor-Koordinaten erfasst ($2)',
+      it: '[$1] ✅ Coordinate editor rilevate ($2)',
+      ru: '[$1] ✅ Координаты редактора определены ($2)',
+      tr: '[$1] ✅ Düzenleyici koordinatları kilitlendi ($2)'
+    }
+  },
+  {
+    regex: /\[([^\]]+)\]\s*(?:❌\s*)?无法定位到富文本编辑框控件[！!]?/g,
+    translations: {
+      zh: '[$1] ❌ 无法定位到富文本编辑框控件！',
+      en: '[$1] ❌ Rich-text editor control not found!',
+      ja: '[$1] ❌ リッチテキストエディタが見つかりません！',
+      ko: '[$1] ❌ 리치 텍스트 편집기를 찾을 수 없습니다!',
+      vi: '[$1] ❌ Không tìm thấy khung soạn thảo!',
+      th: '[$1] ❌ ไม่พบกล่องข้อความ!',
+      id: '[$1] ❌ Kontrol editor teks kaya tidak ditemukan!',
+      es: '[$1] ❌ ¡No se pudo localizar el editor de texto!',
+      fr: '[$1] ❌ Éditeur de texte introuvable !',
+      pt: '[$1] ❌ Editor de texto não encontrado!',
+      de: '[$1] ❌ Rich-Text-Editor nicht gefunden!',
+      it: '[$1] ❌ Editor di testo non trovato!',
+      ru: '[$1] ❌ Не удалось найти текстовый редактор!',
+      tr: '[$1] ❌ Zengin metin düzenleyici bulunamadı!'
+    }
+  },
+  {
+    regex: /\[([^\]]+)\]\s*正在物理点击富文本编辑框聚焦.*/g,
+    translations: {
+      zh: '[$1] 正在物理点击富文本编辑框聚焦...',
+      en: '[$1] Clicking rich-text editor to focus...',
+      ja: '[$1] リッチテキストエディタをクリックしてフォーカス中...',
+      ko: '[$1] 리치 텍스트 편집기 클릭 및 포커스 중...',
+      vi: '[$1] Đang nhấp để chọn khung soạn thảo...',
+      th: '[$1] กำลังคลิกกล่องข้อความ...',
+      id: '[$1] Mengklik editor untuk memfokuskan...',
+      es: '[$1] Haciendo clic en el editor para enfocar...',
+      fr: '[$1] Clic sur l’éditeur pour focaliser...',
+      pt: '[$1] Clicando no editor para focar...',
+      de: '[$1] Klick auf den Editor zur Fokussierung...',
+      it: '[$1] Clic sull’editor per mettere a fuoco...',
+      ru: '[$1] Клик по редактору для фокусировки...',
+      tr: '[$1] Odaklanmak için düzenleyiciye tıklanıyor...'
+    }
+  },
+  {
+    regex: /\[([^\]]+)\]\s*正在模拟用户粘贴注入文案并解析话题标签.*/g,
+    translations: {
+      zh: '[$1] 正在模拟用户粘贴注入文案并解析话题标签...',
+      en: '[$1] Pasting description & parsing hashtags naturally...',
+      ja: '[$1] 概要文とハッシュタグを自然に入力中...',
+      ko: '[$1] 설명 및 해시태그 자연스럽게 붙여넣는 중...',
+      vi: '[$1] Đang dán mô tả và phân tích thẻ hashtag...',
+      th: '[$1] กำลังวางคำอธิบายและแฮชแท็กอย่างเป็นธรรมชาติ...',
+      id: '[$1] Menempelkan deskripsi & tagar secara alami...',
+      es: '[$1] Pegando descripción y analizando etiquetas...',
+      fr: '[$1] Collage de la description et des hashtags...',
+      pt: '[$1] Colando descrição e analisando hashtags...',
+      de: '[$1] Beschreibung und Hashtags werden eingefügt...',
+      it: '[$1] Incolla descrizione e analisi hashtag...',
+      ru: '[$1] Вставка описания и обработка хэштегов...',
+      tr: '[$1] Açıklama yapıştırılıyor ve etiketler ayrıştırılıyor...'
+    }
+  },
+  {
+    regex: /\[([^\]]+)\]\s*(?:✅\s*)?富文本简介注入成功[！!]?\s*\(([^)]+)\)/g,
+    translations: {
+      zh: '[$1] ✅ 富文本简介注入成功！($2)',
+      en: '[$1] ✅ Description filled successfully! ($2)',
+      ja: '[$1] ✅ 概要欄への入力が成功しました！($2)',
+      ko: '[$1] ✅ 설명 입력 성공! ($2)',
+      vi: '[$1] ✅ Đã nhập mô tả thành công! ($2)',
+      th: '[$1] ✅ กรอกคำอธิบายสำเร็จแล้ว! ($2)',
+      id: '[$1] ✅ Deskripsi berhasil diisi! ($2)',
+      es: '[$1] ✅ ¡Descripción completada con éxito! ($2)',
+      fr: '[$1] ✅ Description remplie avec succès ! ($2)',
+      pt: '[$1] ✅ Descrição preenchida com sucesso! ($2)',
+      de: '[$1] ✅ Beschreibung erfolgreich ausgefüllt! ($2)',
+      it: '[$1] ✅ Descrizione inserita con successo! ($2)',
+      ru: '[$1] ✅ Описание успешно заполнено! ($2)',
+      tr: '[$1] ✅ Açıklama başarıyla dolduruldu! ($2)'
+    }
+  },
+  {
+    regex: /(?:🔍\s*)?开始深度诊断当前页面 DOM 元素.*/g,
+    translations: {
+      zh: '🔍 开始深度诊断当前页面 DOM 元素 (含 Shadow DOM 穿透)...',
+      en: '🔍 Inspecting page DOM elements (including Shadow DOM)...',
+      ja: '🔍 ページ DOM 要素を診断中 (Shadow DOM 対応)...',
+      ko: '🔍 페이지 DOM 요소 정밀 진단 중 (Shadow DOM 포함)...',
+      vi: '🔍 Đang kiểm tra cấu trúc DOM trang (bao gồm Shadow DOM)...',
+      th: '🔍 กำลังตรวจสอบองค์ประกอบ DOM ของหน้า (รวม Shadow DOM)...',
+      id: '🔍 Memeriksa elemen DOM halaman (termasuk Shadow DOM)...',
+      es: '🔍 Inspeccionando elementos DOM (incluido Shadow DOM)...',
+      fr: '🔍 Inspection des éléments DOM (Shadow DOM inclus)...',
+      pt: '🔍 Inspecionando elementos DOM (incluindo Shadow DOM)...',
+      de: '🔍 Seiten-DOM-Elemente werden geprüft (inkl. Shadow DOM)...',
+      it: '🔍 Analisi elementi DOM della pagina (incluso Shadow DOM)...',
+      ru: '🔍 Диагностика DOM-элементов страницы (включая Shadow DOM)...',
+      tr: '🔍 Sayfa DOM öğeleri inceleniyor (Shadow DOM dahil)...'
+    }
+  },
+  {
+    regex: /(?:📊\s*)?DOM 诊断结果已生成/g,
+    translations: {
+      zh: '📊 DOM 诊断结果已生成',
+      en: '📊 DOM inspection completed',
+      ja: '📊 DOM 診断結果を取得しました',
+      ko: '📊 DOM 진단 결과 생성 완료',
+      vi: '📊 Đã hoàn tất kiểm tra DOM',
+      th: '📊 ผลการตรวจสอบ DOM พร้อมแล้ว',
+      id: '📊 Hasil pemeriksaan DOM selesai',
+      es: '📊 Inspección DOM completada',
+      fr: '📊 Analyse DOM terminée',
+      pt: '📊 Inspeção DOM concluída',
+      de: '📊 DOM-Analyse abgeschlossen',
+      it: '📊 Analisi DOM completata',
+      ru: '📊 Диагностика DOM завершена',
+      tr: '📊 DOM incelemesi tamamlandı'
     }
   }
 ];

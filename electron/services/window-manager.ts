@@ -1,6 +1,6 @@
 import { BrowserWindow, BrowserView, session, app, ipcMain, WebContents, Menu, MenuItemConstructorOptions, shell, nativeImage } from 'electron';
 import path from 'path';
-import { pathToFileURL } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import fs from 'fs';
 import crypto from 'crypto';
 import { APP_CONFIG, getConfiguredRootDomain, isOwnSiteUrl, getChromiumVersionInfo } from '../config';
@@ -11,6 +11,8 @@ import { sessionKeeper } from './session-keeper';
 import { systemLogger } from '../utils/logger';
 import { renderManager } from './render-manager';
 import { oauthBridge } from './oauth-bridge';
+import { isTrustedIpcSender } from '../utils/ipc-security';
+import { isSafeHttpTargetUrl } from '../utils/url-safety';
 import { SUPPORTED_LANGUAGES, VALID_LANG_CODES, SupportedLanguageItem, getLocale, normalizeLangCode } from '../utils/i18n';
 
 export { SUPPORTED_LANGUAGES, VALID_LANG_CODES, SupportedLanguageItem, getLocale, normalizeLangCode };
@@ -58,6 +60,8 @@ export class WindowManager {
   private stealthInjectedContents: WeakSet<WebContents> = new WeakSet();
   private videoPlayerWindow: BrowserWindow | null = null;
   private externalWebWindow: BrowserWindow | null = null;
+  private hideLoadingTimer: NodeJS.Timeout | null = null;
+  private lastSavedSessionToken: string = '';
 
   private loadPersistedLanguage(): string {
     try {
@@ -77,17 +81,25 @@ export class WindowManager {
   }
 
   private persistLanguage(lang: string): void {
+    const configPath = path.join(app.getPath('userData'), 'app-settings.json');
+    const tmpConfigPath = `${configPath}.tmp-${process.pid}`;
     try {
-      const configPath = path.join(app.getPath('userData'), 'app-settings.json');
-      let currentData: any = {};
+      let currentData: Record<string, any> = {};
       if (fs.existsSync(configPath)) {
         try {
-          currentData = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+          const parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            currentData = parsed;
+          }
         } catch { }
       }
       currentData.language = lang;
-      fs.writeFileSync(configPath, JSON.stringify(currentData, null, 2), 'utf-8');
+      fs.writeFileSync(tmpConfigPath, JSON.stringify(currentData, null, 2), { encoding: 'utf-8', mode: 0o600 });
+      fs.renameSync(tmpConfigPath, configPath);
     } catch (err) {
+      try {
+        if (fs.existsSync(tmpConfigPath)) fs.unlinkSync(tmpConfigPath);
+      } catch {}
       console.warn('[WindowManager] 保存语言配置失败:', err);
     }
   }
@@ -155,7 +167,7 @@ export class WindowManager {
             (function() {
               try {
                 if (typeof window === 'undefined') return;
-                const targetLang = '${this.currentLanguage}';
+                const targetLang = ${JSON.stringify(this.currentLanguage)};
                 localStorage.setItem('appLang', targetLang);
                 localStorage.setItem('i18nextLng', targetLang);
                 localStorage.setItem('oauth_redirect_lang', targetLang);
@@ -454,6 +466,10 @@ export class WindowManager {
    * 显示 Loading 遮罩层
    */
   public showLoadingOverlay(message?: string): void {
+    if (this.hideLoadingTimer) {
+      clearTimeout(this.hideLoadingTimer);
+      this.hideLoadingTimer = null;
+    }
     if (!this.mainWindow || !this.loadingView || this.loadingView.webContents.isDestroyed()) return;
     this.isLoadingVisible = true;
     const views = this.mainWindow.getBrowserViews();
@@ -478,8 +494,12 @@ export class WindowManager {
     this.loadingView.webContents.send('loading:status', {
       state: 'finishing',
     });
-    // 延迟 300ms 待 CSS 淡出完毕后更新层级
-    setTimeout(() => {
+    if (this.hideLoadingTimer) {
+      clearTimeout(this.hideLoadingTimer);
+    }
+    // 延迟 320ms 待 CSS 淡出完毕后更新层级
+    this.hideLoadingTimer = setTimeout(() => {
+      this.hideLoadingTimer = null;
       this.isLoadingVisible = false;
       this.updateTopViews();
     }, 320);
@@ -489,6 +509,10 @@ export class WindowManager {
    * 显示 Loading 错误卡片
    */
   public showLoadingError(errorCode?: number, errorDescription?: string): void {
+    if (this.hideLoadingTimer) {
+      clearTimeout(this.hideLoadingTimer);
+      this.hideLoadingTimer = null;
+    }
     if (!this.loadingView || this.loadingView.webContents.isDestroyed()) return;
     this.isLoadingVisible = true;
     this.updateTopViews();
@@ -553,29 +577,80 @@ export class WindowManager {
   }
 
   /**
-   * 注册 TabBar 的 IPC 控制指令
+   * 锁定特权内置本地视图，严禁跳转到不受信任的外部 URL 或打开任意新窗口
+   */
+  private lockdownLocalView(contents: WebContents, allowedHtmlPath: string): void {
+    const resolvedAllowedPath = path.resolve(allowedHtmlPath);
+    const isSameAllowedLocalHtml = (navUrl: string): boolean => {
+      try {
+        const parsed = new URL(navUrl);
+        if (parsed.protocol !== 'file:') return false;
+        const targetPath = path.resolve(fileURLToPath(parsed));
+        if (process.platform === 'win32') {
+          return targetPath.toLowerCase() === resolvedAllowedPath.toLowerCase();
+        }
+        return targetPath === resolvedAllowedPath;
+      } catch {
+        return false;
+      }
+    };
+    contents.on('will-navigate', (event, navUrl) => {
+      if (!isSameAllowedLocalHtml(navUrl)) {
+        event.preventDefault();
+        if (isSafeHttpTargetUrl(navUrl)) {
+          shell.openExternal(navUrl).catch(() => { });
+        }
+      }
+    });
+    contents.setWindowOpenHandler(({ url }) => {
+      if (isSafeHttpTargetUrl(url)) {
+        shell.openExternal(url).catch(() => { });
+      }
+      return { action: 'deny' };
+    });
+  }
+
+  /**
+   * 注册 TabBar 的 IPC 控制指令（严格校验发送方为可信 TabBar / Loading 视图）
    */
   private setupTabBarIpc(): void {
     if (this.isTabBarIpcInitialized) return;
     this.isTabBarIpcInitialized = true;
 
-    ipcMain.on('tabbar:ready', () => {
+    const isTabBarSender = (event: Electron.IpcMainEvent): boolean => {
+      if (!isTrustedIpcSender(event)) return false;
+      const wc = this.tabBarView?.webContents;
+      return Boolean(wc && !wc.isDestroyed() && event.sender === wc);
+    };
+
+    const isLoadingSender = (event: Electron.IpcMainEvent): boolean => {
+      if (!isTrustedIpcSender(event)) return false;
+      const wc = this.loadingView?.webContents;
+      return Boolean(wc && !wc.isDestroyed() && event.sender === wc);
+    };
+
+    ipcMain.on('tabbar:ready', (event) => {
+      if (!isTabBarSender(event)) return;
       this.notifyTabBarState();
     });
 
-    ipcMain.on('tabbar:switch', (_event, tabId: string) => {
+    ipcMain.on('tabbar:switch', (event, tabId: string) => {
+      if (!isTabBarSender(event)) return;
       this.switchTab(tabId);
     });
 
-    ipcMain.on('tabbar:close', (_event, tabId: string) => {
+    ipcMain.on('tabbar:close', (event, tabId: string) => {
+      if (!isTabBarSender(event)) return;
       this.closeTab(tabId);
     });
 
-    ipcMain.on('tabbar:open-platform', (_event, platformId: 'wechat' | 'xiaohongshu') => {
+    ipcMain.on('tabbar:open-platform', (event, platformId: 'wechat' | 'xiaohongshu') => {
+      if (!isTabBarSender(event)) return;
       this.openPlatformTab(platformId);
     });
 
-    ipcMain.on('tabbar:go-back', () => {
+    ipcMain.on('tabbar:go-back', (event) => {
+      if (!isTabBarSender(event)) return;
       const active = this.tabs.get(this.activeTabId);
       if (!active) return;
       const nav = (active.view.webContents as any).navigationHistory;
@@ -584,7 +659,8 @@ export class WindowManager {
       }
     });
 
-    ipcMain.on('tabbar:go-forward', () => {
+    ipcMain.on('tabbar:go-forward', (event) => {
+      if (!isTabBarSender(event)) return;
       const active = this.tabs.get(this.activeTabId);
       if (!active) return;
       const nav = (active.view.webContents as any).navigationHistory;
@@ -593,7 +669,8 @@ export class WindowManager {
       }
     });
 
-    ipcMain.on('tabbar:reload', () => {
+    ipcMain.on('tabbar:reload', (event) => {
+      if (!isTabBarSender(event)) return;
       const active = this.tabs.get(this.activeTabId);
       if (active) {
         if (this.activeTabId === 'main') {
@@ -603,31 +680,38 @@ export class WindowManager {
       }
     });
 
-    ipcMain.on('tabbar:toggle-devtools', () => {
+    ipcMain.on('tabbar:toggle-devtools', (event) => {
+      if (!isTabBarSender(event)) return;
       this.toggleActiveDevTools();
     });
 
-    ipcMain.on('tabbar:open-logs', () => {
+    ipcMain.on('tabbar:open-logs', (event) => {
+      if (!isTabBarSender(event)) return;
       this.openLogsTab();
     });
 
-    ipcMain.on('tabbar:open-render', () => {
+    ipcMain.on('tabbar:open-render', (event) => {
+      if (!isTabBarSender(event)) return;
       this.openRenderTab();
     });
 
-    ipcMain.on('tabbar:open-about', () => {
+    ipcMain.on('tabbar:open-about', (event) => {
+      if (!isTabBarSender(event)) return;
       this.openAboutWindow();
     });
 
-    ipcMain.on('tabbar:open-language-menu', (_event, coords?: { x?: number; y?: number }) => {
+    ipcMain.on('tabbar:open-language-menu', (event, coords?: { x?: number; y?: number }) => {
+      if (!isTabBarSender(event)) return;
       this.showLanguageMenu(coords?.x, coords?.y);
     });
 
-    ipcMain.on('tabbar:set-language', (_event, lang: string) => {
+    ipcMain.on('tabbar:set-language', (event, lang: string) => {
+      if (!isTabBarSender(event)) return;
       this.setLanguage(lang);
     });
 
-    ipcMain.on('loading:ready', () => {
+    ipcMain.on('loading:ready', (event) => {
+      if (!isLoadingSender(event)) return;
       if (this.loadingView && !this.loadingView.webContents.isDestroyed()) {
         this.loadingView.webContents.send('loading:status', {
           state: this.isLoadingVisible ? 'loading' : (this.isMainAppLoaded ? 'idle' : 'loading'),
@@ -636,7 +720,8 @@ export class WindowManager {
       }
     });
 
-    ipcMain.on('loading:retry', () => {
+    ipcMain.on('loading:retry', (event) => {
+      if (!isLoadingSender(event)) return;
       const mainTab = this.tabs.get('main');
       if (mainTab && !mainTab.view.webContents.isDestroyed()) {
         this.showLoadingOverlay();
@@ -689,6 +774,7 @@ export class WindowManager {
       },
     });
 
+    this.lockdownLocalView(this.aboutWindow.webContents, aboutHtml);
     this.aboutWindow.loadFile(aboutHtml, {
       query: { lang: this.currentLanguage || 'zh' },
     });
@@ -740,6 +826,7 @@ export class WindowManager {
       });
 
       this.bindDevToolsShortcut(view.webContents);
+      this.lockdownLocalView(view.webContents, logHtml);
       view.webContents.loadFile(logHtml, {
         query: { lang: this.currentLanguage || 'zh' },
       });
@@ -816,6 +903,7 @@ export class WindowManager {
       });
 
       this.bindDevToolsShortcut(view.webContents);
+      this.lockdownLocalView(view.webContents, renderHtml);
       view.webContents.loadFile(renderHtml, {
         query: { lang: this.currentLanguage || 'zh' },
       });
@@ -1036,7 +1124,7 @@ export class WindowManager {
           try {
             openHost = new URL(url).hostname.toLowerCase();
           } catch {}
-          const isMainDomain = isOwnSiteUrl(url) || openHost === 'localhost' || openHost === '127.0.0.1';
+          const isMainDomain = isOwnSiteUrl(url) || (!app.isPackaged && (openHost === 'localhost' || openHost === '127.0.0.1'));
           if (isMainDomain) {
             mainView.webContents.loadURL(url).catch((e) => {
               console.warn('[WindowManager] 主站 window.open 重定向失败:', e?.message || e);
@@ -1126,8 +1214,9 @@ export class WindowManager {
     let startUrl = process.env.ELECTRON_START_URL || APP_CONFIG.siteUrl || APP_CONFIG.productionUrl;
 
     if (!startUrl) {
-      console.error('[WindowManager] 未配置有效站点地址 (NEXT_PUBLIC_SITE_ORIGIN 未配置)');
-      this.showLoadingError(-1, '未配置有效站点地址');
+      const loc = getLocale(this.currentLanguage);
+      console.error('[WindowManager] Site URL is not configured (NEXT_PUBLIC_SITE_ORIGIN missing)');
+      this.showLoadingError(-1, loc.dialogs.projectDirNotFound || 'Site URL is not configured');
     } else {
       if (this.currentLanguage && this.currentLanguage !== 'zh') {
         try {
@@ -1146,9 +1235,10 @@ export class WindowManager {
       });
     }
 
+    const locMain = getLocale(this.currentLanguage);
     this.tabs.set('main', {
       id: 'main',
-      title: 'ShortVideo 主站',
+      title: locMain.menu.help.officialSite || 'ShortVideo',
       closable: false,
       view: mainView,
     });
@@ -1486,6 +1576,7 @@ export class WindowManager {
       try {
         if (webContents.isDestroyed()) return;
         const url = webContents.getURL() || '';
+        if (/^(?:file|devtools|chrome|about):/i.test(url)) return;
         if (isGoogleOAuthUrl(url)) return; // 跳过 Google 账号页面，保持其原生 API 完整性
         webContents.executeJavaScript(STEALTH_SCRIPT).catch(() => { });
         webContents.executeJavaScript(MEDIA_GUARDIAN_SCRIPT).catch(() => { });
@@ -1664,15 +1755,57 @@ export class WindowManager {
           req['sec-ch-ua-platform-version'] = '"15.0.0"';
         }
 
-        // 3. 语言头确保标准
+        // 3. 语言头按当前配置语言/系统区域动态生成（与 navigator.language 一致，防止硬编码指纹穿帮）
         if (!req['Accept-Language'] && !req['accept-language']) {
-          req['Accept-Language'] = 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7';
+          const langCode = (this.currentLanguage || app.getLocale() || 'en').split('-')[0].toLowerCase();
+          const primaryTagMap: Record<string, string> = {
+            zh: 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+            en: 'en-US,en;q=0.9',
+            ja: 'ja-JP,ja;q=0.9,en-US;q=0.8,en;q=0.7',
+            ko: 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+            vi: 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
+            th: 'th-TH,th;q=0.9,en-US;q=0.8,en;q=0.7',
+            id: 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+            es: 'es-ES,es;q=0.9,en-US;q=0.8,en;q=0.7',
+            fr: 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+            pt: 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+            de: 'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7',
+            it: 'it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7',
+            ru: 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+            tr: 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+          };
+          req['Accept-Language'] = primaryTagMap[langCode] || 'en-US,en;q=0.9';
         }
 
         callback({ requestHeaders: req });
       });
     } catch (e: any) {
       console.warn('[WindowManager] 设置请求头伪装异常:', e?.message || e);
+    }
+  }
+
+  private bringMainWindowToFront(): void {
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
+    try {
+      if (this.mainWindow.isMinimized()) this.mainWindow.restore();
+      this.mainWindow.setAlwaysOnTop(true);
+      this.mainWindow.show();
+      this.mainWindow.focus();
+      this.mainWindow.setAlwaysOnTop(false);
+    } catch { }
+  }
+
+  private persistSessionToken(sessionFile: string, token: string): void {
+    if (!token || token === this.lastSavedSessionToken) return;
+    const tmpSessionFile = `${sessionFile}.tmp-${process.pid}`;
+    try {
+      fs.writeFileSync(tmpSessionFile, JSON.stringify({ token, updatedAt: Date.now() }, null, 2), { encoding: 'utf-8', mode: 0o600 });
+      fs.renameSync(tmpSessionFile, sessionFile);
+      this.lastSavedSessionToken = token;
+    } catch {
+      try {
+        if (fs.existsSync(tmpSessionFile)) fs.unlinkSync(tmpSessionFile);
+      } catch { }
     }
   }
 
@@ -1693,13 +1826,7 @@ export class WindowManager {
       }
 
       // 2. 唤醒并激活主窗口（强制穿透 Windows 焦点防抢占保护）
-      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-        if (this.mainWindow.isMinimized()) this.mainWindow.restore();
-        this.mainWindow.setAlwaysOnTop(true);
-        this.mainWindow.show();
-        this.mainWindow.focus();
-        this.mainWindow.setAlwaysOnTop(false);
-      }
+      this.bringMainWindowToFront();
 
       // 3. 向主站注入 LocalStorage 凭证并刷新
       const mainTab = this.tabs.get('main');
@@ -1719,7 +1846,7 @@ export class WindowManager {
         const curMainUrl = mainTab.view.webContents.getURL() || '';
         const siteOrigin = APP_CONFIG.siteUrl || APP_CONFIG.productionUrl || '';
         let targetDestination = siteOrigin;
-        if (curMainUrl && curMainUrl.includes('/login')) {
+        if (curMainUrl && isOwnSiteUrl(curMainUrl) && curMainUrl.includes('/login')) {
           // 精确保留用户原本的语言路径 (如 /zh/login -> /zh/)
           targetDestination = curMainUrl.replace(/\/login.*$/, '/') || siteOrigin;
         }
@@ -1734,15 +1861,7 @@ export class WindowManager {
         }
 
         // 4. 用户在外部浏览器完成授权后，自动唤起并聚焦桌面客户端主窗口（利用临时 AlwaysOnTop 突破 Windows 焦点锁定）
-        if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-          try {
-            if (this.mainWindow.isMinimized()) this.mainWindow.restore();
-            this.mainWindow.setAlwaysOnTop(true);
-            this.mainWindow.show();
-            this.mainWindow.focus();
-            this.mainWindow.setAlwaysOnTop(false);
-          } catch { }
-        }
+        this.bringMainWindowToFront();
       }
     } catch (e: any) {
       console.warn('[WindowManager] applyAuthToken 异常:', e?.message || e);
@@ -1793,13 +1912,14 @@ export class WindowManager {
     const sessionFile = path.join(app.getPath('userData'), 'user_session.json');
     let isMainTabOnOwnSite = false;
 
-    // 1. 尝试从活动的主站点页面 WebContents 中提取
+    // 1. 尝试从活动的主站点页面 WebContents 中提取（仅当确认为本站页面时执行，禁止跨站读取）
     const mainTab = this.tabs.get('main');
     if (mainTab?.view && !mainTab.view.webContents.isDestroyed()) {
       try {
         const curMainUrl = mainTab.view.webContents.getURL() || '';
         isMainTabOnOwnSite = isOwnSiteUrl(curMainUrl);
-        const rawToken = await mainTab.view.webContents.executeJavaScript(`
+        if (isMainTabOnOwnSite) {
+          const rawToken = await mainTab.view.webContents.executeJavaScript(`
           (function() {
             try {
               const candidateKeys = ['TokenKeyName', 'token', 'auth_token', 'accessToken', 'jwt'];
@@ -1822,13 +1942,12 @@ export class WindowManager {
             }
           })();
         `);
-        if (rawToken && typeof rawToken === 'string' && rawToken.trim()) {
-          const decrypted = this.decryptTokenString(rawToken);
-          if (decrypted) {
-            try {
-              fs.writeFileSync(sessionFile, JSON.stringify({ token: decrypted, updatedAt: Date.now() }, null, 2), 'utf-8');
-            } catch (_) {}
-            return decrypted;
+          if (rawToken && typeof rawToken === 'string' && rawToken.trim()) {
+            const decrypted = this.decryptTokenString(rawToken);
+            if (decrypted) {
+              this.persistSessionToken(sessionFile, decrypted);
+              return decrypted;
+            }
           }
         }
       } catch (_) { }
@@ -1842,9 +1961,7 @@ export class WindowManager {
         if ((c.name === 'token' || c.name === 'TokenKeyName' || c.name === 'auth_token') && c.value) {
           const decrypted = this.decryptTokenString(c.value);
           if (decrypted) {
-            try {
-              fs.writeFileSync(sessionFile, JSON.stringify({ token: decrypted, updatedAt: Date.now() }, null, 2), 'utf-8');
-            } catch (_) {}
+            this.persistSessionToken(sessionFile, decrypted);
             return decrypted;
           }
         }
@@ -1853,6 +1970,7 @@ export class WindowManager {
 
     // 若主站当前已正常加载于自有域名，但 localStorage 与 Cookie 均无有效 Token，说明用户已在网页退出登录；必须同步清空本地缓存文件，严禁复用旧会话
     if (isMainTabOnOwnSite) {
+      this.lastSavedSessionToken = '';
       try {
         if (fs.existsSync(sessionFile)) {
           fs.unlinkSync(sessionFile);
@@ -1915,10 +2033,19 @@ export class WindowManager {
           targetUrl = parsed.toString();
         } catch { }
 
-        console.log('[WindowManager] 启动系统默认浏览器进行 Google 官方认证 (直接回调本地 127.0.0.1):', targetUrl);
-        shell.openExternal(targetUrl).catch((err) => {
-          console.warn('[WindowManager] 打开系统浏览器失败:', err?.message || err);
-        });
+        try {
+          const safeExternalOAuth = new URL(targetUrl);
+          if (!isSafeHttpTargetUrl(safeExternalOAuth)) {
+            console.warn('[WindowManager] 拒绝通过外部浏览器打开不安全的 OAuth 链接:', targetUrl);
+            return;
+          }
+          console.log('[WindowManager] 启动系统默认浏览器进行 Google 官方认证 (直接回调本地 127.0.0.1):', safeExternalOAuth.toString());
+          shell.openExternal(safeExternalOAuth.toString()).catch((err) => {
+            console.warn('[WindowManager] 打开系统浏览器失败:', err?.message || err);
+          });
+        } catch {
+          console.warn('[WindowManager] 拒绝打开格式非法的 OAuth 链接');
+        }
         return;
       } catch (e: any) {
         console.warn('[WindowManager] 构建 Google 认证链接失败:', e?.message || e);
@@ -1972,8 +2099,16 @@ export class WindowManager {
       authWin.webContents.executeJavaScript(`
         (function() {
           try {
-            delete Object.getPrototypeOf(navigator).webdriver;
-            delete navigator.webdriver;
+            if (Object.prototype.hasOwnProperty.call(navigator, 'webdriver')) {
+              delete (navigator)['webdriver'];
+            }
+            if (navigator.webdriver !== false) {
+              Object.defineProperty(Navigator.prototype, 'webdriver', {
+                get: function webdriver() { return false; },
+                configurable: true,
+                enumerable: true
+              });
+            }
           } catch(e) {}
           try {
             if (!window.chrome) window.chrome = {};
@@ -2005,19 +2140,21 @@ export class WindowManager {
     authWin.webContents.on('dom-ready', injectChromeShim);
 
     // 弹窗内部 window.open 处理：将非认证相关的外部帮助、隐私政策等页面导向系统浏览器
+    const GOOGLE_HELP_HOSTS = ['support.google.com', 'policies.google.com', 'myaccount.google.com'];
     authWin.webContents.setWindowOpenHandler(({ url }) => {
       try {
         if (!url) return { action: 'deny' };
-        if (
-          url.startsWith('https://support.google.com') ||
-          url.startsWith('https://policies.google.com') ||
-          url.startsWith('https://myaccount.google.com')
-        ) {
-          shell.openExternal(url).catch(() => { });
+        const parsed = new URL(url);
+        const host = parsed.hostname.toLowerCase();
+        if (parsed.protocol === 'https:' && GOOGLE_HELP_HOSTS.includes(host) && isSafeHttpTargetUrl(parsed)) {
+          shell.openExternal(parsed.toString()).catch(() => { });
           return { action: 'deny' };
         }
+        if (isSafeHttpTargetUrl(parsed)) {
+          return { action: 'allow' };
+        }
       } catch { }
-      return { action: 'allow' };
+      return { action: 'deny' };
     });
 
     // 检查并同步登录状态
@@ -2196,6 +2333,10 @@ export class WindowManager {
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
           return null;
         }
+        if (!isSafeHttpTargetUrl(parsed)) {
+          console.warn('[WindowManager] 拒绝打开不安全或私网 HTTP URL:', parsed.origin);
+          return null;
+        }
         targetUrl = parsed.toString();
       } catch {
         return null;
@@ -2229,7 +2370,6 @@ export class WindowManager {
         return this.videoPlayerWindow;
       }
 
-      const playerFileUrl = pathToFileURL(playerHtmlPath).href;
       const videoWin = new BrowserWindow({
         width: 1080,
         height: 720,
@@ -2252,21 +2392,7 @@ export class WindowManager {
       videoWin.webContents.setUserAgent(APP_CONFIG.userAgent);
 
       // 安全隔离：严禁特权本地播放器窗口导航到外部不受信任的网页
-      videoWin.webContents.on('will-navigate', (event, navUrl) => {
-        if (!navUrl.startsWith(playerFileUrl)) {
-          event.preventDefault();
-          if (/^https?:\/\//i.test(navUrl)) {
-            shell.openExternal(navUrl).catch(() => { });
-          }
-        }
-      });
-
-      videoWin.webContents.setWindowOpenHandler(({ url }) => {
-        if (/^https?:\/\//i.test(url)) {
-          shell.openExternal(url).catch(() => { });
-        }
-        return { action: 'deny' };
-      });
+      this.lockdownLocalView(videoWin.webContents, playerHtmlPath);
 
       videoWin.on('closed', () => {
         this.videoPlayerWindow = null;
@@ -2318,15 +2444,23 @@ export class WindowManager {
     webWin.webContents.setUserAgent(APP_CONFIG.userAgent);
 
     webWin.webContents.on('will-navigate', (event, navUrl) => {
-      if (!/^https?:\/\//i.test(navUrl)) {
+      try {
+        const parsed = new URL(navUrl);
+        if (!isSafeHttpTargetUrl(parsed)) {
+          event.preventDefault();
+        }
+      } catch {
         event.preventDefault();
       }
     });
 
     webWin.webContents.setWindowOpenHandler(({ url }) => {
-      if (/^https?:\/\//i.test(url)) {
-        shell.openExternal(url).catch(() => { });
-      }
+      try {
+        const parsed = new URL(url);
+        if (isSafeHttpTargetUrl(parsed)) {
+          shell.openExternal(parsed.toString()).catch(() => { });
+        }
+      } catch { }
       return { action: 'deny' };
     });
 
@@ -2361,6 +2495,10 @@ export class WindowManager {
     }
 
     // 销毁 Loading 遮罩视图，防止资源泄漏
+    if (this.hideLoadingTimer) {
+      clearTimeout(this.hideLoadingTimer);
+      this.hideLoadingTimer = null;
+    }
     if (this.loadingView) {
       try {
         (this.loadingView.webContents as any).destroy();

@@ -59,9 +59,8 @@ export function generateMediaGuardianScript(): string {
         return nativeToString.call(this);
       };
       guardedFunctions.add(customToString);
-      if (!Function.prototype.toString.toString().includes('[native code]')) {
-        Function.prototype.toString = customToString;
-      }
+      // 支持与 anti-detection 链式共存：外层已有 toString hook 时仍须安装本模块 hook 以掩盖 guardedPlay 源码
+      Function.prototype.toString = customToString;
     } catch (e) {}
 
     // 1. 穿透 DOM、Shadow DOM 与同源 iframe 获取全量媒体元素
@@ -292,19 +291,24 @@ export function generateMediaGuardianScript(): string {
       }
     } catch (e) {}
 
-    // 8. 周期性守护心跳（每 1 秒校验一次，动态跟踪与修正多媒体状态）
+    // 8. 周期性守护心跳（仅在存在活动/多路媒体时执行独占核验，避免无媒体页面每秒全量 DOM 遍历）
     setInterval(() => {
       try {
-        applyAudioExclusivity();
-
         const mediaList = getAllMediaElements();
-        let audiblePlayingList = [];
+        if (mediaList.length === 0) return;
 
+        let audiblePlayingList = [];
         for (const m of mediaList) {
           if (!m.paused && !m.muted && m.volume > 0) {
             audiblePlayingList.push(m);
           }
         }
+
+        if (mediaList.length < 2 && audiblePlayingList.length <= 1) {
+          return;
+        }
+
+        applyAudioExclusivity(audiblePlayingList[0]);
 
         // 若发现存在 2 个或以上正在同时发声的播放器，仅保留主要播放器，将其余强制暂停并静音
         if (audiblePlayingList.length > 1) {

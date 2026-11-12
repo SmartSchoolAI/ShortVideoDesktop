@@ -1345,6 +1345,7 @@
     let startTime = null;
     let lastRenderState = null;
     let lastRenderProgress = null;
+    let copyTimer = null;
 
     // ANSI 颜色转 HTML 标记简易解析器与 URL 识别
     function parseAnsiToHtml(str) {
@@ -1422,6 +1423,16 @@
         .replace(/'/g, '&#39;');
     }
 
+    function decodeBasicHtmlEntities(str) {
+      return String(str || '')
+        .replace(/&#x27;/gi, "'")
+        .replace(/&#0?39;/g, "'")
+        .replace(/&quot;/g, '"')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&');
+    }
+
     const PLAY_VIDEO_TIPS = {
       zh: '点击播放该视频',
       en: 'Click to play video',
@@ -1452,6 +1463,13 @@
         if (!url) return match;
 
         let cleanUrl = url;
+        let entitySuffix = '';
+        const entityBoundaryMatch = cleanUrl.match(/&(?:lt|gt|quot|#0?39|#x27);/i);
+        if (entityBoundaryMatch && typeof entityBoundaryMatch.index === 'number') {
+          entitySuffix = cleanUrl.slice(entityBoundaryMatch.index);
+          cleanUrl = cleanUrl.slice(0, entityBoundaryMatch.index);
+        }
+
         let trailing = '';
         const trailingMatch = cleanUrl.match(/([.,;!?:)\]>]+)$/);
         if (trailingMatch) {
@@ -1459,15 +1477,16 @@
           cleanUrl = cleanUrl.slice(0, -trailing.length);
         }
 
+        const rawUrl = decodeBasicHtmlEntities(cleanUrl);
         // 仅对 .mp4 格式的视频添加播放链接，普通 URL 绝不加链接
-        const isMp4 = /\.mp4(\?.*)?$/i.test(cleanUrl);
+        const isMp4 = /\.mp4(\?.*)?$/i.test(rawUrl);
         if (!isMp4) {
           return match;
         }
 
         const tip = getPlayTip();
-        const safeUrl = escapeAttr(cleanUrl);
-        return `<a href="javascript:void(0)" class="media-link remote-media-link" data-url="${safeUrl}" title="${tip}">🎬 ${cleanUrl}</a>${trailing}`;
+        const safeUrl = escapeAttr(rawUrl);
+        return `<a href="#" class="media-link remote-media-link" data-url="${safeUrl}" title="${tip}">🎬 ${cleanUrl}</a>${trailing}${entitySuffix}`;
       });
 
       // 2. 解析 Windows 和 Unix 本地媒体文件绝对路径：只对 .mp4 视频文件增加链接
@@ -1478,8 +1497,8 @@
         if (!targetPath) return match;
 
         const tip = getPlayTip();
-        const safePath = escapeAttr(targetPath);
-        return `<a href="javascript:void(0)" class="media-link local-media-link" data-path="${safePath}" title="${tip}">▶️ ${targetPath}</a>`;
+        const safePath = escapeAttr(decodeBasicHtmlEntities(targetPath));
+        return `<a href="#" class="media-link local-media-link" data-path="${safePath}" title="${tip}">▶️ ${targetPath}</a>`;
       });
 
       return html;
@@ -3078,6 +3097,25 @@
         }
       },
       {
+        pattern: /❌\s*任务\s*\[(.*?)\]\s*执行异常:\s*(.*?)（致命状态\s*(.*?)，跳过待渲染状态回写）/i,
+        templates: {
+          zh: '❌ 任务 [$1] 执行异常: $2（致命状态 $3，跳过待渲染状态回写）',
+          en: '❌ Task [$1] execution error: $2 (Fatal status $3, skipped waiting_render restore)',
+          ja: '❌ タスク [$1] 実行エラー: $2（致命的ステータス $3、waiting_render への書き戻しをスキップしました）',
+          ko: '❌ 작업 [$1] 실행 오류: $2 (치명적 상태 $3, waiting_render 상태 복원 건너뜀)',
+          vi: '❌ Tác vụ [$1] lỗi thực thi: $2 (Trạng thái nghiêm trọng $3, đã bỏ qua khôi phục waiting_render)',
+          th: '❌ งาน [$1] เกิดข้อผิดพลาด: $2 (สถานะร้ายแรง $3 ข้ามการเขียนคืน waiting_render)',
+          id: '❌ Tugas [$1] kesalahan eksekusi: $2 (Status fatal $3, lewati pemulihan waiting_render)',
+          es: '❌ Error en tarea [$1]: $2 (Estado fatal $3, omitiendo restauración de waiting_render)',
+          fr: '❌ Erreur tâche [$1] : $2 (Statut fatal $3, restauration waiting_render ignorée)',
+          pt: '❌ Erro na tarefa [$1]: $2 (Status fatal $3, restauração de waiting_render ignorada)',
+          de: '❌ Fehler Aufgabe [$1]: $2 (Fataler Status $3, Wiederherstellung auf waiting_render übersprungen)',
+          it: '❌ Errore attività [$1]: $2 (Stato irreversibile $3, ripristino waiting_render saltato)',
+          ru: '❌ Ошибка задачи [$1]: $2 (Критичный статус $3, возврат waiting_render пропущен)',
+          tr: '❌ Görev [$1] hatası: $2 (Kritik durum $3, waiting_render geri yüklemesi atlandı)',
+        }
+      },
+      {
         pattern: /❌\s*任务\s*\[(.*?)\]\s*执行异常:\s*(.*?)（尝试恢复待渲染状态失败，请核查服务端状态）/i,
         templates: {
           zh: '❌ 任务 [$1] 执行异常: $2（尝试恢复待渲染状态失败，请核查服务端状态）',
@@ -3635,22 +3673,42 @@
       return prefix + body;
     }
 
+    const RENDER_LOC_CACHE = new WeakMap();
+    function getLocalizedRenderText(entry, lang) {
+      const safeRaw = typeof entry?.text === 'string' ? entry.text : String(entry?.text ?? '');
+      const targetLang = (lang || 'zh').toLowerCase();
+      if (!entry || typeof entry !== 'object') {
+        return localizeRenderLog(safeRaw, targetLang);
+      }
+      let cached = RENDER_LOC_CACHE.get(entry);
+      if (cached && cached.lang === targetLang && cached.raw === safeRaw) {
+        return cached.text;
+      }
+      const localized = localizeRenderLog(safeRaw, targetLang);
+      RENDER_LOC_CACHE.set(entry, { lang: targetLang, raw: safeRaw, text: localized });
+      return localized;
+    }
+
+    const ALLOWED_RENDER_TYPES = new Set(['info', 'stdout', 'stderr', 'success', 'error', 'warn']);
+
     function createLogElement(entry) {
       const line = document.createElement('div');
       line.className = 'log-line';
-      line.dataset.id = entry.id;
+      line.dataset.id = entry?.id ?? '';
 
       const timeSpan = document.createElement('span');
       timeSpan.className = 'log-time';
-      timeSpan.textContent = entry.timestamp;
+      timeSpan.textContent = typeof entry?.timestamp === 'string' ? entry.timestamp : '';
 
+      const rawType = typeof entry?.type === 'string' ? entry.type : 'info';
+      const safeType = ALLOWED_RENDER_TYPES.has(rawType) ? rawType : 'info';
       const typeSpan = document.createElement('span');
-      typeSpan.className = `log-type ${entry.type}`;
-      typeSpan.textContent = entry.type;
+      typeSpan.className = `log-type ${safeType}`;
+      typeSpan.textContent = safeType;
 
       const contentSpan = document.createElement('span');
       contentSpan.className = 'log-content';
-      const localizedText = localizeRenderLog(entry.text, currentRenderLang);
+      const localizedText = getLocalizedRenderText(entry, currentRenderLang);
       const parsedHtml = parseAnsiToHtml(localizedText);
       contentSpan.innerHTML = searchQuery ? highlightSearchQuery(parsedHtml, searchQuery) : parsedHtml;
 
@@ -3701,9 +3759,15 @@
         allLogs[idx] = entry;
       } else {
         allLogs.push(entry);
+        if (allLogs.length > 2500) {
+          allLogs.shift();
+        }
       }
 
-      const el = container.querySelector(`.log-line[data-id="${entry.id}"]`);
+      const safeDomId = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+        ? CSS.escape(String(entry.id))
+        : String(entry.id).replace(/[^a-zA-Z0-9_-]/g, '');
+      const el = container.querySelector(`.log-line[data-id="${safeDomId}"]`);
       if (el) {
         if (!matchQuery(entry)) {
           el.remove();
@@ -3711,13 +3775,14 @@
           const timeSpan = el.querySelector('.log-time');
           const typeSpan = el.querySelector('.log-type');
           const contentSpan = el.querySelector('.log-content');
-          if (timeSpan) timeSpan.textContent = entry.timestamp;
+          if (timeSpan) timeSpan.textContent = typeof entry?.timestamp === 'string' ? entry.timestamp : '';
           if (typeSpan) {
-            typeSpan.className = `log-type ${entry.type}`;
-            typeSpan.textContent = entry.type;
+            const safeUpdType = ALLOWED_RENDER_TYPES.has(entry?.type) ? entry.type : 'info';
+            typeSpan.className = `log-type ${safeUpdType}`;
+            typeSpan.textContent = safeUpdType;
           }
           if (contentSpan) {
-            const localizedText = localizeRenderLog(entry.text, currentRenderLang);
+            const localizedText = getLocalizedRenderText(entry, currentRenderLang);
             const parsedHtml = parseAnsiToHtml(localizedText);
             contentSpan.innerHTML = searchQuery ? highlightSearchQuery(parsedHtml, searchQuery) : parsedHtml;
           }
@@ -3750,15 +3815,15 @@
       }
 
       if (autoScroll) {
-        scrollToBottom();
+        scheduleScrollToBottom();
       }
     }
 
     function matchQuery(entry) {
       if (!searchQuery) return true;
       const q = searchQuery.toLowerCase();
-      const raw = (entry.text || '').toLowerCase();
-      const loc = localizeRenderLog(entry.text || '', currentRenderLang).toLowerCase();
+      const raw = String(entry?.text || '').toLowerCase();
+      const loc = getLocalizedRenderText(entry, currentRenderLang).toLowerCase();
       return raw.includes(q) || loc.includes(q);
     }
 
@@ -3781,7 +3846,7 @@
       statLines.textContent = allLogs.length.toString();
 
       if (autoScroll) {
-        scrollToBottom();
+        scheduleScrollToBottom();
       }
     }
 
@@ -3807,12 +3872,21 @@
           }
         }
         if (autoScroll) {
-          scrollToBottom();
+          scheduleScrollToBottom();
         }
       }
     }
 
     let isProgrammaticScroll = false;
+    let pendingScrollRaf = 0;
+
+    function scheduleScrollToBottom() {
+      if (!container || pendingScrollRaf) return;
+      pendingScrollRaf = requestAnimationFrame(() => {
+        pendingScrollRaf = 0;
+        scrollToBottom();
+      });
+    }
 
     function scrollToBottom() {
       if (!container) return;
@@ -3828,13 +3902,15 @@
       autoScroll = enabled;
       const c = getRenderLocale();
       const txt = enabled ? c.autoScrollOn : c.autoScrollOff;
-      if (enabled) {
-        btnAutoScroll.classList.add('active');
-        btnAutoScroll.innerHTML = `<span>⬇</span> <span id="btn-autoscroll-text">${txt}</span>`;
-        scrollToBottom();
+      btnAutoScroll.classList.toggle('active', Boolean(enabled));
+      const labelEl = document.getElementById('btn-autoscroll-text');
+      if (labelEl) {
+        labelEl.textContent = txt;
       } else {
-        btnAutoScroll.classList.remove('active');
-        btnAutoScroll.innerHTML = `<span>⬇</span> <span id="btn-autoscroll-text">${txt}</span>`;
+        btnAutoScroll.innerHTML = `<span>⬇</span> <span id="btn-autoscroll-text">${escapeAttr(txt)}</span>`;
+      }
+      if (enabled) {
+        scrollToBottom();
       }
     }
 
@@ -3904,18 +3980,23 @@
       if (allLogs.length === 0) return;
       const text = allLogs
         .map(l => {
-          const locText = localizeRenderLog(l.text, currentRenderLang);
-          return `[${l.timestamp}] [${l.type}] ${locText}`;
+          const locText = getLocalizedRenderText(l, currentRenderLang);
+          return `[${l?.timestamp || ''}] [${l?.type || 'info'}] ${locText}`;
         })
         .join('\n');
       navigator.clipboard.writeText(text).then(() => {
         const c = getRenderLocale();
         const copySpan = document.getElementById('btn-copy-text');
         if (copySpan) {
-          const old = copySpan.textContent;
-          copySpan.textContent = c.copied;
-          setTimeout(() => { copySpan.textContent = old; }, 1500);
+          copySpan.textContent = c.copied || 'Copied!';
+          if (copyTimer) clearTimeout(copyTimer);
+          copyTimer = setTimeout(() => {
+            copyTimer = null;
+            copySpan.textContent = getRenderLocale().copy || 'Copy';
+          }, 1500);
         }
+      }).catch((err) => {
+        console.warn('复制渲染日志失败:', err);
       });
     });
 
@@ -3923,8 +4004,8 @@
       if (allLogs.length === 0) return;
       const text = allLogs
         .map(l => {
-          const locText = localizeRenderLog(l.text, currentRenderLang);
-          return `[${l.timestamp}] [${l.type}] ${locText}`;
+          const locText = getLocalizedRenderText(l, currentRenderLang);
+          return `[${l?.timestamp || ''}] [${l?.type || 'info'}] ${locText}`;
         })
         .join('\r\n');
       const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
@@ -4039,7 +4120,7 @@
       }
       if (data && data.state) updateStatus(data.state);
       if (data && Array.isArray(data.logs)) {
-        allLogs = data.logs;
+        allLogs = data.logs.slice(-2500);
         renderLogs();
         const lastWithProg = [...data.logs].reverse().find(l => l.progress);
         if (lastWithProg && lastWithProg.progress) {
@@ -4063,12 +4144,18 @@
       updateProgressBar(prog);
     });
 
+    let hideProgressTimer = null;
     ipcRenderer.on('render:status-update', (_event, state) => {
+      if (hideProgressTimer) {
+        clearTimeout(hideProgressTimer);
+        hideProgressTimer = null;
+      }
       updateStatus(state);
       if (state.status === 'success') {
         const c = getRenderLocale();
         updateProgressBar({ percent: 100, eta: c.statusCompleted });
-        setTimeout(() => {
+        hideProgressTimer = setTimeout(() => {
+          hideProgressTimer = null;
           if (progressWrap && currentStatus === 'success') {
             progressWrap.style.display = 'none';
           }
@@ -4095,7 +4182,7 @@
         updateStatus(res.state);
       }
       if (res && Array.isArray(res.logs)) {
-        allLogs = res.logs;
+        allLogs = res.logs.slice(-2500);
         renderLogs();
       }
     }).catch(() => { });

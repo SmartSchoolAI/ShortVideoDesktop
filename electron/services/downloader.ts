@@ -2,91 +2,83 @@ import fs from 'fs';
 import path from 'path';
 import https from 'https';
 import http from 'http';
-import net from 'net';
 import crypto from 'crypto';
 import os from 'os';
 import { app } from 'electron';
 import { APP_CONFIG } from '../config';
+import { isSafeVideoDownloadUrl } from '../utils/url-safety';
 
-function isPrivateOrLoopbackIp(ip: string): boolean {
-  const clean = ip.replace(/^\[|\]$/g, '').toLowerCase();
-  if (!net.isIP(clean)) return false;
-  if (net.isIPv4(clean)) {
-    const parts = clean.split('.').map(Number);
-    if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
-      return true;
-    }
-    const [a, b] = parts;
-    if (a === 0 || a === 10 || a === 127) return true;
-    if (a === 169 && b === 254) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 100 && b >= 64 && b <= 127) return true;
-    return false;
-  }
-  const normalized = clean.startsWith('::ffff:') ? clean.slice(7) : clean;
-  if (net.isIPv4(normalized)) return isPrivateOrLoopbackIp(normalized);
-  if (clean === '::1' || clean === '::') return true;
-  if (clean.startsWith('fe80:') || clean.startsWith('fc') || clean.startsWith('fd')) return true;
-  return false;
-}
-
-export function isSafeVideoDownloadUrl(parsedUrl: URL): boolean {
-  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-    return false;
-  }
-  const configuredOrigins = [APP_CONFIG.siteUrl, APP_CONFIG.downloadUrl]
-    .filter(Boolean)
-    .map((u) => {
-      try {
-        return new URL(u).origin;
-      } catch {
-        return '';
-      }
-    })
-    .filter(Boolean);
-  if (configuredOrigins.includes(parsedUrl.origin)) {
-    return true;
-  }
-  const host = parsedUrl.hostname.replace(/^\[|\]$/g, '').toLowerCase();
-  if (!host || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) {
-    return false;
-  }
-  if (net.isIP(host) && isPrivateOrLoopbackIp(host)) {
-    return false;
-  }
-  return true;
-}
+export { isSafeVideoDownloadUrl };
 
 export type DownloadProgressCallback = (downloadedBytes: number, totalBytes: number, percentText: string) => void;
+
+// 按规范化缓存文件路径去重并发下载，避免多任务写同一路径竞争覆盖
+const inFlightDownloads = new Map<string, Promise<string>>();
+let hasPrunedStaleTempFiles = false;
+
+function pruneStaleTempFiles(cacheDir: string): void {
+  if (hasPrunedStaleTempFiles) return;
+  hasPrunedStaleTempFiles = true;
+  try {
+    const cutoffMs = Date.now() - 2 * 60 * 60 * 1000;
+    for (const ent of fs.readdirSync(cacheDir, { withFileTypes: true })) {
+      if (!ent.isFile() || !ent.name.endsWith('.tmp')) continue;
+      const fullPath = path.join(cacheDir, ent.name);
+      try {
+        const st = fs.statSync(fullPath);
+        if (st.mtimeMs < cutoffMs) {
+          fs.unlinkSync(fullPath);
+        }
+      } catch { }
+    }
+  } catch { }
+}
 
 
 /**
  * 校验本地缓存的文件是否为有效的二进制视频（防止服务器返回404的HTML错误页）
  */
-function isValidVideoFile(filePath: string): boolean {
+export function isValidVideoFile(filePath: string): boolean {
   try {
-    if (!fs.existsSync(filePath)) return false;
+    if (!filePath || typeof filePath !== 'string' || !fs.existsSync(filePath)) return false;
     const stats = fs.statSync(filePath);
-    if (stats.size < 10240) return false;
+    if (!stats.isFile() || stats.size < 10240) return false;
 
-    // 读取前 256 字节检查魔数与文件特征
+    // 读取前 256 字节检查魔数与文件特征，使用 try/finally 确保异常时必定释放 fd
     const uint8Buf = new Uint8Array(256);
-    const fd = fs.openSync(filePath, 'r');
-    fs.readSync(fd, uint8Buf, 0, 256, 0);
-    fs.closeSync(fd);
+    let fd: number | null = null;
+    try {
+      fd = fs.openSync(filePath, 'r');
+      fs.readSync(fd, uint8Buf, 0, 256, 0);
+    } finally {
+      if (fd !== null) {
+        try {
+          fs.closeSync(fd);
+        } catch { }
+      }
+    }
 
     const buffer = Buffer.from(uint8Buf);
 
-    const headStr = buffer.toString('utf8').toLowerCase();
-    if (headStr.includes('<!doctype') || headStr.includes('<html') || headStr.includes('<head')) {
+    const headStr = buffer.toString('utf8').trimStart().toLowerCase();
+    if (
+      headStr.startsWith('<!doctype') ||
+      headStr.startsWith('<html') ||
+      headStr.startsWith('<head') ||
+      headStr.startsWith('<?xml') ||
+      headStr.startsWith('<error') ||
+      headStr.startsWith('<svg') ||
+      headStr.startsWith('{')
+    ) {
       return false;
     }
 
-    // 检查常见的视频格式特征 (ftyp for mp4/mov, or webm/mkv)
+    // 检查常见的视频格式特征 (ftyp for mp4/mov, webm/mkv, avi/riff, flv)
     const isMp4 = buffer.includes(Buffer.from('ftyp', 'ascii'));
     const isWebm = buffer[0] === 0x1a && buffer[1] === 0x45 && buffer[2] === 0xdf && buffer[3] === 0xa3;
-    return isMp4 || isWebm || stats.size > 102400; // 兜底：若大于100KB且非HTML则放行
+    const isAvi = buffer.slice(0, 4).toString('ascii') === 'RIFF' && buffer.slice(8, 12).toString('ascii') === 'AVI ';
+    const isFlv = buffer.slice(0, 3).toString('ascii') === 'FLV' && buffer[3] === 0x01;
+    return isMp4 || isWebm || isAvi || isFlv || stats.size > 102400; // 兜底：若大于100KB且非HTML/XML/JSON错误包则放行
   } catch {
     return false;
   }
@@ -97,6 +89,9 @@ function isValidVideoFile(filePath: string): boolean {
  */
 export function findExistingLocalVideo(inputPathOrUrl: string): string | null {
   try {
+    if (!inputPathOrUrl || typeof inputPathOrUrl !== 'string' || inputPathOrUrl.includes('\0')) {
+      return null;
+    }
     if (fs.existsSync(inputPathOrUrl) && isValidVideoFile(inputPathOrUrl)) {
       return inputPathOrUrl;
     }
@@ -140,7 +135,7 @@ export function findExistingLocalVideo(inputPathOrUrl: string): string | null {
               const nameWithoutExt = path.basename(ent.name, ext);
               if (nameWithoutExt.toLowerCase() === baseName.toLowerCase()) {
                 const full = path.join(dir, ent.name);
-                if (!folderSegment || dir.includes(folderSegment) || full.includes(folderSegment)) {
+                if (!folderSegment || dir.split(/[\\/]/).includes(folderSegment)) {
                   return full;
                 }
               }
@@ -161,7 +156,7 @@ export function findExistingLocalVideo(inputPathOrUrl: string): string | null {
                   continue;
                 }
                 const full = path.join(dir, ent.name);
-                if (!folderSegment || dir.includes(folderSegment) || full.includes(folderSegment)) {
+                if (!folderSegment || dir.split(/[\\/]/).includes(folderSegment)) {
                   return full;
                 }
               }
@@ -224,36 +219,51 @@ function downloadFileStream(
       return reject(new Error(`无效的视频下载 URL: ${url}`));
     }
 
+    const MAX_VIDEO_BYTES = 512 * 1024 * 1024; // 512 MB upper bound
+    const tempPath = `${targetPath}.${process.pid}.${Date.now()}.${crypto.randomBytes(4).toString('hex')}.tmp`;
     let settled = false;
     let activeFileStream: fs.WriteStream | null = null;
+    let activeRes: http.IncomingMessage | null = null;
     const failAndCleanup = (err: Error) => {
       if (settled) return;
       settled = true;
       try {
+        activeRes?.destroy();
+      } catch { }
+      try {
         activeFileStream?.destroy();
       } catch { }
-      safeUnlink(targetPath);
+      safeUnlink(tempPath);
       reject(err);
     };
 
     const client = parsedUrl.protocol === 'https:' ? https : http;
 
     const req = client.get(parsedUrl.toString(), (res) => {
+      activeRes = res;
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         res.resume();
         let nextUrl: string;
         try {
           const resolved = new URL(res.headers.location, parsedUrl);
+          if (parsedUrl.protocol === 'https:' && resolved.protocol !== 'https:') {
+            settled = true;
+            safeUnlink(tempPath);
+            return reject(new Error(`拒绝不安全的 HTTPS 降级重定向: ${resolved.origin}`));
+          }
           if (!isSafeVideoDownloadUrl(resolved)) {
             settled = true;
+            safeUnlink(tempPath);
             return reject(new Error(`非法或受限的重定向目标: ${resolved.origin}`));
           }
           nextUrl = resolved.toString();
         } catch {
           settled = true;
+          safeUnlink(tempPath);
           return reject(new Error(`无效的重定向地址: ${res.headers.location}`));
         }
         settled = true;
+        safeUnlink(tempPath);
         downloadFileStream(nextUrl, targetPath, onProgress, redirectCount + 1)
           .then(resolve)
           .catch(reject);
@@ -263,17 +273,48 @@ function downloadFileStream(
       if (res.statusCode !== 200) {
         res.resume();
         settled = true;
+        safeUnlink(tempPath);
         reject(new Error(`下载视频失败，HTTP 状态码: ${res.statusCode} (${url})`));
         return;
       }
 
-      const fileStream = fs.createWriteStream(targetPath);
+      const contentType = String(res.headers['content-type'] || '').toLowerCase();
+      if (
+        contentType &&
+        (contentType.includes('text/html') ||
+          contentType.includes('application/json') ||
+          contentType.includes('text/plain') ||
+          contentType.includes('text/xml') ||
+          contentType.includes('application/xml') ||
+          contentType.includes('image/svg+xml'))
+      ) {
+        res.resume();
+        settled = true;
+        safeUnlink(tempPath);
+        reject(new Error(`下载视频失败，远程返回非视频响应类型: ${contentType}`));
+        return;
+      }
+
+      const declaredTotal = parseInt(res.headers['content-length'] || '0', 10);
+      if (Number.isFinite(declaredTotal) && declaredTotal > MAX_VIDEO_BYTES) {
+        res.destroy();
+        settled = true;
+        safeUnlink(tempPath);
+        reject(new Error(`远程视频体积超过允许上限 (${Math.round(declaredTotal / 1024 / 1024)}MB > 512MB)`));
+        return;
+      }
+
+      const fileStream = fs.createWriteStream(tempPath);
       activeFileStream = fileStream;
-      const totalBytes = parseInt(res.headers['content-length'] || '0', 10);
+      const totalBytes = Number.isFinite(declaredTotal) ? declaredTotal : 0;
       let downloadedBytes = 0;
 
       res.on('data', (chunk) => {
         downloadedBytes += chunk.length;
+        if (downloadedBytes > MAX_VIDEO_BYTES) {
+          failAndCleanup(new Error('远程视频流超出最大体积限制 (512MB)'));
+          return;
+        }
         if (totalBytes > 0) {
           const pct = Math.min(100, Math.round((downloadedBytes / totalBytes) * 100));
           onProgress?.(downloadedBytes, totalBytes, `${pct}%`);
@@ -301,9 +342,26 @@ function downloadFileStream(
       fileStream.on('finish', () => {
         fileStream.close(() => {
           if (settled) return;
-          if (!isValidVideoFile(targetPath)) {
+          if (!res.complete) {
+            failAndCleanup(new Error('远程视频 HTTP 响应未完整结束（连接可能被提前关闭）'));
+            return;
+          }
+          if (!isValidVideoFile(tempPath)) {
             failAndCleanup(new Error('下载的文件非有效视频流（可能是远程返回了404错误网页）'));
             return;
+          }
+          try {
+            if (isValidVideoFile(targetPath)) {
+              safeUnlink(tempPath);
+            } else {
+              fs.renameSync(tempPath, targetPath);
+            }
+          } catch (renameErr: any) {
+            if (!isValidVideoFile(targetPath)) {
+              failAndCleanup(renameErr instanceof Error ? renameErr : new Error(String(renameErr)));
+              return;
+            }
+            safeUnlink(tempPath);
           }
           settled = true;
           onProgress?.(downloadedBytes, totalBytes || downloadedBytes, '100%');
@@ -333,8 +391,8 @@ export async function ensureLocalVideoFile(
   videoUrlOrPath: string,
   onProgress?: DownloadProgressCallback
 ): Promise<string> {
-  if (!videoUrlOrPath) {
-    throw new Error('视频资源路径不能为空');
+  if (!videoUrlOrPath || typeof videoUrlOrPath !== 'string' || /[\x00-\x1f\x7f]/.test(videoUrlOrPath)) {
+    throw new Error('视频资源路径无效或不能为空');
   }
 
   // 1. 如果本身就是合法的本地绝对文件路径且已存在
@@ -378,6 +436,8 @@ export async function ensureLocalVideoFile(
     const cacheDir = path.join(app.getPath('userData'), 'cached_videos');
     if (!fs.existsSync(cacheDir)) {
       fs.mkdirSync(cacheDir, { recursive: true });
+    } else {
+      pruneStaleTempFiles(cacheDir);
     }
 
     // 根据 URL 生成候选 URL 列表（支持远程多语言后缀智能降级）
@@ -438,7 +498,16 @@ export async function ensureLocalVideoFile(
         if (i > 0) {
           console.log(`[Downloader] 🔄 带有语言后缀的版本不存在，正在尝试根主视频地址: ${currentUrl}`);
         }
-        const downloadedPath = await downloadFileStream(currentUrl, targetPath, onProgress);
+        let pending = inFlightDownloads.get(targetPath);
+        if (!pending) {
+          pending = downloadFileStream(currentUrl, targetPath, onProgress).finally(() => {
+            if (inFlightDownloads.get(targetPath) === pending) {
+              inFlightDownloads.delete(targetPath);
+            }
+          });
+          inFlightDownloads.set(targetPath, pending);
+        }
+        const downloadedPath = await pending;
         return downloadedPath;
       } catch (err: any) {
         lastError = err;

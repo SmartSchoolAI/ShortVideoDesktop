@@ -1,21 +1,28 @@
 import path from 'path';
 import fs from 'fs';
 
-// 桌面环境配置加载：
-// 1. 本地开发环境：允许使用 .env 与 .env.desktop
-// 2. 编译打包后的生产安装包：在任何条件下严禁加载 .env，仅允许加载公开安全的 .env.desktop
-function loadDesktopEnv(): void {
+export function isPackagedRuntime(): boolean {
   let isPackaged = false;
   try {
     const electron = require('electron');
-    if (electron?.app?.isPackaged) {
+    if (electron?.app?.isPackaged === true) {
       isPackaged = true;
     }
   } catch (_) {}
 
-  if ((process as any).resourcesPath || __dirname.includes('.asar')) {
+  const resPath = String((process as any).resourcesPath || '');
+  const isDevElectronResources = resPath.includes(`${path.sep}node_modules${path.sep}`);
+  if (__dirname.includes('.asar') || (!(process as any).defaultApp && Boolean(resPath) && !isDevElectronResources)) {
     isPackaged = true;
   }
+  return isPackaged;
+}
+
+// 桌面环境配置加载：
+// 1. 本地开发环境：允许使用 .env 与 .env.desktop
+// 2. 编译打包后的生产安装包：在任何条件下严禁加载 .env，仅允许加载公开安全的 .env.desktop
+function loadDesktopEnv(): void {
+  const isPackaged = isPackagedRuntime();
 
   const candidates = isPackaged
     ? [
@@ -120,25 +127,12 @@ export function getAppTagVersion(): string {
     return v.startsWith('v') ? v : `v${v}`;
   }
 
-  // 1. 优先尝试从 git tags 中读取当前发布 TAG 号
-  try {
-    const { execSync } = require('child_process');
-    const gitTag = execSync('git describe --tags --abbrev=0', {
-      encoding: 'utf-8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-      timeout: 1000,
-    })?.trim();
-    if (gitTag && /^v?\d+/.test(gitTag)) {
-      return gitTag.startsWith('v') ? gitTag : `v${gitTag}`;
-    }
-  } catch {}
-
-  // 2. 尝试从 package.json 中读取
+  // 1. 优先从 package.json 中读取，避免在生产环境触发外部子进程调用
   try {
     const candidates = [
-      path.resolve(process.cwd(), 'package.json'),
       path.resolve(__dirname, '../package.json'),
       path.resolve(__dirname, '../../package.json'),
+      path.resolve(process.cwd(), 'package.json'),
     ];
     for (const p of candidates) {
       if (fs.existsSync(p)) {
@@ -147,6 +141,21 @@ export function getAppTagVersion(): string {
       }
     }
   } catch {}
+
+  // 2. 仅非打包开发模式下回退读取 git tags
+  if (!isPackagedRuntime()) {
+    try {
+      const { execSync } = require('child_process');
+      const gitTag = execSync('git describe --tags --abbrev=0', {
+        encoding: 'utf-8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+        timeout: 1000,
+      })?.trim();
+      if (gitTag && /^v?\d+/.test(gitTag)) {
+        return gitTag.startsWith('v') ? gitTag : `v${gitTag}`;
+      }
+    } catch {}
+  }
 
   return 'v0.1.19';
 }

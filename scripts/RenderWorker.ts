@@ -1219,6 +1219,25 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
     }
   },
   {
+    regex: /❌ 任务 \[(.*?)\] 执行异常:\s*(.*?)（致命状态 (.*?)，跳过待渲染状态回写）/g,
+    translations: {
+      "zh": "❌ 任务 [$1] 执行异常: $2（致命状态 $3，跳过待渲染状态回写）",
+      "en": "❌ Task [$1] execution error: $2 (Fatal status $3, skipped waiting_render restore)",
+      "ja": "❌ タスク [$1] 実行エラー: $2（致命的ステータス $3、waiting_render への書き戻しをスキップしました）",
+      "ko": "❌ 작업 [$1] 실행 오류: $2 (치명적 상태 $3, waiting_render 상태 복원 건너뜀)",
+      "vi": "❌ Tác vụ [$1] lỗi thực thi: $2 (Trạng thái nghiêm trọng $3, đã bỏ qua khôi phục waiting_render)",
+      "th": "❌ งาน [$1] เกิดข้อผิดพลาด: $2 (สถานะร้ายแรง $3 ข้ามการเขียนคืน waiting_render)",
+      "id": "❌ Tugas [$1] kesalahan eksekusi: $2 (Status fatal $3, lewati pemulihan waiting_render)",
+      "es": "❌ Error en tarea [$1]: $2 (Estado fatal $3, omitiendo restauración de waiting_render)",
+      "fr": "❌ Erreur tâche [$1] : $2 (Statut fatal $3, restauration waiting_render ignorée)",
+      "pt": "❌ Erro na tarefa [$1]: $2 (Status fatal $3, restauração de waiting_render ignorada)",
+      "de": "❌ Fehler Aufgabe [$1]: $2 (Fataler Status $3, Wiederherstellung auf waiting_render übersprungen)",
+      "it": "❌ Errore attività [$1]: $2 (Stato irreversibile $3, ripristino waiting_render saltato)",
+      "ru": "❌ Ошибка задачи [$1]: $2 (Критичный статус $3, возврат waiting_render пропущен)",
+      "tr": "❌ Görev [$1] hatası: $2 (Kritik durum $3, waiting_render geri yüklemesi atlandı)",
+    }
+  },
+  {
     regex: /❌ 任务 \[(.*?)\] 执行异常:\s*(.*?)（尝试恢复待渲染状态失败，请核查服务端状态）/g,
     translations: {
       "zh": "❌ 任务 [$1] 执行异常: $2（尝试恢复待渲染状态失败，请核查服务端状态）",
@@ -6102,8 +6121,12 @@ export async function handleTaskErrorWithCircuitBreaker(task: any, baseUrl: stri
   }
 
   const taskLabel = currentRunningTaskId ?? task?.videoId ?? task?.id ?? 'unknown';
+  const skipRestoreOnFatalStatus =
+    currentCategory === 'HttpFatalError (404)' ||
+    currentCategory === 'HttpFatalError (401)' ||
+    currentCategory === 'HttpFatalError (403)';
   let restored = false;
-  if (taskLabel && taskLabel !== 'unknown') {
+  if (taskLabel && taskLabel !== 'unknown' && !skipRestoreOnFatalStatus) {
     const mod: VideoModule = task?.__module
       ? inferModuleFromHints(task.__module, task?.folderPath, taskLabel)
       : detectTaskModule(task);
@@ -6122,6 +6145,8 @@ export async function handleTaskErrorWithCircuitBreaker(task: any, baseUrl: stri
 
   if (restored) {
     log(localizeScriptLog(`❌ 任务 [${taskLabel}] 执行异常: ${err.message}，已自动恢复为待渲染状态`), 'red');
+  } else if (skipRestoreOnFatalStatus) {
+    log(localizeScriptLog(`❌ 任务 [${taskLabel}] 执行异常: ${err.message}（致命状态 ${currentCategory}，跳过待渲染状态回写）`), 'red');
   } else {
     log(localizeScriptLog(`❌ 任务 [${taskLabel}] 执行异常: ${err.message}（尝试恢复待渲染状态失败，请核查服务端状态）`), 'red');
   }
@@ -6134,7 +6159,7 @@ export async function handleTaskErrorWithCircuitBreaker(task: any, baseUrl: stri
     if (currentCategory === 'NetworkConnectionError') {
       // 网络连接/代理上传异常属于瞬态网络抖动，不杀死整个渲染进程，而是进行网络恢复冷却后重置计数器
       log(localizeScriptLog(`\n⚠️ 检测到网络连接/代理上传异常已发生 ${consecutiveSameErrorCount} 次，正在进入 10 秒网络恢复冷却等待，稍后继续任务轮询...`), 'yellow');
-      await new Promise((resolve) => setTimeout(resolve, 10000));
+      await interruptibleSleep(10000);
       consecutiveSameErrorCount = 0;
       return;
     }
@@ -6203,8 +6228,8 @@ async function triggerQueue(
         if (isCircuitBreakerTripped) {
           break;
         }
-        // 异常冷静防抖缓冲：休眠 3 秒，避免极速死循环抢单消耗系统与数据库资源
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        // 异常冷静防抖缓冲：可中断休眠 3 秒，避免极速死循环抢单消耗系统与数据库资源
+        await interruptibleSleep(3000);
       } finally {
         currentRunningTaskId = null;
       }
@@ -6260,7 +6285,10 @@ async function listenSSEForModule(
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split('\n\n');
+        if (buffer.length > 262144) {
+          buffer = buffer.slice(-65536);
+        }
+        const parts = buffer.split(/\r?\n\r?\n/);
         buffer = parts.pop() || '';
 
         for (const block of parts) {
@@ -6270,7 +6298,7 @@ async function listenSSEForModule(
           let eventName = 'message';
           let dataStr = '';
 
-          for (const line of trimmed.split('\n')) {
+          for (const line of trimmed.split(/\r?\n/)) {
             if (line.startsWith('event:')) {
               eventName = line.replace('event:', '').trim();
             } else if (line.startsWith('data:')) {

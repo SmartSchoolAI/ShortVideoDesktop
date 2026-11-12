@@ -3,6 +3,7 @@ import path from 'path';
 import { app, Notification } from 'electron';
 import { windowManager } from './window-manager';
 import { getLocale, formatI18n } from '../utils/i18n';
+import { isSafeVideoDownloadUrl } from '../utils/url-safety';
 
 export interface ScheduledTaskItem {
   id: string; // 唯一键，例如 `${platform}_${taskId}`
@@ -25,9 +26,23 @@ export type TaskExecutor = (task: ScheduledTaskItem) => Promise<{ success: boole
 class LocalPublishScheduler {
   private tasks: Map<string, ScheduledTaskItem> = new Map();
   private timer: NodeJS.Timeout | null = null;
+  private pendingTickTimers: Set<NodeJS.Timeout> = new Set();
+  private activeCooldownAbort: (() => void) | null = null;
   private isProcessing = false;
+  private isStopped = false;
   private executor: TaskExecutor | null = null;
   private storageFilePath: string = '';
+
+  private scheduleTick(delayMs: number): void {
+    const t = setTimeout(() => {
+      this.pendingTickTimers.delete(t);
+      if (!this.isStopped) {
+        this.tick();
+      }
+    }, delayMs);
+    t.unref?.();
+    this.pendingTickTimers.add(t);
+  }
 
   constructor() {
     // 延迟获取路径，确保 app ready 之后可正确解析 userData
@@ -79,7 +94,7 @@ class LocalPublishScheduler {
         )
       );
       // 启动 3 秒后待窗口与平台环境就绪即刻开始发布
-      setTimeout(() => this.tick(), 3000);
+      this.scheduleTick(3000);
     }
   }
 
@@ -100,7 +115,7 @@ class LocalPublishScheduler {
       this.saveToDisk();
       this.broadcastUpdate();
       console.log(`[Scheduler] 已手动重置 ${retried.length} 个失败任务并立即执行`);
-      setTimeout(() => this.tick(), 500);
+      this.scheduleTick(500);
     }
     return retried;
   }
@@ -109,20 +124,81 @@ class LocalPublishScheduler {
    * 启动定时轮询监听（每 15 秒检查一次是否有到达定时时间的任务）
    */
   public start(): void {
+    this.isStopped = false;
     if (this.timer) return;
     console.log('[Scheduler] 本地定时发布调度服务已启动，轮询周期: 15s');
     this.timer = setInterval(() => {
       this.tick();
     }, 15000);
+    this.timer.unref?.();
     // 启动后立即检查一次
-    setTimeout(() => this.tick(), 2000);
+    this.scheduleTick(2000);
   }
 
   public stop(): void {
+    this.isStopped = true;
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
     }
+    for (const t of this.pendingTickTimers) {
+      clearTimeout(t);
+    }
+    this.pendingTickTimers.clear();
+    if (this.activeCooldownAbort) {
+      try { this.activeCooldownAbort(); } catch {}
+      this.activeCooldownAbort = null;
+    }
+  }
+
+  private sanitizeTaskInput(raw: any): ScheduledTaskItem | null {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    if (
+      typeof raw.id !== 'string' ||
+      !raw.id.trim() ||
+      typeof raw.taskId !== 'string' ||
+      !raw.taskId.trim() ||
+      (raw.platform !== 'wechat' && raw.platform !== 'xiaohongshu' && raw.platform !== 'bilibili' && raw.platform !== 'douyin') ||
+      !Number.isFinite(Number(raw.scheduledPublishAt)) ||
+      Number(raw.scheduledPublishAt) <= 0 ||
+      typeof raw.videoUrl !== 'string'
+    ) {
+      return null;
+    }
+    try {
+      const parsedVideoUrl = new URL(raw.videoUrl.trim());
+      if (parsedVideoUrl.protocol !== 'http:' && parsedVideoUrl.protocol !== 'https:') {
+        return null;
+      }
+      if (!isSafeVideoDownloadUrl(parsedVideoUrl)) {
+        return null;
+      }
+    } catch {
+      return null;
+    }
+    const cleanStatus =
+      raw.status === 'pending' || raw.status === 'executing' || raw.status === 'success' || raw.status === 'failed'
+        ? raw.status
+        : 'pending';
+    const cleanTags = Array.isArray(raw.tags)
+      ? raw.tags.filter((x: any): x is string => typeof x === 'string' && x.trim().length > 0).map((x: string) => x.trim().slice(0, 64)).slice(0, 20)
+      : undefined;
+
+    return {
+      id: raw.id.trim().slice(0, 128),
+      taskId: raw.taskId.trim().slice(0, 128),
+      platform: raw.platform,
+      videoUrl: raw.videoUrl.trim(),
+      title: typeof raw.title === 'string' ? raw.title.slice(0, 500) : '',
+      description: typeof raw.description === 'string' ? raw.description.slice(0, 4000) : '',
+      ...(cleanTags && cleanTags.length > 0 ? { tags: cleanTags } : {}),
+      scheduledPublishAt: Number(raw.scheduledPublishAt),
+      status: cleanStatus,
+      ...(typeof raw.error === 'string' ? { error: raw.error.slice(0, 500) } : {}),
+      ...(Number.isFinite(Number(raw.executedAt)) && Number(raw.executedAt) > 0 ? { executedAt: Number(raw.executedAt) } : {}),
+      ...(typeof raw.wordA === 'string' ? { wordA: raw.wordA.slice(0, 128) } : {}),
+      ...(typeof raw.wordB === 'string' ? { wordB: raw.wordB.slice(0, 128) } : {}),
+    };
   }
 
   /**
@@ -133,40 +209,16 @@ class LocalPublishScheduler {
       return this.getAllTasks();
     }
     let addedCount = 0;
-    for (const t of newTasks) {
-      if (
-        !t ||
-        typeof t !== 'object' ||
-        typeof t.id !== 'string' ||
-        !t.id.trim() ||
-        typeof t.taskId !== 'string' ||
-        !t.taskId.trim() ||
-        (t.platform !== 'wechat' && t.platform !== 'xiaohongshu') ||
-        !Number.isFinite(Number(t.scheduledPublishAt)) ||
-        Number(t.scheduledPublishAt) <= 0 ||
-        typeof t.videoUrl !== 'string'
-      ) {
+    for (const rawTask of newTasks) {
+      if (!rawTask || (rawTask.platform !== 'wechat' && rawTask.platform !== 'xiaohongshu')) {
         continue;
       }
-      try {
-        const parsedVideoUrl = new URL(t.videoUrl.trim());
-        if (parsedVideoUrl.protocol !== 'http:' && parsedVideoUrl.protocol !== 'https:') {
-          continue;
-        }
-      } catch {
-        continue;
-      }
-      const cleanId = t.id.trim();
-      const existing = this.tasks.get(cleanId);
-      // 如果已存在且处于成功状态，允许重新排期
-      this.tasks.set(cleanId, {
-        ...existing,
-        ...t,
-        id: cleanId,
-        taskId: t.taskId.trim(),
-        videoUrl: t.videoUrl.trim(),
-        scheduledPublishAt: Number(t.scheduledPublishAt),
+      const cleanTask = this.sanitizeTaskInput(rawTask);
+      if (!cleanTask) continue;
+      this.tasks.set(cleanTask.id, {
+        ...cleanTask,
         status: 'pending',
+        error: undefined,
       });
       addedCount++;
     }
@@ -175,7 +227,7 @@ class LocalPublishScheduler {
       this.broadcastUpdate();
       console.log(`[Scheduler] 成功添加/更新 ${addedCount} 个定时任务`);
       // 添加后立刻触发一次检查
-      setTimeout(() => this.tick(), 500);
+      this.scheduleTick(500);
     }
     return this.getAllTasks();
   }
@@ -204,10 +256,10 @@ class LocalPublishScheduler {
    * 定时心跳轮询：扫描到达时间的待发布任务
    */
   private async tick(): Promise<void> {
-    if (this.isProcessing || !this.executor) return;
+    if (this.isStopped || this.isProcessing || !this.executor) return;
 
     const now = Date.now();
-    // 查找已到期且待执行的任务 (允许 30 秒容差)
+    // 查找已到期且待执行的任务 (允许 1 秒时钟容差)
     const dueTasks: ScheduledTaskItem[] = [];
     for (const task of this.tasks.values()) {
       if (task.status === 'pending' && task.scheduledPublishAt <= now + 1000) {
@@ -223,6 +275,7 @@ class LocalPublishScheduler {
     this.isProcessing = true;
     try {
       for (const task of dueTasks) {
+        if (this.isStopped) break;
         console.log(`[Scheduler] ⏰ 到达定时时间！准备自动执行上传任务 [${task.platform}] - ${task.title}`);
         task.status = 'executing';
         this.broadcastUpdate();
@@ -257,8 +310,20 @@ class LocalPublishScheduler {
         this.saveToDisk();
         this.broadcastUpdate();
 
-        // 两个连续自动发布之间留出 5 秒冷却时间，避免界面频繁切换
-        await new Promise((resolve) => setTimeout(resolve, 5000));
+        // 两个连续自动发布之间留出 5 秒可中断冷却时间，避免界面频繁切换及退出阻塞
+        if (this.isStopped) break;
+        await new Promise<void>((resolve) => {
+          const cooldownTimer = setTimeout(() => {
+            this.activeCooldownAbort = null;
+            resolve();
+          }, 5000);
+          cooldownTimer.unref?.();
+          this.activeCooldownAbort = () => {
+            clearTimeout(cooldownTimer);
+            this.activeCooldownAbort = null;
+            resolve();
+          };
+        });
       }
     } finally {
       this.isProcessing = false;
@@ -299,11 +364,14 @@ class LocalPublishScheduler {
     if (!this.storageFilePath || !fs.existsSync(this.storageFilePath)) return;
     try {
       const raw = fs.readFileSync(this.storageFilePath, 'utf-8');
-      const list: ScheduledTaskItem[] = JSON.parse(raw);
+      const list: unknown = JSON.parse(raw);
       if (Array.isArray(list)) {
         this.tasks.clear();
-        for (const item of list) {
-          this.tasks.set(item.id, item);
+        for (const rawItem of list) {
+          const cleanItem = this.sanitizeTaskInput(rawItem);
+          if (cleanItem) {
+            this.tasks.set(cleanItem.id, cleanItem);
+          }
         }
         console.log(`[Scheduler] 已从本地文件加载 ${this.tasks.size} 个定时任务`);
       }
@@ -314,10 +382,15 @@ class LocalPublishScheduler {
 
   private saveToDisk(): void {
     if (!this.storageFilePath) return;
+    const tmpPath = `${this.storageFilePath}.tmp-${process.pid}`;
     try {
       const list = Array.from(this.tasks.values());
-      fs.writeFileSync(this.storageFilePath, JSON.stringify(list, null, 2), 'utf-8');
+      fs.writeFileSync(tmpPath, JSON.stringify(list, null, 2), { encoding: 'utf-8', mode: 0o600 });
+      fs.renameSync(tmpPath, this.storageFilePath);
     } catch (err) {
+      try {
+        if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+      } catch {}
       console.warn('[Scheduler] 保存本地任务文件失败:', err);
     }
   }

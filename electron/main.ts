@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, Menu, MenuItemConstructorOptions, Notification, shell } from 'electron';
 import fs from 'fs';
 import { execSync } from 'child_process';
+import os from 'os';
 import path from 'path';
 import { windowManager } from './services/window-manager';
 import { cdpBridge } from './services/cdp-bridge';
@@ -12,6 +13,7 @@ import { localizePlatformLog } from './platforms/platform-i18n';
 import { injectPlatformToast } from './utils/toast-helper';
 import { APP_CONFIG, isOwnSiteUrl } from './config';
 import { isTrustedIpcSender } from './utils/ipc-security';
+import { isSafeHttpTargetUrl } from './utils/url-safety';
 import { localScheduler } from './services/scheduler';
 import { sessionKeeper } from './services/session-keeper';
 import { setupConsoleLogger, systemLogger } from './utils/logger';
@@ -27,7 +29,9 @@ if (process.platform === 'win32') {
   try {
     execSync('chcp 65001', { stdio: 'ignore' });
   } catch { }
-  process.env.LANG = 'zh_CN.UTF-8';
+  if (!process.env.LANG) {
+    process.env.LANG = 'C.UTF-8';
+  }
   // 注册 AppUserModelId 确保 Windows 10/11 任务栏图标分组与原生 Toast 通知正常工作
   app.setAppUserModelId(APP_CONFIG.appId);
 }
@@ -187,7 +191,9 @@ function setupApplicationMenu(): void {
         {
           label: m.help.officialSite,
           click: () => {
-            shell.openExternal(APP_CONFIG.siteUrl);
+            if (isSafeHttpTargetUrl(APP_CONFIG.siteUrl)) {
+              shell.openExternal(APP_CONFIG.siteUrl).catch(() => {});
+            }
           },
         },
       ],
@@ -247,7 +253,6 @@ async function executePlatformPublishCore(
       message: startNotice,
       type: 'info',
       inProgress: true,
-      estimatedTime: '1-3分钟',
       banner: {
         show: true,
         title: formatI18n(loc.notifications.startPublishTitle),
@@ -364,6 +369,19 @@ function registerIpcHandlers(): void {
     '.mp4', '.webm', '.ogg', '.m4v', '.mov', '.mkv',
     '.mp3', '.wav', '.m4a', '.aac', '.flac', '.log', '.txt',
   ]);
+  const SAFE_TEXT_LOG_EXTS = new Set(['.log', '.txt']);
+
+  const isPathInsideDir = (targetPath: string, baseDir: string): boolean => {
+    try {
+      const cleanBase = path.resolve(baseDir);
+      const normTarget = process.platform === 'win32' ? targetPath.toLowerCase() : targetPath;
+      const normBase = process.platform === 'win32' ? cleanBase.toLowerCase() : cleanBase;
+      const prefix = normBase.endsWith(path.sep) ? normBase : `${normBase}${path.sep}`;
+      return normTarget === normBase || normTarget.startsWith(prefix);
+    } catch {
+      return false;
+    }
+  };
 
   const resolveAllowedLocalMediaPath = (
     filePath: string
@@ -389,6 +407,20 @@ function registerIpcHandlers(): void {
     const ext = path.extname(cleanPath).toLowerCase();
     if (!ALLOWED_LOCAL_MEDIA_EXTS.has(ext)) {
       return { ok: false, message: `Unsupported file type: ${ext || '(none)'}` };
+    }
+    if (SAFE_TEXT_LOG_EXTS.has(ext)) {
+      const allowedLogDirs = [
+        app.getPath('userData'),
+        app.getPath('logs'),
+        os.tmpdir(),
+        path.resolve('logs'),
+        !app.isPackaged ? process.cwd() : '',
+      ].filter(Boolean);
+      const realTarget = fs.existsSync(cleanPath) ? fs.realpathSync(cleanPath) : cleanPath;
+      const inAllowedDir = allowedLogDirs.some((dir) => isPathInsideDir(realTarget, fs.existsSync(dir) ? fs.realpathSync(dir) : dir));
+      if (!inAllowedDir) {
+        return { ok: false, message: 'Text/log file access is restricted to application directories' };
+      }
     }
     if (!fs.existsSync(cleanPath) || !fs.statSync(cleanPath).isFile()) {
       return { ok: false, message: `File does not exist: ${cleanPath}` };
@@ -423,8 +455,15 @@ function registerIpcHandlers(): void {
       if (platform !== 'wechat' && platform !== 'xiaohongshu') {
         return { success: false, platform, message: 'Unsupported platform' };
       }
-      if (!payload || typeof payload !== 'object') {
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
         return { success: false, platform, message: 'Invalid publish payload' };
+      }
+      if (
+        (payload.title !== undefined && typeof payload.title !== 'string') ||
+        (payload.description !== undefined && typeof payload.description !== 'string') ||
+        (payload.videoUrl !== undefined && typeof payload.videoUrl !== 'string')
+      ) {
+        return { success: false, platform, message: 'Invalid publish payload fields' };
       }
       console.log(`[IPC platform:publish] 收到 ${platform} 自动化发布指令:`, {
         title: payload?.title,
@@ -519,6 +558,9 @@ function registerIpcHandlers(): void {
       if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
         return { success: false, message: 'Only HTTP/HTTPS URLs are allowed' };
       }
+      if (!isSafeHttpTargetUrl(parsed)) {
+        return { success: false, message: 'Blocked unsafe or private network URL' };
+      }
       const win = windowManager.openExternalVideoWindow(parsed.toString());
       return { success: Boolean(win) };
     } catch {
@@ -548,7 +590,10 @@ function registerIpcHandlers(): void {
     } catch (err: any) {
       console.warn('[WindowManager] 内置弹窗播放异常，降级调起系统默认播放器:', err);
       try {
-        await shell.openPath(cleanPath);
+        const openErr = await shell.openPath(cleanPath);
+        if (openErr) {
+          return { success: false, message: openErr };
+        }
         return { success: true };
       } catch (fallbackErr: any) {
         return { success: false, message: fallbackErr?.message || String(fallbackErr) };
@@ -570,6 +615,9 @@ function registerIpcHandlers(): void {
         const parsed = new URL(trimmed);
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
           return { success: false, message: 'Only HTTP/HTTPS URLs are allowed' };
+        }
+        if (!isSafeHttpTargetUrl(parsed)) {
+          return { success: false, message: 'Blocked unsafe or private network URL' };
         }
         await shell.openExternal(parsed.toString());
         return { success: true };
@@ -706,8 +754,13 @@ if (!gotTheLock) {
 
     // 客户端打开时：同时打开主站、系统日志和视频渲染三个TAB，主站是选中的TAB，后台自动启动视频渲染
     // 统一初始化辅助 TAB 视图（系统日志与视频渲染后台进程）
+    let auxTabsTimer: NodeJS.Timeout | null = null;
     const ensureDefaultAuxTabs = () => {
-      setTimeout(() => {
+      if (auxTabsTimer) {
+        clearTimeout(auxTabsTimer);
+      }
+      auxTabsTimer = setTimeout(() => {
+        auxTabsTimer = null;
         try {
           console.log('[Main] 正在就绪【系统运行日志】与【视频渲染】TAB，主站保持激活选中...');
           windowManager.openLogsTab(false);
@@ -733,9 +786,22 @@ if (!gotTheLock) {
         main.focus();
       }
     });
+
+    app.on('before-quit', () => {
+      if (auxTabsTimer) {
+        clearTimeout(auxTabsTimer);
+        auxTabsTimer = null;
+      }
+    });
   });
 
   app.on('before-quit', async () => {
+    try {
+      localScheduler.stop();
+    } catch { }
+    try {
+      sessionKeeper.destroy();
+    } catch { }
     try {
       renderManager.stopRender();
     } catch { }

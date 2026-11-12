@@ -1,11 +1,13 @@
 import { WebContents, clipboard } from 'electron';
 import { Page, Locator } from 'playwright-core';
 import { PublishAbortedError } from '../platforms/base-platform';
+import { pickRealisticAdjacentTypo } from '../services/cdp-bridge';
 
 export interface HumanTypingOptions {
   minDelay?: number;
   maxDelay?: number;
   errorRate?: number; // 输错字并回退修改的概率 (0.0 ~ 1.0)
+  signal?: AbortSignal;
 }
 
 /**
@@ -13,13 +15,13 @@ export interface HumanTypingOptions {
  */
 export async function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   if (signal?.aborted) {
-    throw new PublishAbortedError('任务已被主动中止: 标签页已被关闭');
+    throw new PublishAbortedError();
   }
   return new Promise((resolve, reject) => {
     let timer: NodeJS.Timeout | null = null;
     const onAbort = () => {
       if (timer) clearTimeout(timer);
-      reject(new PublishAbortedError('任务已被主动中止: 标签页已被关闭'));
+      reject(new PublishAbortedError());
     };
 
     timer = setTimeout(() => {
@@ -62,7 +64,7 @@ export async function waitHumanInterval(
 ): Promise<void> {
   const effectiveSignal = signal || tracer.getSignal?.();
   if (effectiveSignal?.aborted || tracer.isAborted?.()) {
-    throw new PublishAbortedError('任务已被主动中止: 标签页已被关闭');
+    throw new PublishAbortedError();
   }
   const duration = getRandomDelay(minMs, maxMs);
   const startTime = Date.now();
@@ -77,7 +79,7 @@ export async function waitHumanInterval(
   // 持续倒计时循环（Toast 始终常驻显示，数字平滑递减）
   while (Date.now() < endTime) {
     if (effectiveSignal?.aborted || tracer.isAborted?.()) {
-      throw new PublishAbortedError('任务已被主动中止: 标签页已被关闭');
+      throw new PublishAbortedError();
     }
     const remainingMs = endTime - Date.now();
     if (remainingMs <= 0) break;
@@ -110,9 +112,13 @@ export async function waitHumanInterval(
  */
 export async function simulateHumanPaste(
   webContents: WebContents,
-  text: string
+  text: string,
+  signal?: AbortSignal
 ): Promise<void> {
-  await simulateClipboardHesitation();
+  if (signal?.aborted) {
+    throw new PublishAbortedError();
+  }
+  await simulateClipboardHesitation(signal);
   clipboard.writeText(text);
 
   const isMac = process.platform === 'darwin';
@@ -127,7 +133,7 @@ export async function simulateHumanPaste(
     modifiers: [isMac ? 'meta' : 'control'],
   });
 
-  await sleep(getRandomDelay(350, 650));
+  await sleep(getRandomDelay(350, 650), signal);
 }
 
 /**
@@ -138,52 +144,31 @@ export async function simulateHumanTyping(
   text: string,
   options: HumanTypingOptions = {}
 ): Promise<void> {
-  const { minDelay = 40, maxDelay = 130, errorRate = 0.04 } = options;
-  const keyboardMistakes: Record<string, string[]> = {
-    a: ['s', 'q', 'z'],
-    b: ['v', 'g', 'h', 'n'],
-    c: ['x', 'd', 'v'],
-    d: ['s', 'e', 'r', 'f', 'c'],
-    e: ['w', 'r', 'd', 's'],
-    f: ['d', 'r', 't', 'g', 'v'],
-    g: ['f', 't', 'y', 'h', 'b'],
-    h: ['g', 'y', 'u', 'j', 'n'],
-    i: ['u', 'o', 'k'],
-    k: ['j', 'i', 'o', 'l'],
-    m: ['n', 'j', 'k'],
-    n: ['b', 'h', 'j', 'm'],
-    o: ['i', 'p', 'k', 'l'],
-    p: ['o', 'l'],
-    s: ['a', 'w', 'e', 'd', 'x'],
-    t: ['r', 'y', 'g', 'f'],
-    u: ['y', 'i', 'h', 'j'],
-    v: ['c', 'f', 'g', 'b'],
-    w: ['q', 'e', 's'],
-  };
+  const { minDelay = 40, maxDelay = 130, errorRate = 0.04, signal } = options;
 
   for (let i = 0; i < text.length; i++) {
+    if (signal?.aborted) {
+      throw new PublishAbortedError();
+    }
     const char = text[i];
 
-    if (Math.random() < errorRate && /[a-z]/i.test(char)) {
-      const lower = char.toLowerCase();
-      const possibleMistakes = keyboardMistakes[lower] || ['x', 's', 'e'];
-      const typo = possibleMistakes[Math.floor(Math.random() * possibleMistakes.length)];
+    if (Math.random() < errorRate && /[a-zA-Z0-9]/.test(char)) {
+      const typo = pickRealisticAdjacentTypo(char);
 
       webContents.sendInputEvent({ type: 'char', keyCode: typo });
-      await sleep(getRandomDelay(70, 160));
-      await sleep(getRandomDelay(120, 260));
+      await sleep(getRandomDelay(190, 420), signal);
       webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Backspace' });
       webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Backspace' });
-      await sleep(getRandomDelay(90, 180));
+      await sleep(getRandomDelay(90, 180), signal);
     }
 
     webContents.sendInputEvent({ type: 'char', keyCode: char });
 
     const delay = getRandomDelay(minDelay, maxDelay);
     if ([',', '，', '.', '。', '!', '！', '\n'].includes(char)) {
-      await sleep(delay + getRandomDelay(150, 380));
+      await sleep(delay + getRandomDelay(150, 380), signal);
     } else {
-      await sleep(delay);
+      await sleep(delay, signal);
     }
   }
 }
@@ -197,7 +182,10 @@ export async function simulatePlaywrightTyping(
   text: string,
   options: HumanTypingOptions = {}
 ): Promise<void> {
-  const { minDelay = 35, maxDelay = 110, errorRate = 0.03 } = options;
+  const { minDelay = 35, maxDelay = 110, errorRate = 0.03, signal } = options;
+  if (signal?.aborted) {
+    throw new PublishAbortedError();
+  }
 
   // 1. 获取目标元素盒模型，计算微抖动坐标并平滑移动鼠标，杜绝瞬间瞬移和绝对几何中心点
   try {
@@ -206,41 +194,47 @@ export async function simulatePlaywrightTyping(
       const targetX = box.x + box.width / 2 + (Math.random() - 0.5) * Math.min(10, box.width * 0.3);
       const targetY = box.y + box.height / 2 + (Math.random() - 0.5) * Math.min(8, box.height * 0.3);
       await page.mouse.move(targetX, targetY, { steps: Math.floor(Math.random() * 4) + 4 });
-      await sleep(getRandomDelay(40, 100));
+      await sleep(getRandomDelay(40, 100), signal);
       await page.mouse.down();
-      await sleep(getRandomDelay(50, 100));
+      await sleep(getRandomDelay(50, 100), signal);
       await page.mouse.up();
     } else {
+      await sleep(getRandomDelay(60, 140), signal);
       await locator.click();
     }
-  } catch {
+  } catch (err: any) {
+    if (err instanceof PublishAbortedError || signal?.aborted) throw err;
+    await sleep(getRandomDelay(60, 140), signal);
     await locator.click();
   }
 
-  await sleep(getRandomDelay(100, 220));
+  await sleep(getRandomDelay(100, 220), signal);
 
   // 清空现有文字 (使用小写 a，严禁带 Shift 造成非预期行为)
   await page.keyboard.press('ControlOrMeta+a');
-  await sleep(getRandomDelay(60, 120));
+  await sleep(getRandomDelay(60, 120), signal);
   await page.keyboard.press('Backspace');
-  await sleep(getRandomDelay(80, 200));
+  await sleep(getRandomDelay(80, 200), signal);
 
   for (let i = 0; i < text.length; i++) {
+    if (signal?.aborted) {
+      throw new PublishAbortedError();
+    }
     const char = text[i];
 
-    // 偶发性误触纠错 (支持字母与数字)
+    // 偶发性误触纠错 (按 QWERTY 相邻物理按键模拟误触，避免固定错字特征)
     if (Math.random() < errorRate && /[a-zA-Z0-9]/.test(char)) {
-      const typo = 's';
+      const typo = pickRealisticAdjacentTypo(char);
       await page.keyboard.type(typo, { delay: getRandomDelay(50, 120) });
-      await sleep(getRandomDelay(150, 300));
+      await sleep(getRandomDelay(150, 300), signal);
       await page.keyboard.press('Backspace');
-      await sleep(getRandomDelay(80, 180));
+      await sleep(getRandomDelay(80, 180), signal);
     }
 
     await page.keyboard.type(char, { delay: getRandomDelay(minDelay, maxDelay) });
 
     if ([',', '，', '.', '。', '!', '！', '\n', '#'].includes(char)) {
-      await sleep(getRandomDelay(180, 420));
+      await sleep(getRandomDelay(180, 420), signal);
     }
   }
 }
@@ -252,8 +246,12 @@ export async function simulatePlaywrightTyping(
 export async function simulatePlaywrightPaste(
   page: Page,
   locator: Locator,
-  text: string
+  text: string,
+  signal?: AbortSignal
 ): Promise<void> {
+  if (signal?.aborted) {
+    throw new PublishAbortedError();
+  }
   // 平滑拟人移动并聚焦
   try {
     const box = await locator.boundingBox();
@@ -261,33 +259,36 @@ export async function simulatePlaywrightPaste(
       const targetX = box.x + box.width / 2 + (Math.random() - 0.5) * Math.min(10, box.width * 0.3);
       const targetY = box.y + box.height / 2 + (Math.random() - 0.5) * Math.min(8, box.height * 0.3);
       await page.mouse.move(targetX, targetY, { steps: Math.floor(Math.random() * 4) + 4 });
-      await sleep(getRandomDelay(40, 100));
+      await sleep(getRandomDelay(40, 100), signal);
       await page.mouse.down();
-      await sleep(getRandomDelay(50, 100));
+      await sleep(getRandomDelay(50, 100), signal);
       await page.mouse.up();
     } else {
+      await sleep(getRandomDelay(60, 140), signal);
       await locator.click();
     }
-  } catch {
+  } catch (err: any) {
+    if (err instanceof PublishAbortedError || signal?.aborted) throw err;
+    await sleep(getRandomDelay(60, 140), signal);
     await locator.click();
   }
 
-  await sleep(getRandomDelay(120, 260));
+  await sleep(getRandomDelay(120, 260), signal);
 
   // 清空现有文字
   await page.keyboard.press('ControlOrMeta+a');
-  await sleep(getRandomDelay(60, 120));
+  await sleep(getRandomDelay(60, 120), signal);
   await page.keyboard.press('Backspace');
-  await sleep(150);
+  await sleep(getRandomDelay(120, 200), signal);
 
   // 模拟复制停顿并写入系统剪贴板
-  await simulateClipboardHesitation();
+  await simulateClipboardHesitation(signal);
   clipboard.writeText(text);
 
   // 发送快捷键粘贴
   const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
   await page.keyboard.press(`${modifier}+v`);
-  await sleep(getRandomDelay(400, 750));
+  await sleep(getRandomDelay(400, 750), signal);
 }
 
 /**
@@ -297,13 +298,17 @@ export async function simulatePlaywrightPaste(
 export async function simulateHumanClick(
   webContents: WebContents,
   x: number,
-  y: number
+  y: number,
+  signal?: AbortSignal
 ): Promise<void> {
+  if (signal?.aborted) {
+    throw new PublishAbortedError();
+  }
   const targetX = Math.round(x + (Math.random() - 0.5) * 4);
   const targetY = Math.round(y + (Math.random() - 0.5) * 4);
 
-  // 模拟手部肌肉微弧度移动 (3~5 步短距离多点轨迹插值)
-  const steps = 4;
+  // 模拟手部肌肉微弧度移动 (3~6 步随机短距离多点轨迹插值)
+  const steps = Math.floor(Math.random() * 4) + 3;
   for (let i = 1; i <= steps; i++) {
     const t = i / steps;
     const curX = Math.round(targetX - (1 - t) * 12 + (Math.random() * 2 - 1));
@@ -313,7 +318,7 @@ export async function simulateHumanClick(
       x: curX,
       y: curY,
     });
-    await sleep(getRandomDelay(10, 20));
+    await sleep(getRandomDelay(10, 20), signal);
   }
 
   // 最终对准目标
@@ -322,7 +327,7 @@ export async function simulateHumanClick(
     x: targetX,
     y: targetY,
   });
-  await sleep(getRandomDelay(40, 90));
+  await sleep(getRandomDelay(40, 90), signal);
 
   webContents.sendInputEvent({
     type: 'mouseDown',
@@ -331,14 +336,18 @@ export async function simulateHumanClick(
     button: 'left',
     clickCount: 1,
   });
-  await sleep(getRandomDelay(60, 120));
-
-  webContents.sendInputEvent({
-    type: 'mouseUp',
-    x: targetX,
-    y: targetY,
-    button: 'left',
-    clickCount: 1,
-  });
-  await sleep(getRandomDelay(70, 160));
+  try {
+    await sleep(getRandomDelay(60, 120), signal);
+  } finally {
+    try {
+      webContents.sendInputEvent({
+        type: 'mouseUp',
+        x: targetX,
+        y: targetY,
+        button: 'left',
+        clickCount: 1,
+      });
+    } catch {}
+  }
+  await sleep(getRandomDelay(70, 160), signal);
 }

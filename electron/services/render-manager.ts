@@ -1,4 +1,5 @@
 import { spawn, ChildProcess } from 'child_process';
+import { StringDecoder } from 'string_decoder';
 import path from 'path';
 import fs from 'fs';
 import { app, ipcMain, WebContents, dialog, shell } from 'electron';
@@ -37,6 +38,7 @@ export interface RenderState {
 export class RenderManager {
   private static instance: RenderManager | null = null;
   private currentProcess: ChildProcess | null = null;
+  private stoppedChildren: WeakSet<ChildProcess> = new WeakSet();
   private logs: RenderLogEntry[] = [];
   private maxLogs = 5000;
   private nextLogId = 1;
@@ -96,18 +98,26 @@ export class RenderManager {
   }
 
   private saveProjectDir(dir: string): void {
+    const cfg = this.getSettingsPath();
+    const tmpCfg = `${cfg}.tmp-${process.pid}`;
     try {
-      const cfg = this.getSettingsPath();
-      let currentData: any = {};
+      let currentData: Record<string, any> = {};
       if (fs.existsSync(cfg)) {
         try {
-          currentData = JSON.parse(fs.readFileSync(cfg, 'utf-8'));
+          const parsed = JSON.parse(fs.readFileSync(cfg, 'utf-8'));
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            currentData = parsed;
+          }
         } catch {}
       }
       currentData.projectDir = dir;
-      fs.writeFileSync(cfg, JSON.stringify(currentData, null, 2), 'utf-8');
+      fs.writeFileSync(tmpCfg, JSON.stringify(currentData, null, 2), { encoding: 'utf-8', mode: 0o600 });
+      fs.renameSync(tmpCfg, cfg);
       this.configuredProjectDir = dir;
     } catch (err) {
+      try {
+        if (fs.existsSync(tmpCfg)) fs.unlinkSync(tmpCfg);
+      } catch {}
       console.warn('[RenderManager] 保存项目目录配置失败:', err);
     }
   }
@@ -116,6 +126,10 @@ export class RenderManager {
    * 注册 IPC 接口供视图层和标签栏交互
    */
   private registerIpc(): void {
+    if (!ipcMain || typeof ipcMain.handle !== 'function') {
+      return;
+    }
+
     ipcMain.handle('render:start', async (event) => {
       if (!isTrustedIpcSender(event)) {
         return { success: false, message: 'Untrusted IPC sender' };
@@ -162,9 +176,9 @@ export class RenderManager {
       if (!isTrustedIpcSender(event)) {
         return { success: false, message: 'Untrusted IPC sender' };
       }
-      if (typeof dir === 'string' && dir.trim() && fs.existsSync(dir)) {
+      if (typeof dir === 'string' && !dir.includes('\0') && dir.trim()) {
         const cleanDir = path.resolve(dir.trim());
-        if (fs.statSync(cleanDir).isDirectory()) {
+        if (fs.existsSync(cleanDir) && fs.statSync(cleanDir).isDirectory()) {
           this.saveProjectDir(cleanDir);
           this.appendLog('system', `📁 项目源码工作目录已更新为: ${cleanDir}`);
           return { success: true, projectDir: cleanDir };
@@ -220,14 +234,16 @@ export class RenderManager {
         }
         if (existingModuleDirs.length > 0) {
           existingModuleDirs.sort((a, b) => b.mtimeMs - a.mtimeMs);
-          await shell.openPath(existingModuleDirs[0].dir);
+          const openErr = await shell.openPath(existingModuleDirs[0].dir);
+          if (openErr) return { success: false, message: openErr };
           return { success: true, openedPath: existingModuleDirs[0].dir };
         }
 
         if (!fs.existsSync(defaultOutputDir)) {
           fs.mkdirSync(defaultOutputDir, { recursive: true });
         }
-        await shell.openPath(defaultOutputDir);
+        const openErr = await shell.openPath(defaultOutputDir);
+        if (openErr) return { success: false, message: openErr };
         return { success: true, openedPath: defaultOutputDir };
       } catch (err: any) {
         return { success: false, message: err.message };
@@ -600,6 +616,35 @@ export class RenderManager {
       NODE_ENV: 'production',
     };
 
+    // 剥离无关的服务端/网关高敏感凭证，避免渲染子进程暴露桌面本地开发环境中的服务端密钥
+    const strippedSecretKeys = [
+      'JWT_SECRET',
+      'D1_API_TOKEN',
+      'CLOUDFLARE_API_TOKEN',
+      'TURNSTILE_SECRET_KEY',
+      'TURNSTILE_SECRET',
+      'DEEPSEEK_API_KEY',
+      'POIXE_API_KEY',
+      'OPENAI_API_KEY',
+      'ANTHROPIC_API_KEY',
+      'RESEND_API_KEY',
+      'R2_ACCESS_KEY_ID',
+      'R2_SECRET_ACCESS_KEY',
+      'AWS_SECRET_ACCESS_KEY',
+      'YOUTUBE_CLIENT_SECRET',
+      'GOOGLE_CLIENT_SECRET',
+      'FACEBOOK_APP_SECRET',
+      'LINE_CHANNEL_SECRET',
+      'WECHAT_APP_SECRET',
+      'WECHAT_MINI_APP_SECRET',
+      'CRON_SECRET',
+      'SYNC_SECRET',
+      'UNSUBSCRIBE_SECRET',
+    ];
+    for (const secretKey of strippedSecretKeys) {
+      delete env[secretKey];
+    }
+
     const extraPaths: string[] = [];
 
     // 动态探测并注入 Remotion 在 Windows/Mac/Linux 各平台的 compositor 原生二进制目录 (包含 ffmpeg, ffprobe)
@@ -853,21 +898,55 @@ export class RenderManager {
       });
 
       const child = this.currentProcess;
+      const decoders = {
+        stdout: new StringDecoder('utf8'),
+        stderr: new StringDecoder('utf8'),
+      };
+      const lineBuffers = {
+        stdout: '',
+        stderr: '',
+      };
 
+      const emitProcessedLine = (type: 'stdout' | 'stderr', rawLine: string) => {
+        const line = rawLine.replace(/^\r+|\r+$/g, '');
+        if (line.trim().length > 0) {
+          if (
+            line.includes('LaTeX-incompatible input') ||
+            line.includes('unicodeTextInMathMode') ||
+            line.includes("strict mode is set to 'warn'")
+          ) {
+            return;
+          }
+          this.appendLog(type, line);
+        }
+      };
+
+      const MAX_LINE_BUFFER_CHARS = 64 * 1024;
       const handleData = (type: 'stdout' | 'stderr', chunk: Buffer) => {
-        const str = chunk.toString('utf-8');
-        const lines = str.split(/\r\n|\n|\r/);
-        for (const rawLine of lines) {
-          const line = rawLine.replace(/^\r+|\r+$/g, '');
-          if (line.trim().length > 0) {
-            if (
-              line.includes('LaTeX-incompatible input') ||
-              line.includes('unicodeTextInMathMode') ||
-              line.includes("strict mode is set to 'warn'")
-            ) {
-              continue;
+        if (this.currentProcess !== child || this.stoppedChildren.has(child)) return;
+        const text = decoders[type].write(chunk);
+        if (!text) return;
+        const combined = lineBuffers[type] + text;
+        const parts = combined.split(/\r\n|\n|\r/);
+        let remaining = parts.pop() || '';
+        for (const rawLine of parts) {
+          emitProcessedLine(type, rawLine);
+        }
+        if (remaining.length > MAX_LINE_BUFFER_CHARS) {
+          emitProcessedLine(type, remaining.slice(0, MAX_LINE_BUFFER_CHARS) + '... [truncated long line]');
+          remaining = '';
+        }
+        lineBuffers[type] = remaining;
+      };
+
+      const flushStreams = () => {
+        for (const streamType of ['stdout', 'stderr'] as const) {
+          const tail = lineBuffers[streamType] + decoders[streamType].end();
+          lineBuffers[streamType] = '';
+          if (tail) {
+            for (const rawLine of tail.split(/\r\n|\n|\r/)) {
+              emitProcessedLine(streamType, rawLine);
             }
-            this.appendLog(type, line);
           }
         }
       };
@@ -876,17 +955,30 @@ export class RenderManager {
       child.stderr?.on('data', (chunk: Buffer) => handleData('stderr', chunk));
 
       child.on('error', (err: any) => {
+        if (this.stoppedChildren.has(child) || (this.currentProcess !== null && this.currentProcess !== child)) {
+          return;
+        }
+        flushStreams();
         this.status = 'error';
         this.endTime = Date.now();
         this.appendLog('error', `❌ 渲染子进程启动异常: ${err.message}`);
-        this.currentProcess = null;
+        if (this.currentProcess === child) {
+          this.currentProcess = null;
+        }
         this.broadcast('render:status-update', this.getState());
       });
 
       child.on('close', (code: number | null) => {
+        flushStreams();
+        // 若已被 stopRender() 手动中止或已被后续新一轮渲染替换，严禁异步 close 覆盖当前状态
+        if (this.stoppedChildren.has(child) || (this.currentProcess !== null && this.currentProcess !== child)) {
+          return;
+        }
         this.endTime = Date.now();
         this.exitCode = code;
-        this.currentProcess = null;
+        if (this.currentProcess === child) {
+          this.currentProcess = null;
+        }
 
         if (code === 0) {
           this.status = 'success';
@@ -917,7 +1009,9 @@ export class RenderManager {
       return { success: false, message: this.getLoc().dialogs.renderNotRunning };
     }
 
-    const pid = this.currentProcess.pid;
+    const procRef = this.currentProcess;
+    const pid = procRef.pid;
+    this.stoppedChildren.add(procRef);
     this.appendLog('system', `🛑 正在终止视频渲染进程 (PID: ${pid})...`);
 
     try {
@@ -926,19 +1020,19 @@ export class RenderManager {
         spawn('taskkill', ['/pid', pid.toString(), '/T', '/F'], { windowsHide: true });
       } else if (pid) {
         // macOS / Linux: 先发 SIGTERM 优雅关闭，2 秒内未退出再强制 SIGKILL
-        const procRef = this.currentProcess;
         try {
           process.kill(-pid, 'SIGTERM');
         } catch {
           // 非进程组长时兜底单进程 SIGTERM
           try { procRef?.kill('SIGTERM'); } catch {}
         }
-        setTimeout(() => {
+        const forceKillTimer = setTimeout(() => {
           if (procRef && !procRef.killed) {
             try { process.kill(-pid, 'SIGKILL'); } catch {}
             try { procRef.kill('SIGKILL'); } catch {}
           }
         }, 2000);
+        forceKillTimer.unref?.();
       }
 
       this.status = 'idle';

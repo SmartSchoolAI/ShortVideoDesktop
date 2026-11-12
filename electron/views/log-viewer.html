@@ -1347,8 +1347,8 @@
 
     function decodeBasicHtmlEntities(str) {
       return String(str || '')
-        .replace(/&#039;/g, "'")
-        .replace(/&#39;/g, "'")
+        .replace(/&#x27;/gi, "'")
+        .replace(/&#0?39;/g, "'")
         .replace(/&quot;/g, '"')
         .replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>')
@@ -1397,13 +1397,13 @@
           vi: '[Bước 5/6] Bắt đầu nhập mô tả video và thẻ chủ đề...',
           th: '[ขั้นตอน 5/6] เริ่มป้อนคำอธิบายวิดีโอและแท็กหัวข้อ...',
           id: '[Langkah 5/6] Mulai memasukkan deskripsi video dan tag topik...',
-          es: '[Step 5/6] Starting to enter video description and topic tags...',
-          fr: '[Step 5/6] Starting to enter video description and topic tags...',
-          pt: '[Step 5/6] Starting to enter video description and topic tags...',
-          de: '[Step 5/6] Starting to enter video description and topic tags...',
-          it: '[Step 5/6] Starting to enter video description and topic tags...',
-          ru: '[Step 5/6] Starting to enter video description and topic tags...',
-          tr: '[Step 5/6] Starting to enter video description and topic tags...',
+          es: '[Paso 5/6] Comenzando a ingresar la descripción del video y etiquetas...',
+          fr: '[Étape 5/6] Début de la saisie de la description et des étiquettes...',
+          pt: '[Etapa 5/6] Iniciando inserção da descrição do vídeo e tags...',
+          de: '[Schritt 5/6] Eingabe von Videobeschreibung und Themen-Tags gestartet...',
+          it: '[Fase 5/6] Avvio inserimento descrizione video e tag argomento...',
+          ru: '[Шаг 5/6] Начало ввода описания видео и тегов тем...',
+          tr: '[Adım 5/6] Video açıklaması ve konu etiketleri girilmeye başlanıyor...',
         }
       },
       {
@@ -1416,13 +1416,13 @@
           vi: '[Mô tả & Thẻ] Bắt đầu tìm kiếm trình soạn thảo văn bản (bao gồm xuyên Shadow DOM)...',
           th: '[คำอธิบายและแท็ก] เริ่มค้นหาตัวแก้ไขข้อความ (รวมถึงการเจาะ Shadow DOM)...',
           id: '[Deskripsi & Tag] Mulai mencari editor teks (termasuk penetrasi Shadow DOM)...',
-          es: '[Description & Tags] Searching for text editor (including Shadow DOM penetration)...',
-          fr: '[Description & Tags] Searching for text editor (including Shadow DOM penetration)...',
-          pt: '[Description & Tags] Searching for text editor (including Shadow DOM penetration)...',
-          de: '[Description & Tags] Searching for text editor (including Shadow DOM penetration)...',
-          it: '[Description & Tags] Searching for text editor (including Shadow DOM penetration)...',
-          ru: '[Description & Tags] Searching for text editor (including Shadow DOM penetration)...',
-          tr: '[Description & Tags] Searching for text editor (including Shadow DOM penetration)...',
+          es: '[Descripción y Etiquetas] Buscando editor de texto (con penetración Shadow DOM)...',
+          fr: '[Description et Tags] Recherche de l’éditeur de texte (avec traversée Shadow DOM)...',
+          pt: '[Descrição e Tags] Procurando editor de texto (incluindo travessia Shadow DOM)...',
+          de: '[Beschreibung & Tags] Suche Texteditor (inkl. Shadow-DOM-Durchdringung)...',
+          it: '[Descrizione e Tag] Ricerca editor di testo (inclusa penetrazione Shadow DOM)...',
+          ru: '[Описание и Теги] Поиск текстового редактора (включая обход Shadow DOM)...',
+          tr: '[Açıklama ve Etiketler] Metin düzenleyici aranıyor (Shadow DOM geçişi dahil)...',
         }
       },
       {
@@ -1435,13 +1435,13 @@
           vi: '[Mô tả & Thẻ] Đã khóa thành công tọa độ vật lý hộp chỉnh sửa văn bản ($1, $2)!',
           th: '[คำอธิบายและแท็ก] ล็อคพิกัดจริงของกล่องแก้ไขข้อความ ($1, $2) สำเร็จ!',
           id: '[Deskripsi & Tag] Berhasil mengunci koordinat fisik kotak edit teks ($1, $2)!',
-          es: '[Description & Tags] Successfully locked text editor physical coordinates ($1, $2)!',
-          fr: '[Description & Tags] Successfully locked text editor physical coordinates ($1, $2)!',
-          pt: '[Description & Tags] Successfully locked text editor physical coordinates ($1, $2)!',
-          de: '[Description & Tags] Successfully locked text editor physical coordinates ($1, $2)!',
-          it: '[Description & Tags] Successfully locked text editor physical coordinates ($1, $2)!',
-          ru: '[Description & Tags] Successfully locked text editor physical coordinates ($1, $2)!',
-          tr: '[Description & Tags] Successfully locked text editor physical coordinates ($1, $2)!',
+          es: '[Descripción y Etiquetas] ¡Coordenadas físicas del editor de texto fijadas ($1, $2)!',
+          fr: '[Description et Tags] Coordonnées physiques de l’éditeur verrouillées ($1, $2) !',
+          pt: '[Descrição e Tags] Coordenadas físicas do editor bloqueadas ($1, $2)!',
+          de: '[Beschreibung & Tags] Physische Koordinaten des Texteditors fixiert ($1, $2)!',
+          it: '[Descrizione e Tag] Coordinate fisiche dell’editor bloccate ($1, $2)!',
+          ru: '[Описание и Теги] Физические координаты текстового поля зафиксированы ($1, $2)!',
+          tr: '[Açıklama ve Etiketler] Metin düzenleyici fiziksel koordinatları kilitlendi ($1, $2)!',
         }
       },
       {
@@ -1454,13 +1454,13 @@
           vi: '[Mô tả & Thẻ] Đang nhấp vào hộp chỉnh sửa văn bản để lấy tiêu điểm...',
           th: '[คำอธิบายและแท็ก] กำลังคลิกกล่องข้อความเพื่อโฟกัส...',
           id: '[Deskripsi & Tag] Mengklik kotak edit teks untuk fokus...',
-          es: '[Description & Tags] Clicking text editor box to focus...',
-          fr: '[Description & Tags] Clicking text editor box to focus...',
-          pt: '[Description & Tags] Clicking text editor box to focus...',
-          de: '[Description & Tags] Clicking text editor box to focus...',
-          it: '[Description & Tags] Clicking text editor box to focus...',
-          ru: '[Description & Tags] Clicking text editor box to focus...',
-          tr: '[Description & Tags] Clicking text editor box to focus...',
+          es: '[Descripción y Etiquetas] Haciendo clic en el editor de texto para enfocar...',
+          fr: '[Description et Tags] Clic sur l’éditeur de texte pour focaliser...',
+          pt: '[Descrição e Tags] Clicando no editor de texto para focar...',
+          de: '[Beschreibung & Tags] Klicke auf das Textfeld zum Fokussieren...',
+          it: '[Descrizione e Tag] Clic sull’editor di testo per mettere a fuoco...',
+          ru: '[Описание и Теги] Клик по текстовому полю для фокусировки...',
+          tr: '[Açıklama ve Etiketler] Odaklanmak için metin düzenleyici kutusuna tıklanıyor...',
         }
       },
       {
@@ -1473,13 +1473,13 @@
           vi: '[Mô tả & Thẻ] Đang mô phỏng dán văn bản và phân tích thẻ chủ đề...',
           th: '[คำอธิบายและแท็ก] กำลังจำลองการวางข้อความและวิเคราะห์แฮชแท็ก...',
           id: '[Deskripsi & Tag] Mensimulasikan penempelan teks dan menguraikan tagar topik...',
-          es: '[Description & Tags] Simulating user typing description and parsing topic hashtags...',
-          fr: '[Description & Tags] Simulating user typing description and parsing topic hashtags...',
-          pt: '[Description & Tags] Simulating user typing description and parsing topic hashtags...',
-          de: '[Description & Tags] Simulating user typing description and parsing topic hashtags...',
-          it: '[Description & Tags] Simulating user typing description and parsing topic hashtags...',
-          ru: '[Description & Tags] Simulating user typing description and parsing topic hashtags...',
-          tr: '[Description & Tags] Simulating user typing description and parsing topic hashtags...',
+          es: '[Descripción y Etiquetas] Simulando entrada de descripción y analizando hashtags...',
+          fr: '[Description et Tags] Simulation de saisie de description et analyse des hashtags...',
+          pt: '[Descrição e Tags] Simulando inserção de descrição e análise de hashtags...',
+          de: '[Beschreibung & Tags] Simuliere Texteingabe und Analyse der Themen-Hashtags...',
+          it: '[Descrizione e Tag] Simulazione inserimento descrizione e analisi hashtag...',
+          ru: '[Описание и Теги] Имитация ввода описания и разбор хэштегов...',
+          tr: '[Açıklama ve Etiketler] Kullanıcı yazımı ve konu etiketi ayrıştırması simüle ediliyor...',
         }
       },
       {
@@ -1492,13 +1492,13 @@
           vi: '[Mô tả & Thẻ] Gửi văn bản thành công! (Số ký tự: $1)',
           th: '[คำอธิบายและแท็ก] ส่งข้อความสำเร็จ! (จำนวนอักขระ: $1)',
           id: '[Deskripsi & Tag] Konten teks berhasil dikirim! (Jumlah karakter: $1)',
-          es: '[Description & Tags] Text content sent successfully! (Length: $1 chars)',
-          fr: '[Description & Tags] Text content sent successfully! (Length: $1 chars)',
-          pt: '[Description & Tags] Text content sent successfully! (Length: $1 chars)',
-          de: '[Description & Tags] Text content sent successfully! (Length: $1 chars)',
-          it: '[Description & Tags] Text content sent successfully! (Length: $1 chars)',
-          ru: '[Description & Tags] Text content sent successfully! (Length: $1 chars)',
-          tr: '[Description & Tags] Text content sent successfully! (Length: $1 chars)',
+          es: '[Descripción y Etiquetas] ¡Texto enviado con éxito! (Longitud: $1 caracteres)',
+          fr: '[Description et Tags] Texte envoyé avec succès ! (Longueur : $1 caractères)',
+          pt: '[Descrição e Tags] Conteúdo de texto enviado com sucesso! (Tamanho: $1 caracteres)',
+          de: '[Beschreibung & Tags] Textinhalt erfolgreich gesendet! (Länge: $1 Zeichen)',
+          it: '[Descrizione e Tag] Testo inviato con successo! (Lunghezza: $1 caratteri)',
+          ru: '[Описание и Теги] Текст успешно отправлен! (Длина: $1 симв.)',
+          tr: '[Açıklama ve Etiketler] Metin içeriği başarıyla gönderildi! (Uzunluk: $1 karakter)',
         }
       },
       {
@@ -1511,13 +1511,13 @@
           vi: '[Bước 5/6 Hoàn tất] Đã điền mô tả & thẻ, chuẩn bị cấu hình tùy chọn nâng cao (chờ ~$1s)...',
           th: '[ขั้นตอน 5/6 เสร็จสมบูรณ์] ใส่คำอธิบายและแท็กแล้ว เตรียมตั้งค่าตัวเลือกขั้นสูง (รอประมาณ $1 วินาที)...',
           id: '[Langkah 5/6 Selesai] Deskripsi & tag telah diisi, menyiapkan opsi publikasi lanjutan (tunggu ~$1s)...',
-          es: '[Step 5/6 Complete] Description & tags injected, configuring advanced publish options (waiting ~$1s)...',
-          fr: '[Step 5/6 Complete] Description & tags injected, configuring advanced publish options (waiting ~$1s)...',
-          pt: '[Step 5/6 Complete] Description & tags injected, configuring advanced publish options (waiting ~$1s)...',
-          de: '[Step 5/6 Complete] Description & tags injected, configuring advanced publish options (waiting ~$1s)...',
-          it: '[Step 5/6 Complete] Description & tags injected, configuring advanced publish options (waiting ~$1s)...',
-          ru: '[Step 5/6 Complete] Description & tags injected, configuring advanced publish options (waiting ~$1s)...',
-          tr: '[Step 5/6 Complete] Description & tags injected, configuring advanced publish options (waiting ~$1s)...',
+          es: '[Paso 5/6 Completado] Descripción y etiquetas insertadas, configurando opciones avanzadas (espera ~$1s)...',
+          fr: '[Étape 5/6 Terminée] Description et tags injectés, configuration des options avancées (attente ~$1s)...',
+          pt: '[Etapa 5/6 Concluída] Descrição e tags inseridos, configurando opções avançadas (aguardando ~$1s)...',
+          de: '[Schritt 5/6 Abgeschlossen] Beschreibung & Tags eingefügt, konfiguriere erweiterte Optionen (ca. $1s)...',
+          it: '[Fase 5/6 Completata] Descrizione e tag inseriti, configurazione opzioni avanzate (attesa ~$1s)...',
+          ru: '[Шаг 5/6 Завершён] Описание и теги вставлены, настройка доп. параметров (ожидание ~$1с)...',
+          tr: '[Adım 5/6 Tamamlandı] Açıklama ve etiketler eklendi, gelişmiş yayın seçenekleri ayarlanıyor (~$1sn)...',
         }
       },
       {
@@ -1530,13 +1530,13 @@
           vi: 'Bắt đầu cấu hình tùy chọn nâng cao (Vị trí/Bộ sưu tập/Lên lịch/Bản gốc/Nhãn AI)...',
           th: 'เริ่มตั้งค่าตัวเลือกขั้นสูง (ตำแหน่ง/คอลเลกชัน/ตั้งเวลา/ต้นฉบับ/ป้ายกำกับ AI)...',
           id: 'Mulai mengonfigurasi opsi lanjutan (Lokasi/Koleksi/Jadwal/Asli/Label AI)...',
-          es: 'Configuring advanced publish options (Location/Collection/Schedule/Original/AI Label)...',
-          fr: 'Configuring advanced publish options (Location/Collection/Schedule/Original/AI Label)...',
-          pt: 'Configuring advanced publish options (Location/Collection/Schedule/Original/AI Label)...',
-          de: 'Configuring advanced publish options (Location/Collection/Schedule/Original/AI Label)...',
-          it: 'Configuring advanced publish options (Location/Collection/Schedule/Original/AI Label)...',
-          ru: 'Configuring advanced publish options (Location/Collection/Schedule/Original/AI Label)...',
-          tr: 'Configuring advanced publish options (Location/Collection/Schedule/Original/AI Label)...',
+          es: 'Configurando opciones avanzadas de publicación (Ubicación/Colección/Programa/Original/Etiqueta IA)...',
+          fr: 'Configuration des options avancées de publication (Lieu/Collection/Planification/Original/Label IA)...',
+          pt: 'Configurando opções avançadas de publicação (Local/Coleção/Agendamento/Original/Rótulo IA)...',
+          de: 'Erweiterte Veröffentlichungsoptionen konfigurieren (Standort/Sammlung/Zeitplan/Original/KI-Label)...',
+          it: 'Configurazione opzioni avanzate di pubblicazione (Posizione/Raccolta/Programma/Originale/Etichetta IA)...',
+          ru: 'Настройка расширенных параметров публикации (Локация/Подборка/Таймер/Оригинал/Метка ИИ)...',
+          tr: 'Gelişmiş yayın seçenekleri yapılandırılıyor (Konum/Koleksiyon/Zamanlama/Orijinal/YZ Etiketi)...',
         }
       },
       {
@@ -1549,13 +1549,13 @@
           vi: 'Đang cuộn các tùy chọn nâng cao của WeChat Channels vào khung nhìn...',
           th: 'กำลังเลื่อนตัวเลือกขั้นสูงของ WeChat Channels ให้อยู่ในมุมมอง...',
           id: 'Menggulir opsi lanjutan WeChat Channels ke tampilan...',
-          es: 'Scrolling WeChat Channels advanced options into view (Location/Original/Collection/AI Label)...',
-          fr: 'Scrolling WeChat Channels advanced options into view (Location/Original/Collection/AI Label)...',
-          pt: 'Scrolling WeChat Channels advanced options into view (Location/Original/Collection/AI Label)...',
-          de: 'Scrolling WeChat Channels advanced options into view (Location/Original/Collection/AI Label)...',
-          it: 'Scrolling WeChat Channels advanced options into view (Location/Original/Collection/AI Label)...',
-          ru: 'Scrolling WeChat Channels advanced options into view (Location/Original/Collection/AI Label)...',
-          tr: 'Scrolling WeChat Channels advanced options into view (Location/Original/Collection/AI Label)...',
+          es: 'Desplazando opciones avanzadas de WeChat Channels a la vista (Ubicación/Original/Colección/IA)...',
+          fr: 'Défilement vers les options avancées WeChat Channels (Lieu/Original/Collection/IA)...',
+          pt: 'Rolando para as opções avançadas do WeChat Channels (Local/Original/Coleção/IA)...',
+          de: 'Scrolle zu den erweiterten WeChat-Channels-Optionen (Standort/Original/Sammlung/KI)...',
+          it: 'Scorrimento alle opzioni avanzate di WeChat Channels (Posizione/Originale/Raccolta/IA)...',
+          ru: 'Прокрутка к расширенным настройкам WeChat Channels (Локация/Оригинал/Подборка/ИИ)...',
+          tr: 'WeChat Channels gelişmiş seçenekleri görünüme kaydırılıyor (Konum/Orijinal/Koleksiyon/YZ)...',
         }
       },
       {
@@ -1567,14 +1567,14 @@
           ko: '고급 게시 옵션 컴포넌트 감지 및 마운트 완료 (소요 시간: $1초)!',
           vi: 'Các tùy chọn nâng cao đã được phát hiện và sẵn sàng (mất $1 giây)!',
           th: 'ตรวจพบตัวเลือกขั้นสูงและพร้อมใช้งานแล้ว (ใช้เวลา $1 วินาที)!',
-          id: 'Komponen opsi publikasi lanjutan terpasang dan siap (memakan waktu $1d)!',
-          es: 'Advanced publish options mounted and ready (took $1s)!',
-          fr: 'Advanced publish options mounted and ready (took $1s)!',
-          pt: 'Advanced publish options mounted and ready (took $1s)!',
-          de: 'Advanced publish options mounted and ready (took $1s)!',
-          it: 'Advanced publish options mounted and ready (took $1s)!',
-          ru: 'Advanced publish options mounted and ready (took $1s)!',
-          tr: 'Advanced publish options mounted and ready (took $1s)!',
+          id: 'Komponen opsi publikasi lanjutan terpasang dan siap (memakan waktu $1 detik)!',
+          es: '¡Opciones avanzadas de publicación listas y montadas (en $1s)!',
+          fr: 'Options avancées de publication montées et prêtes (durée $1s) !',
+          pt: 'Opções avançadas de publicação montadas e prontas (levou $1s)!',
+          de: 'Erweiterte Veröffentlichungsoptionen geladen und bereit ($1s)!',
+          it: 'Opzioni avanzate di pubblicazione pronte (tempo impiegato $1s)!',
+          ru: 'Расширенные параметры публикации смонтированы и готовы (заняло $1с)!',
+          tr: 'Gelişmiş yayın seçenekleri yüklendi ve hazır ($1sn sürdü)!',
         }
       },
       {
@@ -1606,13 +1606,13 @@
           vi: '[Vị trí] Vị trí hiện tại: [$1], đang mở rộng menu vị trí (tọa độ: $2, $3)...',
           th: '[ตำแหน่ง] ตำแหน่งปัจจุบัน: [$1], กำลังเปิดเมนูตำแหน่ง (พิกัด: $2, $3)...',
           id: '[Lokasi] Lokasi saat ini: [$1], membuka menu lokasi (koordinat: $2, $3)...',
-          es: '[Location] Current location: [$1], opening location menu (coords: $2, $3)...',
-          fr: '[Location] Current location: [$1], opening location menu (coords: $2, $3)...',
-          pt: '[Location] Current location: [$1], opening location menu (coords: $2, $3)...',
-          de: '[Location] Current location: [$1], opening location menu (coords: $2, $3)...',
-          it: '[Location] Current location: [$1], opening location menu (coords: $2, $3)...',
-          ru: '[Location] Current location: [$1], opening location menu (coords: $2, $3)...',
-          tr: '[Location] Current location: [$1], opening location menu (coords: $2, $3)...',
+          es: '[Ubicación] Ubicación actual: [$1], abriendo menú de ubicación (coords: $2, $3)...',
+          fr: '[Localisation] Lieu actuel : [$1], ouverture du menu de localisation (coords : $2, $3)...',
+          pt: '[Localização] Local atual: [$1], abrindo menu de localização (coords: $2, $3)...',
+          de: '[Standort] Aktueller Standort: [$1], öffne Standortmenü (Koord.: $2, $3)...',
+          it: '[Posizione] Posizione attuale: [$1], apertura menu posizione (coord: $2, $3)...',
+          ru: '[Местоположение] Текущее: [$1], открытие меню выбора (коорд.: $2, $3)...',
+          tr: '[Konum] Mevcut konum: [$1], konum menüsü açılıyor (koord: $2, $3)...',
         }
       },
       {
@@ -1625,13 +1625,13 @@
           vi: '[Vị trí] Đang chọn tùy chọn [Không hiển thị vị trí] (tọa độ: $1, $2)...',
           th: '[ตำแหน่ง] กำลังเลือกตัวเลือก [ไม่แสดงตำแหน่ง] (พิกัด: $1, $2)...',
           id: '[Lokasi] Memilih opsi [Jangan tampilkan lokasi] (koordinat: $1, $2)...',
-          es: '[Location] Selecting [Do not display location] option (coords: $1, $2)...',
-          fr: '[Location] Selecting [Do not display location] option (coords: $1, $2)...',
-          pt: '[Location] Selecting [Do not display location] option (coords: $1, $2)...',
-          de: '[Location] Selecting [Do not display location] option (coords: $1, $2)...',
-          it: '[Location] Selecting [Do not display location] option (coords: $1, $2)...',
-          ru: '[Location] Selecting [Do not display location] option (coords: $1, $2)...',
-          tr: '[Location] Selecting [Do not display location] option (coords: $1, $2)...',
+          es: '[Ubicación] Seleccionando opción [No mostrar ubicación] (coords: $1, $2)...',
+          fr: '[Localisation] Sélection de [Ne pas afficher le lieu] (coords : $1, $2)...',
+          pt: '[Localização] Selecionando [Não exibir localização] (coords: $1, $2)...',
+          de: '[Standort] Wähle Option [Standort nicht anzeigen] (Koord.: $1, $2)...',
+          it: '[Posizione] Selezione [Non mostrare posizione] (coord: $1, $2)...',
+          ru: '[Местоположение] Выбор варианта [Не показывать] (коорд.: $1, $2)...',
+          tr: '[Konum] [Konumu gösterme] seçeneği seçiliyor (koord: $1, $2)...',
         }
       },
       {
@@ -1663,13 +1663,13 @@
           vi: 'Đang kiểm tra và xử lý [Thêm vào bộ sưu tập]...',
           th: 'กำลังตรวจสอบและจัดการ [เพิ่มคอลเลกชัน]...',
           id: 'Memeriksa dan menangani [Tambah ke Koleksi]...',
-          es: 'Checking and handling [Add Collection]...',
-          fr: 'Checking and handling [Add Collection]...',
-          pt: 'Checking and handling [Add Collection]...',
-          de: 'Checking and handling [Add Collection]...',
-          it: 'Checking and handling [Add Collection]...',
-          ru: 'Checking and handling [Add Collection]...',
-          tr: 'Checking and handling [Add Collection]...',
+          es: 'Comprobando y procesando [Añadir a colección]...',
+          fr: 'Vérification et traitement de [Ajouter à la collection]...',
+          pt: 'Verificando e tratando [Adicionar à coleção]...',
+          de: 'Prüfe und verarbeite [Zur Sammlung hinzufügen]...',
+          it: 'Verifica e gestione [Aggiungi alla raccolta]...',
+          ru: 'Проверка и обработка [Добавить в подборку]...',
+          tr: '[Koleksiyona Ekle] kontrol ediliyor ve işleniyor...',
         }
       },
       {
@@ -1682,13 +1682,13 @@
           vi: '[Thêm bộ sưu tập] Nhấp để mở rộng danh sách bộ sưu tập (tọa độ: $1, $2)...',
           th: '[เพิ่มคอลเลกชัน] คลิกเพื่อเปิดรายการคอลเลกชัน (พิกัด: $1, $2)...',
           id: '[Tambah Koleksi] Mengklik untuk membuka menu tarik-turun koleksi (koordinat: $1, $2)...',
-          es: '[Add Collection] Clicking to expand collection dropdown (coords: $1, $2)...',
-          fr: '[Add Collection] Clicking to expand collection dropdown (coords: $1, $2)...',
-          pt: '[Add Collection] Clicking to expand collection dropdown (coords: $1, $2)...',
-          de: '[Add Collection] Clicking to expand collection dropdown (coords: $1, $2)...',
-          it: '[Add Collection] Clicking to expand collection dropdown (coords: $1, $2)...',
-          ru: '[Add Collection] Clicking to expand collection dropdown (coords: $1, $2)...',
-          tr: '[Add Collection] Clicking to expand collection dropdown (coords: $1, $2)...',
+          es: '[Añadir Colección] Abriendo menú desplegable de colección (coords: $1, $2)...',
+          fr: '[Ajouter Collection] Ouverture du menu déroulant des collections (coords : $1, $2)...',
+          pt: '[Adicionar Coleção] Abrindo lista suspensa de coleções (coords: $1, $2)...',
+          de: '[Sammlung hinzufügen] Öffne Sammlungs-Auswahlliste (Koord.: $1, $2)...',
+          it: '[Aggiungi Raccolta] Apertura menu a discesa raccolta (coord: $1, $2)...',
+          ru: '[Добавить в подборку] Раскрытие списка подборок (коорд.: $1, $2)...',
+          tr: '[Koleksiyon Ekle] Koleksiyon açılır menüsü açılıyor (koord: $1, $2)...',
         }
       },
       {
@@ -1701,13 +1701,13 @@
           vi: '[Thêm bộ sưu tập] Đang chờ dữ liệu danh sách bộ sưu tập...',
           th: '[เพิ่มคอลเลกชัน] กำลังรอข้อมูลรายการคอลเลกชันวิดีโอ...',
           id: '[Tambah Koleksi] Menunggu data daftar koleksi video...',
-          es: '[Add Collection] Waiting for video collection list data...',
-          fr: '[Add Collection] Waiting for video collection list data...',
-          pt: '[Add Collection] Waiting for video collection list data...',
-          de: '[Add Collection] Waiting for video collection list data...',
-          it: '[Add Collection] Waiting for video collection list data...',
-          ru: '[Add Collection] Waiting for video collection list data...',
-          tr: '[Add Collection] Waiting for video collection list data...',
+          es: '[Añadir Colección] Esperando datos de la lista de colecciones...',
+          fr: '[Ajouter Collection] En attente des données de la liste de collections...',
+          pt: '[Adicionar Coleção] Aguardando dados da lista de coleções...',
+          de: '[Sammlung hinzufügen] Warte auf Sammlungslistendaten...',
+          it: '[Aggiungi Raccolta] In attesa dei dati dell’elenco raccolte...',
+          ru: '[Добавить в подборку] Ожидание загрузки списка подборок видео...',
+          tr: '[Koleksiyon Ekle] Video koleksiyon listesi verileri bekleniyor...',
         }
       },
       {
@@ -1720,13 +1720,13 @@
           vi: '[Thêm bộ sưu tập] Trích xuất $1 bộ sưu tập, chọn mục #$2: [$3] (tọa độ: $4, $5)...',
           th: '[เพิ่มคอลเลกชัน] ดึงข้อมูล $1 คอลเลกชัน, เลือกรายการที่ $2: 【$3】 (พิกัด: $4, $5)...',
           id: '[Tambah Koleksi] Mengambil $1 koleksi, memilih #$2: [$3] (koordinat: $4, $5)...',
-          es: '[Add Collection] Retrieved $1 collections, selecting #$2: [$3] (coords: $4, $5)...',
-          fr: '[Add Collection] Retrieved $1 collections, selecting #$2: [$3] (coords: $4, $5)...',
-          pt: '[Add Collection] Retrieved $1 collections, selecting #$2: [$3] (coords: $4, $5)...',
-          de: '[Add Collection] Retrieved $1 collections, selecting #$2: [$3] (coords: $4, $5)...',
-          it: '[Add Collection] Retrieved $1 collections, selecting #$2: [$3] (coords: $4, $5)...',
-          ru: '[Add Collection] Retrieved $1 collections, selecting #$2: [$3] (coords: $4, $5)...',
-          tr: '[Add Collection] Retrieved $1 collections, selecting #$2: [$3] (coords: $4, $5)...',
+          es: '[Añadir Colección] Se obtuvieron $1 colecciones, seleccionando #$2: [$3] (coords: $4, $5)...',
+          fr: '[Ajouter Collection] $1 collections récupérées, sélection #$2 : [$3] (coords : $4, $5)...',
+          pt: '[Adicionar Coleção] $1 coleções obtidas, selecionando #$2: [$3] (coords: $4, $5)...',
+          de: '[Sammlung hinzufügen] $1 Sammlungen geladen, wähle #$2: [$3] (Koord.: $4, $5)...',
+          it: '[Aggiungi Raccolta] Recuperate $1 raccolte, selezione #$2: [$3] (coord: $4, $5)...',
+          ru: '[Добавить в подборку] Получено $1 подборок, выбор #$2: [$3] (коорд.: $4, $5)...',
+          tr: '[Koleksiyon Ekle] $1 koleksiyon alındı, #$2 seçiliyor: [$3] (koord: $4, $5)...',
         }
       },
       {
@@ -1739,13 +1739,13 @@
           vi: '[Thêm bộ sưu tập] Đã thêm thành công vào bộ sưu tập: [$1]!',
           th: '[เพิ่มคอลเลกชัน] เข้าร่วมคอลเลกชันสำเร็จ: 【$1】!',
           id: '[Tambah Koleksi] Berhasil bergabung dengan koleksi: [$1]!',
-          es: '[Add Collection] Successfully joined collection: [$1]!',
-          fr: '[Add Collection] Successfully joined collection: [$1]!',
-          pt: '[Add Collection] Successfully joined collection: [$1]!',
-          de: '[Add Collection] Successfully joined collection: [$1]!',
-          it: '[Add Collection] Successfully joined collection: [$1]!',
-          ru: '[Add Collection] Successfully joined collection: [$1]!',
-          tr: '[Add Collection] Successfully joined collection: [$1]!',
+          es: '[Añadir Colección] ¡Unido con éxito a la colección: [$1]!',
+          fr: '[Ajouter Collection] Ajouté à la collection avec succès : [$1] !',
+          pt: '[Adicionar Coleção] Adicionado à coleção com sucesso: [$1]!',
+          de: '[Sammlung hinzufügen] Erfolgreich zur Sammlung [$1] hinzugefügt!',
+          it: '[Aggiungi Raccolta] Aggiunto alla raccolta con successo: [$1]!',
+          ru: '[Добавить в подборку] Успешно добавлено в подборку: [$1]!',
+          tr: '[Koleksiyon Ekle] Koleksiyona başarıyla eklendi: [$1]!',
         }
       },
       {
@@ -1758,13 +1758,13 @@
           vi: 'Đang cấu hình [Lên lịch xuất bản] (Thời gian: $1)...',
           th: 'กำลังตั้งค่า [การเผยแพร่ตามกำหนดเวลา] (เวลา: $1)...',
           id: 'Mengonfigurasi [Jadwalkan Rilis] (Waktu: $1)...',
-          es: 'Configuring [Scheduled Publish] (Scheduled: $1)...',
-          fr: 'Configuring [Scheduled Publish] (Scheduled: $1)...',
-          pt: 'Configuring [Scheduled Publish] (Scheduled: $1)...',
-          de: 'Configuring [Scheduled Publish] (Scheduled: $1)...',
-          it: 'Configuring [Scheduled Publish] (Scheduled: $1)...',
-          ru: 'Configuring [Scheduled Publish] (Scheduled: $1)...',
-          tr: 'Configuring [Scheduled Publish] (Scheduled: $1)...',
+          es: 'Configurando [Publicación Programada] (Programado: $1)...',
+          fr: 'Configuration de [Publication Planifiée] (Prévu : $1)...',
+          pt: 'Configurando [Publicação Agendada] (Agendado: $1)...',
+          de: 'Konfiguriere [Geplante Veröffentlichung] (Geplant: $1)...',
+          it: 'Configurazione [Pubblicazione Programmata] (Programmata: $1)...',
+          ru: 'Настройка [Отложенная публикация] (Время: $1)...',
+          tr: '[Zamanlanmış Yayın] yapılandırılıyor (Planlanan: $1)...',
         }
       },
       {
@@ -1777,13 +1777,13 @@
           vi: '[Lên lịch xuất bản] Đang nhấp vào nút radio [Lên lịch] (lần $1, tọa độ: $2, $3)...',
           th: '[การเผยแพร่ตามกำหนดเวลา] กำลังคลิกปุ่มตัวเลือก [กำหนดเวลา] (ครั้งที่ $1, พิกัด: $2, $3)...',
           id: '[Jadwalkan Rilis] Mengklik tombol radio [Jadwal] (upaya #$1, koordinat: $2, $3)...',
-          es: '[Scheduled Publish] Clicking [Schedule] radio button (attempt #$1, coords: $2, $3)...',
-          fr: '[Scheduled Publish] Clicking [Schedule] radio button (attempt #$1, coords: $2, $3)...',
-          pt: '[Scheduled Publish] Clicking [Schedule] radio button (attempt #$1, coords: $2, $3)...',
-          de: '[Scheduled Publish] Clicking [Schedule] radio button (attempt #$1, coords: $2, $3)...',
-          it: '[Scheduled Publish] Clicking [Schedule] radio button (attempt #$1, coords: $2, $3)...',
-          ru: '[Scheduled Publish] Clicking [Schedule] radio button (attempt #$1, coords: $2, $3)...',
-          tr: '[Scheduled Publish] Clicking [Schedule] radio button (attempt #$1, coords: $2, $3)...',
+          es: '[Publicación Programada] Haciendo clic en [Programar] (intento #$1, coords: $2, $3)...',
+          fr: '[Publication Planifiée] Clic sur le bouton [Planifier] (essai #$1, coords : $2, $3)...',
+          pt: '[Publicação Agendada] Clicando no botão [Agendar] (tentativa #$1, coords: $2, $3)...',
+          de: '[Geplante Veröffentlichung] Klick auf [Zeitplan] (Versuch #$1, Koord.: $2, $3)...',
+          it: '[Pubblicazione Programmata] Clic su [Programma] (tentativo #$1, coord: $2, $3)...',
+          ru: '[Отложенная публикация] Клик по кнопке [По расписанию] (попытка #$1, коорд.: $2, $3)...',
+          tr: '[Zamanlanmış Yayın] [Zamanla] radyo düğmesine tıklanıyor (deneme #$1, koord: $2, $3)...',
         }
       },
       {
@@ -1796,13 +1796,13 @@
           vi: '[Lên lịch xuất bản] Tùy chọn lên lịch đã kích hoạt, lịch đã sẵn sàng',
           th: '[การเผยแพร่ตามกำหนดเวลา] ตัวเลือกกำหนดเวลาเปิดใช้งานแล้ว ปฏิทินพร้อมแล้ว',
           id: '[Jadwalkan Rilis] Opsi jadwal aktif, panel kalender siap',
-          es: '[Scheduled Publish] Schedule radio activated, calendar panel is ready',
-          fr: '[Scheduled Publish] Schedule radio activated, calendar panel is ready',
-          pt: '[Scheduled Publish] Schedule radio activated, calendar panel is ready',
-          de: '[Scheduled Publish] Schedule radio activated, calendar panel is ready',
-          it: '[Scheduled Publish] Schedule radio activated, calendar panel is ready',
-          ru: '[Scheduled Publish] Schedule radio activated, calendar panel is ready',
-          tr: '[Scheduled Publish] Schedule radio activated, calendar panel is ready',
+          es: '[Publicación Programada] Opción de horario activada, calendario listo',
+          fr: '[Publication Planifiée] Option activée, le calendrier est prêt',
+          pt: '[Publicação Agendada] Opção ativada, painel de calendário pronto',
+          de: '[Geplante Veröffentlichung] Zeitplanoption aktiviert, Kalender bereit',
+          it: '[Pubblicazione Programmata] Opzione attivata, pannello calendario pronto',
+          ru: '[Отложенная публикация] Переключатель активен, панель календаря готова',
+          tr: '[Zamanlanmış Yayın] Zamanlama seçeneği etkinleştirildi, takvim paneli hazır',
         }
       },
       {
@@ -1815,13 +1815,13 @@
           vi: '[Lên lịch xuất bản] Nhấp vào hộp nhập thời gian để mở lịch (lần $1, tọa độ: $2, $3)...',
           th: '[การเผยแพร่ตามกำหนดเวลา] คลิกกล่องใส่เวลาเพื่อเปิดปฏิทิน (ครั้งที่ $1, พิกัด: $2, $3)...',
           id: '[Jadwalkan Rilis] Mengklik input waktu untuk membuka kalender (upaya #$1, koordinat: $2, $3)...',
-          es: '[Scheduled Publish] Clicking time input to open calendar (attempt #$1, coords: $2, $3)...',
-          fr: '[Scheduled Publish] Clicking time input to open calendar (attempt #$1, coords: $2, $3)...',
-          pt: '[Scheduled Publish] Clicking time input to open calendar (attempt #$1, coords: $2, $3)...',
-          de: '[Scheduled Publish] Clicking time input to open calendar (attempt #$1, coords: $2, $3)...',
-          it: '[Scheduled Publish] Clicking time input to open calendar (attempt #$1, coords: $2, $3)...',
-          ru: '[Scheduled Publish] Clicking time input to open calendar (attempt #$1, coords: $2, $3)...',
-          tr: '[Scheduled Publish] Clicking time input to open calendar (attempt #$1, coords: $2, $3)...',
+          es: '[Publicación Programada] Haciendo clic en el campo de hora para abrir calendario (intento #$1, coords: $2, $3)...',
+          fr: '[Publication Planifiée] Clic sur le champ horaire pour ouvrir le calendrier (essai #$1, coords : $2, $3)...',
+          pt: '[Publicação Agendada] Clicando no campo de hora para abrir o calendário (tentativa #$1, coords: $2, $3)...',
+          de: '[Geplante Veröffentlichung] Klick auf Zeitfeld zum Öffnen des Kalenders (Versuch #$1, Koord.: $2, $3)...',
+          it: '[Pubblicazione Programmata] Clic sul campo orario per aprire il calendario (tentativo #$1, coord: $2, $3)...',
+          ru: '[Отложенная публикация] Клик по полю времени для открытия календаря (попытка #$1, коорд.: $2, $3)...',
+          tr: '[Zamanlanmış Yayın] Takvimi açmak için saat alanına tıklanıyor (deneme #$1, koord: $2, $3)...',
         }
       },
       {
@@ -1834,13 +1834,13 @@
           vi: 'Bảng lịch đã mở rộng',
           th: 'แผงปฏิทินขยายออกแล้ว',
           id: 'Panel kalender diperluas',
-          es: 'Calendar panel expanded',
-          fr: 'Calendar panel expanded',
-          pt: 'Calendar panel expanded',
-          de: 'Calendar panel expanded',
-          it: 'Calendar panel expanded',
-          ru: 'Calendar panel expanded',
-          tr: 'Calendar panel expanded',
+          es: 'Panel de calendario desplegado',
+          fr: 'Panneau de calendrier déplié',
+          pt: 'Painel do calendário expandido',
+          de: 'Kalenderfeld ausgeklappt',
+          it: 'Pannello calendario espanso',
+          ru: 'Панель календаря раскрыта',
+          tr: 'Takvim paneli genişletildi',
         }
       },
       {
@@ -1853,13 +1853,13 @@
           vi: '[Lên lịch xuất bản] Nhấp vào ngày $1 (tọa độ: $2, $3)...',
           th: '[การเผยแพร่ตามกำหนดเวลา] คลิกเลือกวันที่ $1 (พิกัด: $2, $3)...',
           id: '[Jadwalkan Rilis] Mengklik tanggal $1 (koordinat: $2, $3)...',
-          es: '[Scheduled Publish] Clicking date day $1 (coords: $2, $3)...',
-          fr: '[Scheduled Publish] Clicking date day $1 (coords: $2, $3)...',
-          pt: '[Scheduled Publish] Clicking date day $1 (coords: $2, $3)...',
-          de: '[Scheduled Publish] Clicking date day $1 (coords: $2, $3)...',
-          it: '[Scheduled Publish] Clicking date day $1 (coords: $2, $3)...',
-          ru: '[Scheduled Publish] Clicking date day $1 (coords: $2, $3)...',
-          tr: '[Scheduled Publish] Clicking date day $1 (coords: $2, $3)...',
+          es: '[Publicación Programada] Haciendo clic en el día $1 (coords: $2, $3)...',
+          fr: '[Publication Planifiée] Clic sur le jour $1 (coords : $2, $3)...',
+          pt: '[Publicação Agendada] Clicando no dia $1 (coords: $2, $3)...',
+          de: '[Geplante Veröffentlichung] Klick auf Tag $1 (Koord.: $2, $3)...',
+          it: '[Pubblicazione Programmata] Clic sul giorno $1 (coord: $2, $3)...',
+          ru: '[Отложенная публикация] Клик по дате $1 (коорд.: $2, $3)...',
+          tr: '[Zamanlanmış Yayın] Ayın $1. gününe tıklanıyor (koord: $2, $3)...',
         }
       },
       {
@@ -1872,13 +1872,13 @@
           vi: '[UpdateManager] 🧹 Đã dọn dẹp bộ nhớ đệm gói cài đặt đã áp dụng: $1',
           th: '[UpdateManager] 🧹 ล้างแคชแพ็กเกจการติดตั้งที่สำเร็จแล้ว: $1',
           id: '[UpdateManager] 🧹 Membersihkan cache paket pembaruan lama: $1',
-          es: '[UpdateManager] 🧹 Cleaned up obsolete update package cache: $1',
-          fr: '[UpdateManager] 🧹 Cleaned up obsolete update package cache: $1',
-          pt: '[UpdateManager] 🧹 Cleaned up obsolete update package cache: $1',
-          de: '[UpdateManager] 🧹 Cleaned up obsolete update package cache: $1',
-          it: '[UpdateManager] 🧹 Cleaned up obsolete update package cache: $1',
-          ru: '[UpdateManager] 🧹 Cleaned up obsolete update package cache: $1',
-          tr: '[UpdateManager] 🧹 Cleaned up obsolete update package cache: $1',
+          es: '[UpdateManager] 🧹 Caché del paquete de actualización obsoleto eliminada: $1',
+          fr: '[UpdateManager] 🧹 Cache du paquet de mise à jour obsolète nettoyé : $1',
+          pt: '[UpdateManager] 🧹 Cache de pacote de atualização obsoleto limpo: $1',
+          de: '[UpdateManager] 🧹 Veralteter Update-Paket-Cache bereinigt: $1',
+          it: '[UpdateManager] 🧹 Cache pacchetto di aggiornamento obsoleto pulita: $1',
+          ru: '[UpdateManager] 🧹 Устаревший кэш пакета обновления очищен: $1',
+          tr: '[UpdateManager] 🧹 Eski güncelleme paketi önbelleği temizlendi: $1',
         }
       },
       {
@@ -1891,13 +1891,13 @@
           vi: '[UpdateManager] 🔄 Đồng bộ cấu hình cập nhật thư mục resources thành shortvideo/update: $1',
           th: '[UpdateManager] 🔄 ปรับเทียบการกำหนดค่าการอัปเดตใน resources เป็น shortvideo/update: $1',
           id: '[UpdateManager] 🔄 Menyelaraskan konfigurasi pembaruan di direktori resources: $1',
-          es: '[UpdateManager] 🔄 Calibrating update config in resources dir to shortvideo/update: $1',
-          fr: '[UpdateManager] 🔄 Calibrating update config in resources dir to shortvideo/update: $1',
-          pt: '[UpdateManager] 🔄 Calibrating update config in resources dir to shortvideo/update: $1',
-          de: '[UpdateManager] 🔄 Calibrating update config in resources dir to shortvideo/update: $1',
-          it: '[UpdateManager] 🔄 Calibrating update config in resources dir to shortvideo/update: $1',
-          ru: '[UpdateManager] 🔄 Calibrating update config in resources dir to shortvideo/update: $1',
-          tr: '[UpdateManager] 🔄 Calibrating update config in resources dir to shortvideo/update: $1',
+          es: '[UpdateManager] 🔄 Calibrando configuración de actualización en resources a shortvideo/update: $1',
+          fr: '[UpdateManager] 🔄 Calibration de la configuration de mise à jour dans resources : $1',
+          pt: '[UpdateManager] 🔄 Calibrando configuração de atualização em resources para shortvideo/update: $1',
+          de: '[UpdateManager] 🔄 Update-Konfiguration in resources wird auf shortvideo/update kalibriert: $1',
+          it: '[UpdateManager] 🔄 Calibrazione configurazione aggiornamento in resources: $1',
+          ru: '[UpdateManager] 🔄 Синхронизация конфигурации обновлений в resources: $1',
+          tr: '[UpdateManager] 🔄 resources dizinindeki güncelleme yapılandırması hizalanıyor: $1',
         }
       },
       {
@@ -1910,13 +1910,13 @@
           vi: '[UpdateManager] Tự động bổ sung cấu hình cập nhật thư mục resources: $1',
           th: '[UpdateManager] เติมเต็มการกำหนดค่าการอัปเดตใน resources อัตโนมัติ: $1',
           id: '[UpdateManager] Melengkapi otomatis konfigurasi pembaruan di direktori resources: $1',
-          es: '[UpdateManager] Auto-completed update configuration in resources directory: $1',
-          fr: '[UpdateManager] Auto-completed update configuration in resources directory: $1',
-          pt: '[UpdateManager] Auto-completed update configuration in resources directory: $1',
-          de: '[UpdateManager] Auto-completed update configuration in resources directory: $1',
-          it: '[UpdateManager] Auto-completed update configuration in resources directory: $1',
-          ru: '[UpdateManager] Auto-completed update configuration in resources directory: $1',
-          tr: '[UpdateManager] Auto-completed update configuration in resources directory: $1',
+          es: '[UpdateManager] Configuración de actualización autocompletada en resources: $1',
+          fr: '[UpdateManager] Configuration de mise à jour complétée dans resources : $1',
+          pt: '[UpdateManager] Configuração de atualização preenchida em resources: $1',
+          de: '[UpdateManager] Update-Konfiguration im Verzeichnis resources ergänzt: $1',
+          it: '[UpdateManager] Configurazione aggiornamento completata in resources: $1',
+          ru: '[UpdateManager] Автоматически дополнена конфигурация в resources: $1',
+          tr: '[UpdateManager] resources dizinindeki güncelleme yapılandırması tamamlandı: $1',
         }
       },
       {
@@ -1929,13 +1929,13 @@
           vi: '[UpdateManager] Ghi/cập nhật cấu hình cập nhật trong thư mục userData: $1',
           th: '[UpdateManager] เขียน/อัปเดตการกำหนดค่าในไดเรกทอรี userData: $1',
           id: '[UpdateManager] Menulis/memperbarui konfigurasi di direktori userData: $1',
-          es: '[UpdateManager] Wrote/updated update config in userData directory: $1',
-          fr: '[UpdateManager] Wrote/updated update config in userData directory: $1',
-          pt: '[UpdateManager] Wrote/updated update config in userData directory: $1',
-          de: '[UpdateManager] Wrote/updated update config in userData directory: $1',
-          it: '[UpdateManager] Wrote/updated update config in userData directory: $1',
-          ru: '[UpdateManager] Wrote/updated update config in userData directory: $1',
-          tr: '[UpdateManager] Wrote/updated update config in userData directory: $1',
+          es: '[UpdateManager] Configuración de actualización escrita/actualizada en userData: $1',
+          fr: '[UpdateManager] Configuration de mise à jour écrite/actualisée dans userData : $1',
+          pt: '[UpdateManager] Configuração de atualização gravada/atualizada em userData: $1',
+          de: '[UpdateManager] Update-Konfiguration in userData geschrieben/aktualisiert: $1',
+          it: '[UpdateManager] Configurazione aggiornamento salvata/aggiornata in userData: $1',
+          ru: '[UpdateManager] Конфигурация обновлений записана/обновлена в userData: $1',
+          tr: '[UpdateManager] userData dizinine güncelleme yapılandırması yazıldı/güncellendi: $1',
         }
       },
       {
@@ -1948,13 +1948,13 @@
           vi: '[SessionKeeper] Đã khởi chạy thăm dò duy trì phiên cho $1 (Nhịp tim im lặng + bảo vệ tích cực)',
           th: '[SessionKeeper] เริ่มต้นโพรบรักษาเซสชันสำหรับ $1 แล้ว (ฮาร์ทบีทเงียบ + การป้องกันที่ใช้งานอยู่)',
           id: '[SessionKeeper] Memulai probe penjaga sesi untuk $1 (Detak jantung senyap + pelindung aktif)',
-          es: '[SessionKeeper] Started session keep-alive probe for $1 (Silent heartbeat + active guard)',
-          fr: '[SessionKeeper] Started session keep-alive probe for $1 (Silent heartbeat + active guard)',
-          pt: '[SessionKeeper] Started session keep-alive probe for $1 (Silent heartbeat + active guard)',
-          de: '[SessionKeeper] Started session keep-alive probe for $1 (Silent heartbeat + active guard)',
-          it: '[SessionKeeper] Started session keep-alive probe for $1 (Silent heartbeat + active guard)',
-          ru: '[SessionKeeper] Started session keep-alive probe for $1 (Silent heartbeat + active guard)',
-          tr: '[SessionKeeper] Started session keep-alive probe for $1 (Silent heartbeat + active guard)',
+          es: '[SessionKeeper] Sonda de mantenimiento de sesión iniciada para $1 (Latido silencioso + guardia activa)',
+          fr: '[SessionKeeper] Sonde de maintien de session démarrée pour $1 (Battement silencieux + garde active)',
+          pt: '[SessionKeeper] Sonda de manutenção de sessão iniciada para $1 (Batimento silencioso + proteção ativa)',
+          de: '[SessionKeeper] Sitzungs-Keep-Alive-Sonde für $1 gestartet (Stiller Heartbeat + aktiver Schutz)',
+          it: '[SessionKeeper] Sonda di mantenimento sessione avviata per $1 (Heartbeat silenzioso + guardia attiva)',
+          ru: '[SessionKeeper] Запущен зонд поддержания сессии для $1 (Тихий пульс + активная защита)',
+          tr: '[SessionKeeper] $1 için oturum canlı tutma probu başlatıldı (Sessiz kalp atışı + aktif koruma)',
         }
       },
       {
@@ -1967,13 +1967,13 @@
           vi: '[SessionKeeper] Đã dừng bảo vệ phiên cho $1',
           th: '[SessionKeeper] หยุดการป้องกันเซสชันสำหรับ $1 แล้ว',
           id: '[SessionKeeper] Menghentikan penjaga sesi untuk $1',
-          es: '[SessionKeeper] Stopped session guard for $1',
-          fr: '[SessionKeeper] Stopped session guard for $1',
-          pt: '[SessionKeeper] Stopped session guard for $1',
-          de: '[SessionKeeper] Stopped session guard for $1',
-          it: '[SessionKeeper] Stopped session guard for $1',
-          ru: '[SessionKeeper] Stopped session guard for $1',
-          tr: '[SessionKeeper] Stopped session guard for $1',
+          es: '[SessionKeeper] Protección de sesión detenida para $1',
+          fr: '[SessionKeeper] Garde de session arrêtée pour $1',
+          pt: '[SessionKeeper] Proteção de sessão interrompida para $1',
+          de: '[SessionKeeper] Sitzungsschutz für $1 gestoppt',
+          it: '[SessionKeeper] Protezione sessione interrotta per $1',
+          ru: '[SessionKeeper] Защита сессии для $1 остановлена',
+          tr: '[SessionKeeper] $1 için oturum koruması durduruldu',
         }
       },
       {
@@ -1986,13 +1986,13 @@
           vi: '[SessionKeeper] Kiểm tra tình trạng phiên nền tảng $1 bình thường',
           th: '[SessionKeeper] การตรวจสุขภาพเซสชันแพลตฟอร์ม $1 ปกติ',
           id: '[SessionKeeper] Pemeriksaan kesehatan sesi platform $1 normal',
-          es: '[SessionKeeper] Platform $1 session health check passed',
-          fr: '[SessionKeeper] Platform $1 session health check passed',
-          pt: '[SessionKeeper] Platform $1 session health check passed',
-          de: '[SessionKeeper] Platform $1 session health check passed',
-          it: '[SessionKeeper] Platform $1 session health check passed',
-          ru: '[SessionKeeper] Platform $1 session health check passed',
-          tr: '[SessionKeeper] Platform $1 session health check passed',
+          es: '[SessionKeeper] Comprobación de salud de sesión de plataforma $1 superada',
+          fr: '[SessionKeeper] Contrôle de santé de session pour la plateforme $1 réussi',
+          pt: '[SessionKeeper] Verificação de integridade de sessão da plataforma $1 aprovada',
+          de: '[SessionKeeper] Sitzungsgesundheitsprüfung für Plattform $1 bestanden',
+          it: '[SessionKeeper] Controllo integrità sessione piattaforma $1 superato',
+          ru: '[SessionKeeper] Проверка состояния сессии платформы $1 пройдена',
+          tr: '[SessionKeeper] $1 platformu oturum sağlığı kontrolü başarılı',
         }
       },
       {
@@ -2005,13 +2005,13 @@
           vi: '[SessionKeeper] $1 được đánh dấu là [Đang thực hiện nhiệm vụ], tạm dừng thăm dò duy trì',
           th: '[SessionKeeper] $1 ถูกทำเครื่องหมายเป็น [กำลังดำเนินการ] หยุดโพรบชั่วคราว',
           id: '[SessionKeeper] $1 ditandai sebagai [Tugas Sedang Berjalan], probe dijeda',
-          es: '[SessionKeeper] $1 marked as [Task in Progress], paused keep-alive probe',
-          fr: '[SessionKeeper] $1 marked as [Task in Progress], paused keep-alive probe',
-          pt: '[SessionKeeper] $1 marked as [Task in Progress], paused keep-alive probe',
-          de: '[SessionKeeper] $1 marked as [Task in Progress], paused keep-alive probe',
-          it: '[SessionKeeper] $1 marked as [Task in Progress], paused keep-alive probe',
-          ru: '[SessionKeeper] $1 marked as [Task in Progress], paused keep-alive probe',
-          tr: '[SessionKeeper] $1 marked as [Task in Progress], paused keep-alive probe',
+          es: '[SessionKeeper] $1 marcado como [Tarea en progreso], sonda pausada',
+          fr: '[SessionKeeper] $1 marqué [Tâche en cours], sonde mise en pause',
+          pt: '[SessionKeeper] $1 marcado como [Tarefa em andamento], sonda pausada',
+          de: '[SessionKeeper] $1 als [Aufgabe läuft] markiert, Keep-Alive-Sonde pausiert',
+          it: '[SessionKeeper] $1 contrassegnato [Attività in corso], sonda in pausa',
+          ru: '[SessionKeeper] $1 помечен как [Задача выполняется], зонд приостановлен',
+          tr: '[SessionKeeper] $1 [Görev Devam Ediyor] olarak işaretlendi, prob duraklatıldı',
         }
       },
       {
@@ -2024,13 +2024,13 @@
           vi: '[SessionKeeper] Nhiệm vụ $1 đã kết thúc, khôi phục thăm dò duy trì phiên định kỳ',
           th: '[SessionKeeper] งาน $1 สิ้นสุดลงแล้ว กลับมาใช้โพรบรักษาเซสชันตามปกติ',
           id: '[SessionKeeper] Tugas $1 selesai, melanjutkan probe penjaga sesi berkala',
-          es: '[SessionKeeper] $1 task ended, resumed regular session keep-alive probe',
-          fr: '[SessionKeeper] $1 task ended, resumed regular session keep-alive probe',
-          pt: '[SessionKeeper] $1 task ended, resumed regular session keep-alive probe',
-          de: '[SessionKeeper] $1 task ended, resumed regular session keep-alive probe',
-          it: '[SessionKeeper] $1 task ended, resumed regular session keep-alive probe',
-          ru: '[SessionKeeper] $1 task ended, resumed regular session keep-alive probe',
-          tr: '[SessionKeeper] $1 task ended, resumed regular session keep-alive probe',
+          es: '[SessionKeeper] Tarea de $1 finalizada, sonda de mantenimiento reanudada',
+          fr: '[SessionKeeper] Tâche $1 terminée, reprise de la sonde de session',
+          pt: '[SessionKeeper] Tarefa de $1 encerrada, sonda de manutenção retomada',
+          de: '[SessionKeeper] Aufgabe $1 beendet, reguläre Sitzungssonde fortgesetzt',
+          it: '[SessionKeeper] Attività $1 terminata, sonda sessione ripresa',
+          ru: '[SessionKeeper] Задача $1 завершена, возобновление обычного зонда сессии',
+          tr: '[SessionKeeper] $1 görevi bitti, normal oturum canlı tutma probu sürdürüldü',
         }
       },
       {
@@ -2043,13 +2043,13 @@
           vi: '[SessionKeeper] Đã nhận lệnh: Đang tải lại toàn bộ trang cho $1...',
           th: '[SessionKeeper] ได้รับคำสั่ง: กำลังโหลดหน้าทั้งหมดใหม่สำหรับ $1...',
           id: '[SessionKeeper] Menerima instruksi: Memuat ulang seluruh halaman untuk $1...',
-          es: '[SessionKeeper] Command received: Reloading full page for $1...',
-          fr: '[SessionKeeper] Command received: Reloading full page for $1...',
-          pt: '[SessionKeeper] Command received: Reloading full page for $1...',
-          de: '[SessionKeeper] Command received: Reloading full page for $1...',
-          it: '[SessionKeeper] Command received: Reloading full page for $1...',
-          ru: '[SessionKeeper] Command received: Reloading full page for $1...',
-          tr: '[SessionKeeper] Command received: Reloading full page for $1...',
+          es: '[SessionKeeper] Comando recibido: Recargando página completa de $1...',
+          fr: '[SessionKeeper] Commande reçue : Rechargement complet de la page pour $1...',
+          pt: '[SessionKeeper] Comando recebido: Recarregando página inteira para $1...',
+          de: '[SessionKeeper] Befehl empfangen: Seite für $1 vollständig neu laden...',
+          it: '[SessionKeeper] Comando ricevuto: Ricaricamento pagina completa per $1...',
+          ru: '[SessionKeeper] Команда получена: полная перезагрузка страницы для $1...',
+          tr: '[SessionKeeper] Komut alındı: $1 için tam sayfa yeniden yükleniyor...',
         }
       },
       {
@@ -2062,13 +2062,13 @@
           vi: '[SessionKeeper] Lệnh tải lại thất bại: Không tìm thấy giao diện $1 đang hoạt động',
           th: '[SessionKeeper] คำสั่งโหลดใหม่ล้มเหลว: ไม่พบมุมมอง $1 ที่ใช้งานอยู่',
           id: '[SessionKeeper] Gagal memuat ulang: Tampilan aktif $1 tidak ditemukan',
-          es: '[SessionKeeper] Reload failed: No active view found for $1',
-          fr: '[SessionKeeper] Reload failed: No active view found for $1',
-          pt: '[SessionKeeper] Reload failed: No active view found for $1',
-          de: '[SessionKeeper] Reload failed: No active view found for $1',
-          it: '[SessionKeeper] Reload failed: No active view found for $1',
-          ru: '[SessionKeeper] Reload failed: No active view found for $1',
-          tr: '[SessionKeeper] Reload failed: No active view found for $1',
+          es: '[SessionKeeper] Error al recargar: No se encontró vista activa para $1',
+          fr: '[SessionKeeper] Échec du rechargement : Aucune vue active trouvée pour $1',
+          pt: '[SessionKeeper] Falha ao recarregar: Nenhuma visualização ativa encontrada para $1',
+          de: '[SessionKeeper] Neuladen fehlgeschlagen: Keine aktive Ansicht für $1 gefunden',
+          it: '[SessionKeeper] Ricaricamento non riuscito: Nessuna vista attiva per $1',
+          ru: '[SessionKeeper] Ошибка перезагрузки: не найден активный вид для $1',
+          tr: '[SessionKeeper] Yeniden yükleme başarısız: $1 için etkin görünüm bulunamadı',
         }
       },
       {
@@ -2081,13 +2081,13 @@
           vi: '[SessionKeeper] Từ chối tải lại: $1 hiện đang thực hiện tác vụ đăng bài',
           th: '[SessionKeeper] ปฏิเสธการโหลดใหม่: $1 กำลังดำเนินการเผยแพร่ในขณะนี้',
           id: '[SessionKeeper] Menolak muat ulang: $1 sedang menjalankan tugas publikasi',
-          es: '[SessionKeeper] Reload rejected: $1 is currently executing a publishing task',
-          fr: '[SessionKeeper] Reload rejected: $1 is currently executing a publishing task',
-          pt: '[SessionKeeper] Reload rejected: $1 is currently executing a publishing task',
-          de: '[SessionKeeper] Reload rejected: $1 is currently executing a publishing task',
-          it: '[SessionKeeper] Reload rejected: $1 is currently executing a publishing task',
-          ru: '[SessionKeeper] Reload rejected: $1 is currently executing a publishing task',
-          tr: '[SessionKeeper] Reload rejected: $1 is currently executing a publishing task',
+          es: '[SessionKeeper] Recarga rechazada: $1 está ejecutando una tarea de publicación',
+          fr: '[SessionKeeper] Rechargement refusé : $1 exécute actuellement une publication',
+          pt: '[SessionKeeper] Recarga rejeitada: $1 está executando uma tarefa de publicação',
+          de: '[SessionKeeper] Neuladen abgelehnt: $1 führt gerade eine Veröffentlichung aus',
+          it: '[SessionKeeper] Ricaricamento rifiutato: $1 sta eseguendo una pubblicazione',
+          ru: '[SessionKeeper] Перезагрузка отклонена: $1 сейчас выполняет публикацию',
+          tr: '[SessionKeeper] Yeniden yükleme reddedildi: $1 şu anda yayınlama görevi yürütüyor',
         }
       },
       {
@@ -2100,13 +2100,13 @@
           vi: '[SessionKeeper] Thực hiện tải lại trang thất bại: $1',
           th: '[SessionKeeper] ดำเนินการโหลดหน้าซ้ำล้มเหลว: $1',
           id: '[SessionKeeper] Gagal memuat ulang halaman penuh: $1',
-          es: '[SessionKeeper] Full page reload failed: $1',
-          fr: '[SessionKeeper] Full page reload failed: $1',
-          pt: '[SessionKeeper] Full page reload failed: $1',
-          de: '[SessionKeeper] Full page reload failed: $1',
-          it: '[SessionKeeper] Full page reload failed: $1',
-          ru: '[SessionKeeper] Full page reload failed: $1',
-          tr: '[SessionKeeper] Full page reload failed: $1',
+          es: '[SessionKeeper] Error al recargar la página completa: $1',
+          fr: '[SessionKeeper] Échec du rechargement complet de la page : $1',
+          pt: '[SessionKeeper] Falha ao recarregar a página inteira: $1',
+          de: '[SessionKeeper] Vollständiges Neuladen der Seite fehlgeschlagen: $1',
+          it: '[SessionKeeper] Ricaricamento completo della pagina non riuscito: $1',
+          ru: '[SessionKeeper] Ошибка полной перезагрузки страницы: $1',
+          tr: '[SessionKeeper] Tam sayfa yenileme başarısız: $1',
         }
       },
       {
@@ -2119,13 +2119,13 @@
           vi: '[SessionKeeper] Kiểm tra duy trì phiên: Phát hiện phiên ($1, $2), chuẩn bị gửi Ping...',
           th: '[SessionKeeper] ตรวจสอบการรักษาเซสชัน: ตรวจพบเซสชัน ($1, $2) กำลังเตรียมส่งคำขอ Ping...',
           id: '[SessionKeeper] Pemeriksaan penjaga sesi: Sesi terdeteksi ($1, $2), menyiapkan permintaan Ping...',
-          es: '[SessionKeeper] Keep-alive check: Session detected ($1, $2), preparing Ping request...',
-          fr: '[SessionKeeper] Keep-alive check: Session detected ($1, $2), preparing Ping request...',
-          pt: '[SessionKeeper] Keep-alive check: Session detected ($1, $2), preparing Ping request...',
-          de: '[SessionKeeper] Keep-alive check: Session detected ($1, $2), preparing Ping request...',
-          it: '[SessionKeeper] Keep-alive check: Session detected ($1, $2), preparing Ping request...',
-          ru: '[SessionKeeper] Keep-alive check: Session detected ($1, $2), preparing Ping request...',
-          tr: '[SessionKeeper] Keep-alive check: Session detected ($1, $2), preparing Ping request...',
+          es: '[SessionKeeper] Comprobación de actividad: sesión detectada ($1, $2), preparando solicitud Ping...',
+          fr: '[SessionKeeper] Contrôle de maintien en vie : session détectée ($1, $2), préparation de la requête Ping...',
+          pt: '[SessionKeeper] Verificação de atividade: sessão detectada ($1, $2), preparando solicitação Ping...',
+          de: '[SessionKeeper] Keep-Alive-Prüfung: Sitzung erkannt ($1, $2), Ping-Anfrage wird vorbereitet...',
+          it: '[SessionKeeper] Controllo keep-alive: sessione rilevata ($1, $2), preparazione richiesta Ping...',
+          ru: '[SessionKeeper] Проверка активности: обнаружена сессия ($1, $2), подготовка Ping-запроса...',
+          tr: '[SessionKeeper] Canlı tutma kontrolü: Oturum algılandı ($1, $2), Ping isteği hazırlanıyor...',
         }
       },
       {
@@ -2138,13 +2138,13 @@
           vi: '[SessionKeeper] [Thông báo quan trọng] Làm mới thành công Cookie xác thực phiên (auth_session)!',
           th: '[SessionKeeper] [ประกาศสำคัญ] รีเฟรชคุกกี้การตรวจสอบสิทธิ์เซสชันสำเร็จ (auth_session)!',
           id: '[SessionKeeper] [Pemberitahuan Penting] Berhasil menyegarkan Cookie autentikasi sesi (auth_session)!',
-          es: '[SessionKeeper] [Important Notice] Successfully refreshed session auth Cookie (auth_session)!',
-          fr: '[SessionKeeper] [Important Notice] Successfully refreshed session auth Cookie (auth_session)!',
-          pt: '[SessionKeeper] [Important Notice] Successfully refreshed session auth Cookie (auth_session)!',
-          de: '[SessionKeeper] [Important Notice] Successfully refreshed session auth Cookie (auth_session)!',
-          it: '[SessionKeeper] [Important Notice] Successfully refreshed session auth Cookie (auth_session)!',
-          ru: '[SessionKeeper] [Important Notice] Successfully refreshed session auth Cookie (auth_session)!',
-          tr: '[SessionKeeper] [Important Notice] Successfully refreshed session auth Cookie (auth_session)!',
+          es: '[SessionKeeper] [Aviso importante] ¡Cookie de autenticación de sesión (auth_session) actualizada correctamente!',
+          fr: '[SessionKeeper] [Avis important] Cookie d\'authentification de session (auth_session) actualisé avec succès !',
+          pt: '[SessionKeeper] [Aviso importante] Cookie de autenticação de sessão (auth_session) atualizado com sucesso!',
+          de: '[SessionKeeper] [Wichtiger Hinweis] Sitzungs-Auth-Cookie (auth_session) erfolgreich aktualisiert!',
+          it: '[SessionKeeper] [Avviso importante] Cookie di autenticazione sessione (auth_session) aggiornato con successo!',
+          ru: '[SessionKeeper] [Важное уведомление] Cookie аутентификации сессии (auth_session) успешно обновлён!',
+          tr: '[SessionKeeper] [Önemli Bildirim] Oturum kimlik doğrulama Çerezi (auth_session) başarıyla yenilendi!',
         }
       },
       {
@@ -2157,13 +2157,13 @@
           vi: '[SessionKeeper] Chuẩn bị gửi Ping duy trì đến dịch vụ lập lịch (Ping #$1)...',
           th: '[SessionKeeper] กำลังเตรียมส่ง Ping ไปยังบริการกำหนดเวลา (Ping #$1)...',
           id: '[SessionKeeper] Menyiapkan permintaan Ping keep-alive ke layanan penjadwal (Ping #$1)...',
-          es: '[SessionKeeper] Preparing Ping keep-alive request to scheduler service (Ping #$1)...',
-          fr: '[SessionKeeper] Preparing Ping keep-alive request to scheduler service (Ping #$1)...',
-          pt: '[SessionKeeper] Preparing Ping keep-alive request to scheduler service (Ping #$1)...',
-          de: '[SessionKeeper] Preparing Ping keep-alive request to scheduler service (Ping #$1)...',
-          it: '[SessionKeeper] Preparing Ping keep-alive request to scheduler service (Ping #$1)...',
-          ru: '[SessionKeeper] Preparing Ping keep-alive request to scheduler service (Ping #$1)...',
-          tr: '[SessionKeeper] Preparing Ping keep-alive request to scheduler service (Ping #$1)...',
+          es: '[SessionKeeper] Preparando solicitud Ping de mantenimiento al servicio de programación (Ping #$1)...',
+          fr: '[SessionKeeper] Préparation de la requête Ping de maintien au service de planification (Ping #$1)...',
+          pt: '[SessionKeeper] Preparando solicitação Ping de manutenção ao serviço de agendamento (Ping #$1)...',
+          de: '[SessionKeeper] Ping-Keep-Alive-Anfrage an den Planungsdienst wird vorbereitet (Ping #$1)...',
+          it: '[SessionKeeper] Preparazione richiesta Ping keep-alive al servizio di pianificazione (Ping #$1)...',
+          ru: '[SessionKeeper] Подготовка Ping-запроса поддержания активности к планировщику (Ping #$1)...',
+          tr: '[SessionKeeper] Zamanlayıcı hizmetine Ping canlı tutma isteği hazırlanıyor (Ping #$1)...',
         }
       },
       {
@@ -2176,13 +2176,13 @@
           vi: '[SessionKeeper] Phản hồi Ping thành công (HTTP 200), Người dùng: $1, Email: $2, Trạng thái: $3',
           th: '[SessionKeeper] การตอบกลับ Ping สำเร็จ (HTTP 200), ผู้ใช้: $1, อีเมล: $2, สถานะกำหนดเวลา: $3',
           id: '[SessionKeeper] Respons Ping berhasil (HTTP 200), Pengguna: $1, Email: $2, Status Penjadwal: $3',
-          es: '[SessionKeeper] Ping response successful (HTTP 200), User: $1, Email: $2, Scheduler State: $3',
-          fr: '[SessionKeeper] Ping response successful (HTTP 200), User: $1, Email: $2, Scheduler State: $3',
-          pt: '[SessionKeeper] Ping response successful (HTTP 200), User: $1, Email: $2, Scheduler State: $3',
-          de: '[SessionKeeper] Ping response successful (HTTP 200), User: $1, Email: $2, Scheduler State: $3',
-          it: '[SessionKeeper] Ping response successful (HTTP 200), User: $1, Email: $2, Scheduler State: $3',
-          ru: '[SessionKeeper] Ping response successful (HTTP 200), User: $1, Email: $2, Scheduler State: $3',
-          tr: '[SessionKeeper] Ping response successful (HTTP 200), User: $1, Email: $2, Scheduler State: $3',
+          es: '[SessionKeeper] Respuesta Ping exitosa (HTTP 200), Usuario: $1, Correo: $2, Estado del programador: $3',
+          fr: '[SessionKeeper] Réponse Ping réussie (HTTP 200), Utilisateur : $1, E-mail : $2, État du planificateur : $3',
+          pt: '[SessionKeeper] Resposta Ping bem-sucedida (HTTP 200), Usuário: $1, E-mail: $2, Estado do agendador: $3',
+          de: '[SessionKeeper] Ping-Antwort erfolgreich (HTTP 200), Benutzer: $1, E-Mail: $2, Planerstatus: $3',
+          it: '[SessionKeeper] Risposta Ping riuscita (HTTP 200), Utente: $1, Email: $2, Stato pianificatore: $3',
+          ru: '[SessionKeeper] Успешный ответ Ping (HTTP 200), Пользователь: $1, Почта: $2, Состояние планировщика: $3',
+          tr: '[SessionKeeper] Ping yanıtı başarılı (HTTP 200), Kullanıcı: $1, E-posta: $2, Zamanlayıcı Durumu: $3',
         }
       },
       {
@@ -2195,13 +2195,13 @@
           vi: '[Scheduler] [Session] Chuẩn bị gửi Ping duy trì đến dịch vụ lập lịch (Ping #$1)...',
           th: '[Scheduler] [Session] กำลังเตรียมส่ง Ping ไปยังบริการกำหนดเวลา (Ping #$1)...',
           id: '[Scheduler] [Session] Menyiapkan Ping keep-alive ke layanan penjadwal (Ping #$1)...',
-          es: '[Scheduler] [Session] Preparing Ping keep-alive to scheduler service (Ping #$1)...',
-          fr: '[Scheduler] [Session] Preparing Ping keep-alive to scheduler service (Ping #$1)...',
-          pt: '[Scheduler] [Session] Preparing Ping keep-alive to scheduler service (Ping #$1)...',
-          de: '[Scheduler] [Session] Preparing Ping keep-alive to scheduler service (Ping #$1)...',
-          it: '[Scheduler] [Session] Preparing Ping keep-alive to scheduler service (Ping #$1)...',
-          ru: '[Scheduler] [Session] Preparing Ping keep-alive to scheduler service (Ping #$1)...',
-          tr: '[Scheduler] [Session] Preparing Ping keep-alive to scheduler service (Ping #$1)...',
+          es: '[Scheduler] [Session] Preparando Ping de mantenimiento al servicio de programación (Ping #$1)...',
+          fr: '[Scheduler] [Session] Préparation du Ping de maintien au service de planification (Ping #$1)...',
+          pt: '[Scheduler] [Session] Preparando Ping de manutenção ao serviço de agendamento (Ping #$1)...',
+          de: '[Scheduler] [Session] Ping-Keep-Alive an den Planungsdienst wird vorbereitet (Ping #$1)...',
+          it: '[Scheduler] [Session] Preparazione Ping keep-alive al servizio di pianificazione (Ping #$1)...',
+          ru: '[Scheduler] [Session] Подготовка Ping поддержания активности к планировщику (Ping #$1)...',
+          tr: '[Scheduler] [Session] Zamanlayıcı hizmetine Ping canlı tutma hazırlanıyor (Ping #$1)...',
         }
       },
       {
@@ -2214,13 +2214,13 @@
           vi: '[Scheduler] [Session] Nhận được phản hồi nhịp tim: status=$1, user=$2, email=$3, scheduleState=$4',
           th: '[Scheduler] [Session] ได้รับการตอบกลับฮาร์ทบีท: status=$1, user=$2, email=$3, scheduleState=$4',
           id: '[Scheduler] [Session] Menerima respons detak jantung: status=$1, user=$2, email=$3, scheduleState=$4',
-          es: '[Scheduler] [Session] Heartbeat response received: status=$1, user=$2, email=$3, scheduleState=$4',
-          fr: '[Scheduler] [Session] Heartbeat response received: status=$1, user=$2, email=$3, scheduleState=$4',
-          pt: '[Scheduler] [Session] Heartbeat response received: status=$1, user=$2, email=$3, scheduleState=$4',
-          de: '[Scheduler] [Session] Heartbeat response received: status=$1, user=$2, email=$3, scheduleState=$4',
-          it: '[Scheduler] [Session] Heartbeat response received: status=$1, user=$2, email=$3, scheduleState=$4',
-          ru: '[Scheduler] [Session] Heartbeat response received: status=$1, user=$2, email=$3, scheduleState=$4',
-          tr: '[Scheduler] [Session] Heartbeat response received: status=$1, user=$2, email=$3, scheduleState=$4',
+          es: '[Scheduler] [Session] Respuesta de latido recibida: status=$1, user=$2, email=$3, scheduleState=$4',
+          fr: '[Scheduler] [Session] Réponse de battement reçue : status=$1, user=$2, email=$3, scheduleState=$4',
+          pt: '[Scheduler] [Session] Resposta de batimento recebida: status=$1, user=$2, email=$3, scheduleState=$4',
+          de: '[Scheduler] [Session] Heartbeat-Antwort empfangen: status=$1, user=$2, email=$3, scheduleState=$4',
+          it: '[Scheduler] [Session] Risposta heartbeat ricevuta: status=$1, user=$2, email=$3, scheduleState=$4',
+          ru: '[Scheduler] [Session] Получен ответ heartbeat: status=$1, user=$2, email=$3, scheduleState=$4',
+          tr: '[Scheduler] [Session] Kalp atışı yanıtı alındı: status=$1, user=$2, email=$3, scheduleState=$4',
         }
       },
       {
@@ -2233,13 +2233,13 @@
           vi: '[Main] Đang chuẩn bị tab [Nhật ký hệ thống] và [Kết xuất video], giữ trang chính hoạt động...',
           th: '[Main] กำลังเตรียมแท็บ [บันทึกคอนโซลระบบ] และ [การเรนเดอร์วิดีโอ] หน้าต่างหลักยังคงทำงานอยู่...',
           id: '[Main] Menyiapkan TAB [Log Konsol Sistem] dan [Rendering Video], situs utama tetap aktif...',
-          es: '[Main] Preparing [System Console Logs] and [Video Rendering] TABs, main site remains active...',
-          fr: '[Main] Preparing [System Console Logs] and [Video Rendering] TABs, main site remains active...',
-          pt: '[Main] Preparing [System Console Logs] and [Video Rendering] TABs, main site remains active...',
-          de: '[Main] Preparing [System Console Logs] and [Video Rendering] TABs, main site remains active...',
-          it: '[Main] Preparing [System Console Logs] and [Video Rendering] TABs, main site remains active...',
-          ru: '[Main] Preparing [System Console Logs] and [Video Rendering] TABs, main site remains active...',
-          tr: '[Main] Preparing [System Console Logs] and [Video Rendering] TABs, main site remains active...',
+          es: '[Main] Preparando pestañas [Registros de consola] y [Renderizado de video], el sitio principal permanece activo...',
+          fr: '[Main] Préparation des onglets [Journaux système] et [Rendu vidéo], le site principal reste actif...',
+          pt: '[Main] Preparando abas [Logs do console] e [Renderização de vídeo], o site principal permanece ativo...',
+          de: '[Main] Tabs [Systemprotokolle] und [Videorendering] werden vorbereitet, Hauptseite bleibt aktiv...',
+          it: '[Main] Preparazione schede [Log di sistema] e [Rendering video], il sito principale resta attivo...',
+          ru: '[Main] Подготовка вкладок [Системный журнал] и [Рендеринг видео], основной сайт остаётся активным...',
+          tr: '[Main] [Sistem Konsol Günlükleri] ve [Video İşleme] sekmeleri hazırlanıyor, ana site etkin kalıyor...',
         }
       },
       {
@@ -2252,13 +2252,13 @@
           vi: '[WindowManager] Đã tạo và cấu hình cửa sổ chính thành công',
           th: '[WindowManager] สร้างและกำหนดค่าหน้าต่างหลักเสร็จสมบูรณ์',
           id: '[WindowManager] Jendela utama berhasil dibuat dan dikonfigurasi',
-          es: '[WindowManager] Main window created and configured successfully',
-          fr: '[WindowManager] Main window created and configured successfully',
-          pt: '[WindowManager] Main window created and configured successfully',
-          de: '[WindowManager] Main window created and configured successfully',
-          it: '[WindowManager] Main window created and configured successfully',
-          ru: '[WindowManager] Main window created and configured successfully',
-          tr: '[WindowManager] Main window created and configured successfully',
+          es: '[WindowManager] Ventana principal creada y configurada correctamente',
+          fr: '[WindowManager] Fenêtre principale créée et configurée avec succès',
+          pt: '[WindowManager] Janela principal criada e configurada com sucesso',
+          de: '[WindowManager] Hauptfenster erfolgreich erstellt und konfiguriert',
+          it: '[WindowManager] Finestra principale creata e configurata correttamente',
+          ru: '[WindowManager] Главное окно успешно создано и настроено',
+          tr: '[WindowManager] Ana pencere başarıyla oluşturuldu ve yapılandırıldı',
         }
       },
       {
@@ -2271,13 +2271,13 @@
           vi: '[Tải lại trang] Trang $1 đã được kích hoạt tải lại thành công',
           th: '[โหลดหน้าซ้ำ] หน้า $1 ถูกทริกเกอร์ให้โหลดใหม่สำเร็จแล้ว',
           id: '[Muat Ulang Halaman] Halaman $1 berhasil dimuat ulang',
-          es: '[Page Reload] $1 page reload triggered successfully',
-          fr: '[Page Reload] $1 page reload triggered successfully',
-          pt: '[Page Reload] $1 page reload triggered successfully',
-          de: '[Page Reload] $1 page reload triggered successfully',
-          it: '[Page Reload] $1 page reload triggered successfully',
-          ru: '[Page Reload] $1 page reload triggered successfully',
-          tr: '[Page Reload] $1 page reload triggered successfully',
+          es: '[Recarga de página] Recarga de la página $1 activada correctamente',
+          fr: '[Rechargement de page] Rechargement de la page $1 déclenché avec succès',
+          pt: '[Recarregar página] Recarregamento da página $1 acionado com sucesso',
+          de: '[Seiten-Neuladen] Neuladen der Seite $1 erfolgreich ausgelöst',
+          it: '[Ricarica pagina] Ricaricamento della pagina $1 attivato con successo',
+          ru: '[Перезагрузка страницы] Перезагрузка страницы $1 успешно запущена',
+          tr: '[Sayfa Yenileme] $1 sayfası yeniden yüklemesi başarıyla tetiklendi',
         }
       },
       {
@@ -2290,13 +2290,13 @@
           vi: '[AutoUpdater] Đang kiểm tra bản cập nhật...',
           th: '[AutoUpdater] กำลังตรวจสอบการอัปเดต...',
           id: '[AutoUpdater] Memeriksa pembaruan...',
-          es: '[AutoUpdater] Checking for update',
-          fr: '[AutoUpdater] Checking for update',
-          pt: '[AutoUpdater] Checking for update',
-          de: '[AutoUpdater] Checking for update',
-          it: '[AutoUpdater] Checking for update',
-          ru: '[AutoUpdater] Checking for update',
-          tr: '[AutoUpdater] Checking for update',
+          es: '[AutoUpdater] Buscando actualizaciones...',
+          fr: '[AutoUpdater] Recherche de mise à jour...',
+          pt: '[AutoUpdater] Verificando atualizações...',
+          de: '[AutoUpdater] Suche nach Updates...',
+          it: '[AutoUpdater] Ricerca aggiornamenti in corso...',
+          ru: '[AutoUpdater] Проверка наличия обновлений...',
+          tr: '[AutoUpdater] Güncelleme kontrol ediliyor...',
         }
       },
       {
@@ -2309,13 +2309,13 @@
           vi: '[AutoUpdater] Tìm thấy phiên bản $1 (url: $2)',
           th: '[AutoUpdater] พบเวอร์ชัน $1 (url: $2)',
           id: '[AutoUpdater] Ditemukan versi $1 (url: $2)',
-          es: '[AutoUpdater] Found version $1 (url: $2)',
-          fr: '[AutoUpdater] Found version $1 (url: $2)',
-          pt: '[AutoUpdater] Found version $1 (url: $2)',
-          de: '[AutoUpdater] Found version $1 (url: $2)',
-          it: '[AutoUpdater] Found version $1 (url: $2)',
-          ru: '[AutoUpdater] Found version $1 (url: $2)',
-          tr: '[AutoUpdater] Found version $1 (url: $2)',
+          es: '[AutoUpdater] Se encontró la versión $1 (url: $2)',
+          fr: '[AutoUpdater] Version $1 trouvée (url : $2)',
+          pt: '[AutoUpdater] Versão $1 encontrada (url: $2)',
+          de: '[AutoUpdater] Version $1 gefunden (URL: $2)',
+          it: '[AutoUpdater] Trovata versione $1 (url: $2)',
+          ru: '[AutoUpdater] Найдена версия $1 (url: $2)',
+          tr: '[AutoUpdater] $1 sürümü bulundu (url: $2)',
         }
       },
       {
@@ -2328,13 +2328,13 @@
           vi: '[AutoUpdater] Không có bản cập nhật nào.',
           th: '[AutoUpdater] ไม่มีการอัปเดตที่ใช้ได้',
           id: '[AutoUpdater] Pembaruan tidak tersedia.',
-          es: '[AutoUpdater] Update not available.',
-          fr: '[AutoUpdater] Update not available.',
-          pt: '[AutoUpdater] Update not available.',
-          de: '[AutoUpdater] Update not available.',
-          it: '[AutoUpdater] Update not available.',
-          ru: '[AutoUpdater] Update not available.',
-          tr: '[AutoUpdater] Update not available.',
+          es: '[AutoUpdater] No hay actualizaciones disponibles.',
+          fr: '[AutoUpdater] Aucune mise à jour disponible.',
+          pt: '[AutoUpdater] Nenhuma atualização disponível.',
+          de: '[AutoUpdater] Kein Update verfügbar.',
+          it: '[AutoUpdater] Nessun aggiornamento disponibile.',
+          ru: '[AutoUpdater] Доступных обновлений нет.',
+          tr: '[AutoUpdater] Kullanılabilir güncelleme yok.',
         }
       },
       {
@@ -2347,13 +2347,13 @@
           vi: '[System] Cửa sổ chính và dịch vụ đã hoàn toàn sẵn sàng',
           th: '[System] หน้าต่างหลักของไคลเอนต์และบริการพร้อมใช้งานเต็มรูปแบบแล้ว',
           id: '[System] Jendela utama dan layanan telah siap sepenuhnya',
-          es: '[System] Client main window and daemon services are fully ready',
-          fr: '[System] Client main window and daemon services are fully ready',
-          pt: '[System] Client main window and daemon services are fully ready',
-          de: '[System] Client main window and daemon services are fully ready',
-          it: '[System] Client main window and daemon services are fully ready',
-          ru: '[System] Client main window and daemon services are fully ready',
-          tr: '[System] Client main window and daemon services are fully ready',
+          es: '[System] Ventana principal del cliente y servicios completamente listos',
+          fr: '[System] Fenêtre principale du client et services prêts',
+          pt: '[System] Janela principal do cliente e serviços totalmente prontos',
+          de: '[System] Hauptfenster des Clients und Hintergrunddienste vollständig bereit',
+          it: '[System] Finestra principale del client e servizi completamente pronti',
+          ru: '[System] Главное окно клиента и фоновые службы полностью готовы',
+          tr: '[System] İstemci ana penceresi ve arka plan hizmetleri tamamen hazır',
         }
       },
       {
@@ -2366,13 +2366,13 @@
           vi: '[System] Phiên bản phần mềm: $1',
           th: '[System] เวอร์ชันซอฟต์แวร์: $1',
           id: '[System] Versi Perangkat Lunak: $1',
-          es: '[System] Software Version: $1',
-          fr: '[System] Software Version: $1',
-          pt: '[System] Software Version: $1',
-          de: '[System] Software Version: $1',
-          it: '[System] Software Version: $1',
-          ru: '[System] Software Version: $1',
-          tr: '[System] Software Version: $1',
+          es: '[System] Versión del software: $1',
+          fr: '[System] Version du logiciel : $1',
+          pt: '[System] Versão do software: $1',
+          de: '[System] Softwareversion: $1',
+          it: '[System] Versione software: $1',
+          ru: '[System] Версия ПО: $1',
+          tr: '[System] Yazılım Sürümü: $1',
         }
       },
       {
@@ -2385,13 +2385,13 @@
           vi: '[Scheduler] Dịch vụ lập lịch đăng bài cục bộ đã khởi chạy, chu kỳ thăm dò: $1',
           th: '[Scheduler] บริการกำหนดเวลาเผยแพร่ในเครื่องเริ่มต้นแล้ว, รอบการสำรวจ: $1',
           id: '[Scheduler] Layanan penjadwalan rilis lokal dimulai, interval polling: $1',
-          es: '[Scheduler] Local scheduled publishing service started, polling interval: $1',
-          fr: '[Scheduler] Local scheduled publishing service started, polling interval: $1',
-          pt: '[Scheduler] Local scheduled publishing service started, polling interval: $1',
-          de: '[Scheduler] Local scheduled publishing service started, polling interval: $1',
-          it: '[Scheduler] Local scheduled publishing service started, polling interval: $1',
-          ru: '[Scheduler] Local scheduled publishing service started, polling interval: $1',
-          tr: '[Scheduler] Local scheduled publishing service started, polling interval: $1',
+          es: '[Scheduler] Servicio local de publicación programada iniciado, intervalo de sondeo: $1',
+          fr: '[Scheduler] Service local de publication planifiée démarré, intervalle d\'interrogation : $1',
+          pt: '[Scheduler] Serviço local de publicação agendada iniciado, intervalo de consulta: $1',
+          de: '[Scheduler] Lokaler Zeitplan-Veröffentlichungsdienst gestartet, Abfrageintervall: $1',
+          it: '[Scheduler] Servizio locale di pubblicazione pianificata avviato, intervallo di polling: $1',
+          ru: '[Scheduler] Локальная служба отложенной публикации запущена, интервал опроса: $1',
+          tr: '[Scheduler] Yerel zamanlanmış yayınlama hizmeti başlatıldı, yoklama aralığı: $1',
         }
       },
       {
@@ -2404,13 +2404,13 @@
           vi: '[Scheduler] Đã đặt lại thủ công $1 tác vụ thất bại và thực thi ngay lập tức',
           th: '[Scheduler] รีเซ็ตงานที่ล้มเหลว $1 งานด้วยตนเองและดำเนินการทันที',
           id: '[Scheduler] Mereset manual $1 tugas gagal dan langsung mengeksekusi',
-          es: '[Scheduler] Manually reset $1 failed tasks and executed immediately',
-          fr: '[Scheduler] Manually reset $1 failed tasks and executed immediately',
-          pt: '[Scheduler] Manually reset $1 failed tasks and executed immediately',
-          de: '[Scheduler] Manually reset $1 failed tasks and executed immediately',
-          it: '[Scheduler] Manually reset $1 failed tasks and executed immediately',
-          ru: '[Scheduler] Manually reset $1 failed tasks and executed immediately',
-          tr: '[Scheduler] Manually reset $1 failed tasks and executed immediately',
+          es: '[Scheduler] Se restablecieron manualmente $1 tareas fallidas y se ejecutaron de inmediato',
+          fr: '[Scheduler] $1 tâches échouées réinitialisées manuellement et exécutées immédiatement',
+          pt: '[Scheduler] $1 tarefas com falha redefinidas manualmente e executadas imediatamente',
+          de: '[Scheduler] $1 fehlgeschlagene Aufgaben manuell zurückgesetzt und sofort ausgeführt',
+          it: '[Scheduler] $1 attività non riuscite reimpostate manualmente ed eseguite subito',
+          ru: '[Scheduler] Вручную сброшено и немедленно запущено неудачных задач: $1',
+          tr: '[Scheduler] Başarısız $1 görev manuel olarak sıfırlandı ve hemen yürütüldü',
         }
       },
       {
@@ -2423,13 +2423,13 @@
           vi: '[Scheduler] 🔄 Khởi động phát hiện $1 tác vụ video bị lỗi/ngắt trước đó, lên lịch gửi lại ngay: $2',
           th: '[Scheduler] 🔄 ตรวจพบงานวิดีโอที่ล้มเหลว/ถูกขัดจังหวะ $1 งานขณะเริ่มทำงาน กำหนดเวลาเผยแพร่อีกครั้งทันที: $2',
           id: '[Scheduler] 🔄 Startup mendeteksi $1 tugas video yang gagal/terputus sebelumnya, menjadwalkan ulang: $2',
-          es: '[Scheduler] 🔄 Startup detected $1 previously failed/interrupted video tasks, scheduling immediate retry: $2',
-          fr: '[Scheduler] 🔄 Startup detected $1 previously failed/interrupted video tasks, scheduling immediate retry: $2',
-          pt: '[Scheduler] 🔄 Startup detected $1 previously failed/interrupted video tasks, scheduling immediate retry: $2',
-          de: '[Scheduler] 🔄 Startup detected $1 previously failed/interrupted video tasks, scheduling immediate retry: $2',
-          it: '[Scheduler] 🔄 Startup detected $1 previously failed/interrupted video tasks, scheduling immediate retry: $2',
-          ru: '[Scheduler] 🔄 Startup detected $1 previously failed/interrupted video tasks, scheduling immediate retry: $2',
-          tr: '[Scheduler] 🔄 Startup detected $1 previously failed/interrupted video tasks, scheduling immediate retry: $2',
+          es: '[Scheduler] 🔄 Al iniciar se detectaron $1 tareas de video fallidas/interrumpidas, programando reintento inmediato: $2',
+          fr: '[Scheduler] 🔄 $1 tâches vidéo précédemment échouées/interrompues détectées au démarrage, nouvelle tentative immédiate : $2',
+          pt: '[Scheduler] 🔄 Detectadas na inicialização $1 tarefas de vídeo com falha/interrompidas, agendando nova tentativa: $2',
+          de: '[Scheduler] 🔄 Beim Start $1 zuvor fehlgeschlagene/unterbrochene Videoaufgaben erkannt, sofortiger Neuversuch: $2',
+          it: '[Scheduler] 🔄 Rilevate all\'avvio $1 attività video non riuscite/interrotte, pianificazione nuovo tentativo immediato: $2',
+          ru: '[Scheduler] 🔄 При запуске обнаружено $1 прерванных/неудачных видеозадач, немедленный повторный запуск: $2',
+          tr: '[Scheduler] 🔄 Başlangıçta daha önce başarısız/kesintiye uğramış $1 video görevi algılandı, hemen yeniden deneniyor: $2',
         }
       },
       {
@@ -2442,13 +2442,13 @@
           vi: '[Scheduler] Đã thêm/cập nhật thành công $1 tác vụ đã lên lịch',
           th: '[Scheduler] เพิ่ม/อัปเดตงานตามกำหนดการ $1 งานสำเร็จ',
           id: '[Scheduler] Berhasil menambah/memperbarui $1 tugas terjadwal',
-          es: '[Scheduler] Successfully added/updated $1 scheduled tasks',
-          fr: '[Scheduler] Successfully added/updated $1 scheduled tasks',
-          pt: '[Scheduler] Successfully added/updated $1 scheduled tasks',
-          de: '[Scheduler] Successfully added/updated $1 scheduled tasks',
-          it: '[Scheduler] Successfully added/updated $1 scheduled tasks',
-          ru: '[Scheduler] Successfully added/updated $1 scheduled tasks',
-          tr: '[Scheduler] Successfully added/updated $1 scheduled tasks',
+          es: '[Scheduler] Se añadieron/actualizaron correctamente $1 tareas programadas',
+          fr: '[Scheduler] $1 tâches planifiées ajoutées/mises à jour avec succès',
+          pt: '[Scheduler] $1 tarefas agendadas adicionadas/atualizadas com sucesso',
+          de: '[Scheduler] $1 geplante Aufgaben erfolgreich hinzugefügt/aktualisiert',
+          it: '[Scheduler] $1 attività pianificate aggiunte/aggiornate con successo',
+          ru: '[Scheduler] Успешно добавлено/обновлено запланированных задач: $1',
+          tr: '[Scheduler] $1 zamanlanmış görev başarıyla eklendi/güncellendi',
         }
       },
       {
@@ -2461,13 +2461,13 @@
           vi: '[Scheduler] Đã hủy tác vụ đã lên lịch: $1',
           th: '[Scheduler] ยกเลิกงานตามกำหนดการแล้ว: $1',
           id: '[Scheduler] Membatalkan tugas terjadwal: $1',
-          es: '[Scheduler] Cancelled scheduled task: $1',
-          fr: '[Scheduler] Cancelled scheduled task: $1',
-          pt: '[Scheduler] Cancelled scheduled task: $1',
-          de: '[Scheduler] Cancelled scheduled task: $1',
-          it: '[Scheduler] Cancelled scheduled task: $1',
-          ru: '[Scheduler] Cancelled scheduled task: $1',
-          tr: '[Scheduler] Cancelled scheduled task: $1',
+          es: '[Scheduler] Tarea programada cancelada: $1',
+          fr: '[Scheduler] Tâche planifiée annulée : $1',
+          pt: '[Scheduler] Tarefa agendada cancelada: $1',
+          de: '[Scheduler] Geplante Aufgabe abgebrochen: $1',
+          it: '[Scheduler] Attività pianificata annullata: $1',
+          ru: '[Scheduler] Запланированная задача отменена: $1',
+          tr: '[Scheduler] Zamanlanmış görev iptal edildi: $1',
         }
       },
       {
@@ -2480,13 +2480,13 @@
           vi: '[Scheduler] ⏰ Đã đến giờ đã lên lịch! Chuẩn bị tự động tải lên [$1] - $2',
           th: '[Scheduler] ⏰ ถึงเวลาที่กำหนดแล้ว! เตรียมอัปโหลดอัตโนมัติ [$1] - $2',
           id: '[Scheduler] ⏰ Waktu terjadwal tercapai! Menyiapkan unggahan otomatis [$1] - $2',
-          es: '[Scheduler] ⏰ Scheduled time reached! Preparing automatic upload [$1] - $2',
-          fr: '[Scheduler] ⏰ Scheduled time reached! Preparing automatic upload [$1] - $2',
-          pt: '[Scheduler] ⏰ Scheduled time reached! Preparing automatic upload [$1] - $2',
-          de: '[Scheduler] ⏰ Scheduled time reached! Preparing automatic upload [$1] - $2',
-          it: '[Scheduler] ⏰ Scheduled time reached! Preparing automatic upload [$1] - $2',
-          ru: '[Scheduler] ⏰ Scheduled time reached! Preparing automatic upload [$1] - $2',
-          tr: '[Scheduler] ⏰ Scheduled time reached! Preparing automatic upload [$1] - $2',
+          es: '[Scheduler] ⏰ ¡Hora programada alcanzada! Preparando carga automática [$1] - $2',
+          fr: '[Scheduler] ⏰ Heure planifiée atteinte ! Préparation du téléversement automatique [$1] - $2',
+          pt: '[Scheduler] ⏰ Horário agendado atingido! Preparando envio automático [$1] - $2',
+          de: '[Scheduler] ⏰ Geplante Zeit erreicht! Automatischer Upload wird vorbereitet [$1] - $2',
+          it: '[Scheduler] ⏰ Ora pianificata raggiunta! Preparazione caricamento automatico [$1] - $2',
+          ru: '[Scheduler] ⏰ Наступило запланированное время! Подготовка автозагрузки [$1] - $2',
+          tr: '[Scheduler] ⏰ Zamanlanan saate ulaşıldı! Otomatik yükleme hazırlanıyor [$1] - $2',
         }
       },
       {
@@ -2499,13 +2499,13 @@
           vi: '[Scheduler] ✅ Đăng bài theo lịch thành công: $1',
           th: '[Scheduler] ✅ เผยแพร่ตามกำหนดเวลาสำเร็จ: $1',
           id: '[Scheduler] ✅ Publikasi terjadwal berhasil: $1',
-          es: '[Scheduler] ✅ Scheduled publishing succeeded: $1',
-          fr: '[Scheduler] ✅ Scheduled publishing succeeded: $1',
-          pt: '[Scheduler] ✅ Scheduled publishing succeeded: $1',
-          de: '[Scheduler] ✅ Scheduled publishing succeeded: $1',
-          it: '[Scheduler] ✅ Scheduled publishing succeeded: $1',
-          ru: '[Scheduler] ✅ Scheduled publishing succeeded: $1',
-          tr: '[Scheduler] ✅ Scheduled publishing succeeded: $1',
+          es: '[Scheduler] ✅ Publicación programada completada: $1',
+          fr: '[Scheduler] ✅ Publication planifiée réussie : $1',
+          pt: '[Scheduler] ✅ Publicação agendada concluída: $1',
+          de: '[Scheduler] ✅ Geplante Veröffentlichung erfolgreich: $1',
+          it: '[Scheduler] ✅ Pubblicazione pianificata riuscita: $1',
+          ru: '[Scheduler] ✅ Отложенная публикация выполнена: $1',
+          tr: '[Scheduler] ✅ Zamanlanmış yayınlama başarılı: $1',
         }
       },
       {
@@ -2518,13 +2518,13 @@
           vi: '[Scheduler] ❌ Đăng bài theo lịch không thành công: $1',
           th: '[Scheduler] ❌ เผยแพร่ตามกำหนดเวลาไม่สำเร็จ: $1',
           id: '[Scheduler] ❌ Publikasi terjadwal gagal: $1',
-          es: '[Scheduler] ❌ Scheduled publishing failed: $1',
-          fr: '[Scheduler] ❌ Scheduled publishing failed: $1',
-          pt: '[Scheduler] ❌ Scheduled publishing failed: $1',
-          de: '[Scheduler] ❌ Scheduled publishing failed: $1',
-          it: '[Scheduler] ❌ Scheduled publishing failed: $1',
-          ru: '[Scheduler] ❌ Scheduled publishing failed: $1',
-          tr: '[Scheduler] ❌ Scheduled publishing failed: $1',
+          es: '[Scheduler] ❌ Error en la publicación programada: $1',
+          fr: '[Scheduler] ❌ Échec de la publication planifiée : $1',
+          pt: '[Scheduler] ❌ Falha na publicação agendada: $1',
+          de: '[Scheduler] ❌ Geplante Veröffentlichung fehlgeschlagen: $1',
+          it: '[Scheduler] ❌ Pubblicazione pianificata non riuscita: $1',
+          ru: '[Scheduler] ❌ Сбой отложенной публикации: $1',
+          tr: '[Scheduler] ❌ Zamanlanmış yayınlama başarısız: $1',
         }
       },
       {
@@ -2537,13 +2537,13 @@
           vi: '[Scheduler] ❌ Ngoại lệ khi thực hiện đăng bài theo lịch: $1',
           th: '[Scheduler] ❌ ข้อผิดพลาดในการเผยแพร่ตามกำหนดเวลา: $1',
           id: '[Scheduler] ❌ Pengecualian saat mengeksekusi publikasi terjadwal: $1',
-          es: '[Scheduler] ❌ Error executing scheduled publishing: $1',
-          fr: '[Scheduler] ❌ Error executing scheduled publishing: $1',
-          pt: '[Scheduler] ❌ Error executing scheduled publishing: $1',
-          de: '[Scheduler] ❌ Error executing scheduled publishing: $1',
-          it: '[Scheduler] ❌ Error executing scheduled publishing: $1',
-          ru: '[Scheduler] ❌ Error executing scheduled publishing: $1',
-          tr: '[Scheduler] ❌ Error executing scheduled publishing: $1',
+          es: '[Scheduler] ❌ Excepción al ejecutar la publicación programada: $1',
+          fr: '[Scheduler] ❌ Exception lors de la publication planifiée : $1',
+          pt: '[Scheduler] ❌ Exceção ao executar publicação agendada: $1',
+          de: '[Scheduler] ❌ Ausnahme bei der geplanten Veröffentlichung: $1',
+          it: '[Scheduler] ❌ Eccezione durante la pubblicazione pianificata: $1',
+          ru: '[Scheduler] ❌ Исключение при выполнении отложенной публикации: $1',
+          tr: '[Scheduler] ❌ Zamanlanmış yayınlama yürütülürken istisna: $1',
         }
       },
       {
@@ -2556,13 +2556,13 @@
           vi: '[Scheduler] Đã tải $1 tác vụ đã lên lịch từ tệp cục bộ',
           th: '[Scheduler] โหลดงานตามกำหนดการ $1 งานจากไฟล์ในเครื่องแล้ว',
           id: '[Scheduler] Memuat $1 tugas terjadwal dari file lokal',
-          es: '[Scheduler] Loaded $1 scheduled tasks from local storage',
-          fr: '[Scheduler] Loaded $1 scheduled tasks from local storage',
-          pt: '[Scheduler] Loaded $1 scheduled tasks from local storage',
-          de: '[Scheduler] Loaded $1 scheduled tasks from local storage',
-          it: '[Scheduler] Loaded $1 scheduled tasks from local storage',
-          ru: '[Scheduler] Loaded $1 scheduled tasks from local storage',
-          tr: '[Scheduler] Loaded $1 scheduled tasks from local storage',
+          es: '[Scheduler] Se cargaron $1 tareas programadas desde el almacenamiento local',
+          fr: '[Scheduler] $1 tâches planifiées chargées depuis le stockage local',
+          pt: '[Scheduler] $1 tarefas agendadas carregadas do armazenamento local',
+          de: '[Scheduler] $1 geplante Aufgaben aus lokalem Speicher geladen',
+          it: '[Scheduler] Caricate $1 attività pianificate dall\'archivio locale',
+          ru: '[Scheduler] Загружено запланированных задач из локального файла: $1',
+          tr: '[Scheduler] Yerel depolamadan $1 zamanlanmış görev yüklendi',
         }
       },
       {
@@ -2575,13 +2575,13 @@
           vi: '[Scheduler] Không thể đọc tác vụ cục bộ: $1',
           th: '[Scheduler] ไม่สามารถอ่านงานในเครื่อง: $1',
           id: '[Scheduler] Gagal membaca tugas lokal yang persisten: $1',
-          es: '[Scheduler] Failed to read local persistent tasks: $1',
-          fr: '[Scheduler] Failed to read local persistent tasks: $1',
-          pt: '[Scheduler] Failed to read local persistent tasks: $1',
-          de: '[Scheduler] Failed to read local persistent tasks: $1',
-          it: '[Scheduler] Failed to read local persistent tasks: $1',
-          ru: '[Scheduler] Failed to read local persistent tasks: $1',
-          tr: '[Scheduler] Failed to read local persistent tasks: $1',
+          es: '[Scheduler] Error al leer las tareas locales persistentes: $1',
+          fr: '[Scheduler] Échec de lecture des tâches locales persistantes : $1',
+          pt: '[Scheduler] Falha ao ler tarefas locais persistentes: $1',
+          de: '[Scheduler] Fehler beim Lesen lokaler persistenter Aufgaben: $1',
+          it: '[Scheduler] Impossibile leggere le attività locali persistenti: $1',
+          ru: '[Scheduler] Ошибка чтения локальных сохранённых задач: $1',
+          tr: '[Scheduler] Yerel kalıcı görevler okunamadı: $1',
         }
       },
       {
@@ -2594,13 +2594,13 @@
           vi: '[Scheduler] Không thể lưu tệp tác vụ cục bộ: $1',
           th: '[Scheduler] ไม่สามารถบันทึกไฟล์งานในเครื่อง: $1',
           id: '[Scheduler] Gagal menyimpan file tugas lokal: $1',
-          es: '[Scheduler] Failed to save local task file: $1',
-          fr: '[Scheduler] Failed to save local task file: $1',
-          pt: '[Scheduler] Failed to save local task file: $1',
-          de: '[Scheduler] Failed to save local task file: $1',
-          it: '[Scheduler] Failed to save local task file: $1',
-          ru: '[Scheduler] Failed to save local task file: $1',
-          tr: '[Scheduler] Failed to save local task file: $1',
+          es: '[Scheduler] Error al guardar el archivo de tareas locales: $1',
+          fr: '[Scheduler] Échec d\'enregistrement du fichier de tâches locales : $1',
+          pt: '[Scheduler] Falha ao salvar arquivo de tarefas locais: $1',
+          de: '[Scheduler] Fehler beim Speichern der lokalen Aufgabendatei: $1',
+          it: '[Scheduler] Impossibile salvare il file delle attività locali: $1',
+          ru: '[Scheduler] Ошибка сохранения локального файла задач: $1',
+          tr: '[Scheduler] Yerel görev dosyası kaydedilemedi: $1',
         }
       },
       {
@@ -2613,13 +2613,13 @@
           vi: '[Scheduler] Không thể khởi tạo đường dẫn lưu trữ: $1',
           th: '[Scheduler] ไม่สามารถกำหนดเส้นทางการจัดเก็บได้: $1',
           id: '[Scheduler] Gagal menginisialisasi jalur penyimpanan: $1',
-          es: '[Scheduler] Failed to initialize storage path: $1',
-          fr: '[Scheduler] Failed to initialize storage path: $1',
-          pt: '[Scheduler] Failed to initialize storage path: $1',
-          de: '[Scheduler] Failed to initialize storage path: $1',
-          it: '[Scheduler] Failed to initialize storage path: $1',
-          ru: '[Scheduler] Failed to initialize storage path: $1',
-          tr: '[Scheduler] Failed to initialize storage path: $1',
+          es: '[Scheduler] Error al inicializar la ruta de almacenamiento: $1',
+          fr: '[Scheduler] Échec d\'initialisation du chemin de stockage : $1',
+          pt: '[Scheduler] Falha ao inicializar o caminho de armazenamento: $1',
+          de: '[Scheduler] Speicherpfad konnte nicht initialisiert werden: $1',
+          it: '[Scheduler] Impossibile inizializzare il percorso di archiviazione: $1',
+          ru: '[Scheduler] Не удалось инициализировать путь хранения: $1',
+          tr: '[Scheduler] Depolama yolu başlatılamadı: $1',
         }
       },
       {
@@ -2632,13 +2632,13 @@
           vi: '[Scheduler] Ngoại lệ hiển thị thông báo hệ thống: $1',
           th: '[Scheduler] ข้อยกเว้นในการแสดงการแจ้งเตือนของระบบ: $1',
           id: '[Scheduler] Pengecualian menampilkan notifikasi sistem: $1',
-          es: '[Scheduler] Exception showing system notification: $1',
-          fr: '[Scheduler] Exception showing system notification: $1',
-          pt: '[Scheduler] Exception showing system notification: $1',
-          de: '[Scheduler] Exception showing system notification: $1',
-          it: '[Scheduler] Exception showing system notification: $1',
-          ru: '[Scheduler] Exception showing system notification: $1',
-          tr: '[Scheduler] Exception showing system notification: $1',
+          es: '[Scheduler] Excepción al mostrar notificación del sistema: $1',
+          fr: '[Scheduler] Exception lors de l\'affichage de la notification système : $1',
+          pt: '[Scheduler] Exceção ao exibir notificação do sistema: $1',
+          de: '[Scheduler] Ausnahme beim Anzeigen der Systembenachrichtigung: $1',
+          it: '[Scheduler] Eccezione durante la visualizzazione della notifica di sistema: $1',
+          ru: '[Scheduler] Исключение при показе системного уведомления: $1',
+          tr: '[Scheduler] Sistem bildirimi gösterilirken istisna: $1',
         }
       },
       {
@@ -2651,298 +2651,13 @@
           vi: '[AutoUpdater] Tự động tạo gói cập nhật thư mục resources: $1',
           th: '[AutoUpdater] สร้างแพ็กเกจอัปเดตในไดเรกทอรี resources อัตโนมัติ: $1',
           id: '[AutoUpdater] Paket pembaruan dibuat otomatis di direktori resources: $1',
-          es: '[AutoUpdater] Auto-generated update package in resources directory: $1',
-          fr: '[AutoUpdater] Auto-generated update package in resources directory: $1',
-          pt: '[AutoUpdater] Auto-generated update package in resources directory: $1',
-          de: '[AutoUpdater] Auto-generated update package in resources directory: $1',
-          it: '[AutoUpdater] Auto-generated update package in resources directory: $1',
-          ru: '[AutoUpdater] Auto-generated update package in resources directory: $1',
-          tr: '[AutoUpdater] Auto-generated update package in resources directory: $1',
-        }
-      },
-      {
-        pattern: /(?:\[UpdateManager\]\s*)?当前已是最新版本\s*[（\(]?([^\)）]*)[）\)]?/i,
-        templates: {
-          zh: '[UpdateManager] 当前已是最新版本 ($1)',
-          en: '[UpdateManager] Already on the latest version ($1)',
-          ja: '[UpdateManager] 現在は最新バージョンです ($1)',
-          ko: '[UpdateManager] 현재 최신 버전입니다 ($1)',
-          vi: '[UpdateManager] Hiện đã là phiên bản mới nhất ($1)',
-          th: '[UpdateManager] ปัจจุบันเป็นเวอร์ชันล่าสุดแล้ว ($1)',
-          id: '[UpdateManager] Sudah menggunakan versi terbaru ($1)',
-          es: '[UpdateManager] Already on the latest version ($1)',
-          fr: '[UpdateManager] Already on the latest version ($1)',
-          pt: '[UpdateManager] Already on the latest version ($1)',
-          de: '[UpdateManager] Already on the latest version ($1)',
-          it: '[UpdateManager] Already on the latest version ($1)',
-          ru: '[UpdateManager] Already on the latest version ($1)',
-          tr: '[UpdateManager] Already on the latest version ($1)',
-        }
-      },
-      {
-        pattern: /(?:\[WindowManager\]\s*)?切换客户端语言至[:：]\s*(?:zh\s*[（\(]中文[）\)]|zh\b)/i,
-        templates: {
-          zh: '[WindowManager] 切换客户端语言至: zh (中文)',
-          en: '[WindowManager] Switched client language to: zh (Chinese)',
-          ja: '[WindowManager] クライアント言語を zh (中国語) に切り替えました',
-          ko: '[WindowManager] 클라이언트 언어를 zh (중국어) 로 전환했습니다',
-          vi: '[WindowManager] Đã chuyển ngôn ngữ ứng dụng sang: zh (Tiếng Trung)',
-          th: '[WindowManager] สลับภาษาของไคลเอนต์เป็น: zh (ภาษาจีน)',
-          id: '[WindowManager] Beralih bahasa klien ke: zh (Bahasa Mandarin)',
-          es: '[WindowManager] Switched client language to: zh (Chinese)',
-          fr: '[WindowManager] Switched client language to: zh (Chinese)',
-          pt: '[WindowManager] Switched client language to: zh (Chinese)',
-          de: '[WindowManager] Switched client language to: zh (Chinese)',
-          it: '[WindowManager] Switched client language to: zh (Chinese)',
-          ru: '[WindowManager] Switched client language to: zh (Chinese)',
-          tr: '[WindowManager] Switched client language to: zh (Chinese)',
-        }
-      },
-      {
-        pattern: /(?:\[WindowManager\]\s*)?切换客户端语言至[:：]\s*(?:ja\s*[（\(]日本語[）\)]|ja\b)/i,
-        templates: {
-          zh: '[WindowManager] 切换客户端语言至: ja (日语)',
-          en: '[WindowManager] Switched client language to: ja (Japanese)',
-          ja: '[WindowManager] クライアント言語を ja (日本語) に切り替えました',
-          ko: '[WindowManager] 클라이언트 언어를 ja (일본어) 로 전환했습니다',
-          vi: '[WindowManager] Đã chuyển ngôn ngữ ứng dụng sang: ja (Tiếng Nhật)',
-          th: '[WindowManager] สลับภาษาของไคลเอนต์เป็น: ja (ภาษาญี่ปุ่น)',
-          id: '[WindowManager] Beralih bahasa klien ke: ja (Bahasa Jepang)',
-          es: '[WindowManager] Switched client language to: ja (Japanese)',
-          fr: '[WindowManager] Switched client language to: ja (Japanese)',
-          pt: '[WindowManager] Switched client language to: ja (Japanese)',
-          de: '[WindowManager] Switched client language to: ja (Japanese)',
-          it: '[WindowManager] Switched client language to: ja (Japanese)',
-          ru: '[WindowManager] Switched client language to: ja (Japanese)',
-          tr: '[WindowManager] Switched client language to: ja (Japanese)',
-        }
-      },
-      {
-        pattern: /(?:\[WindowManager\]\s*)?切换客户端语言至[:：]\s*(.*)/i,
-        templates: {
-          zh: '[WindowManager] 切换客户端语言至: $1',
-          en: '[WindowManager] Switched client language to: $1',
-          ja: '[WindowManager] クライアント言語を $1 に切り替えました',
-          ko: '[WindowManager] 클라이언트 언어를 $1 (으)로 전환했습니다',
-          vi: '[WindowManager] Đã chuyển ngôn ngữ ứng dụng sang: $1',
-          th: '[WindowManager] สลับภาษาของไคลเอนต์เป็น: $1',
-          id: '[WindowManager] Beralih bahasa klien ke: $1',
-          es: '[WindowManager] Switched client language to: $1',
-          fr: '[WindowManager] Switched client language to: $1',
-          pt: '[WindowManager] Switched client language to: $1',
-          de: '[WindowManager] Switched client language to: $1',
-          it: '[WindowManager] Switched client language to: $1',
-          ru: '[WindowManager] Switched client language to: $1',
-          tr: '[WindowManager] Switched client language to: $1',
-        }
-      },
-      {
-        pattern: /(?:\[WindowManager\]\s*)?捕获到\s*OAuth\s*认证窗口请求[（\(]window\.open[）\)]，开启独立认证弹窗[:：]\s*(.*)/i,
-        templates: {
-          zh: '[WindowManager] 捕获到 OAuth 认证窗口请求(window.open)，开启独立认证弹窗: $1',
-          en: '[WindowManager] Caught OAuth popup request (window.open), opened dedicated auth window: $1',
-          ja: '[WindowManager] OAuth 認証ポップアップ要求 (window.open) を検出、独立ウィンドウを開きました: $1',
-          ko: '[WindowManager] OAuth 인증 팝업 요청(window.open) 감지, 독립 인증 창 열기: $1',
-          vi: '[WindowManager] Bắt được yêu cầu cửa sổ xác thực OAuth, mở cửa sổ xác thực độc lập: $1',
-          th: '[WindowManager] ตรวจพบคำขอการรับรองความถูกต้อง OAuth เปิดหน้าต่างอิสระ: $1',
-          id: '[WindowManager] Menangkap permintaan popup OAuth, membuka jendela autentikasi mandiri: $1',
-          es: '[WindowManager] Caught OAuth popup request (window.open), opened dedicated auth window: $1',
-          fr: '[WindowManager] Caught OAuth popup request (window.open), opened dedicated auth window: $1',
-          pt: '[WindowManager] Caught OAuth popup request (window.open), opened dedicated auth window: $1',
-          de: '[WindowManager] Caught OAuth popup request (window.open), opened dedicated auth window: $1',
-          it: '[WindowManager] Caught OAuth popup request (window.open), opened dedicated auth window: $1',
-          ru: '[WindowManager] Caught OAuth popup request (window.open), opened dedicated auth window: $1',
-          tr: '[WindowManager] Caught OAuth popup request (window.open), opened dedicated auth window: $1',
-        }
-      },
-      {
-        pattern: /(?:\[WindowManager\]\s*)?收到来自\s*OAuth\s*流程的凭证[，,]?\s*开始同步至主站\s*LocalStorage\.\.\./i,
-        templates: {
-          zh: '[WindowManager] 收到来自 OAuth 流程的凭证，开始同步至主站 LocalStorage...',
-          en: '[WindowManager] Received OAuth credentials, synchronizing to main LocalStorage...',
-          ja: '[WindowManager] OAuth 認証情報を取得、LocalStorage への同期を開始...',
-          ko: '[WindowManager] OAuth 자격 증명 수신, 메인 사이트 LocalStorage 로 동기화 시작...',
-          vi: '[WindowManager] Nhận được thông tin xác thực OAuth, đang đồng bộ hóa vào LocalStorage...',
-          th: '[WindowManager] ได้รับข้อมูลประจำตัว OAuth กำลังซิงค์กับ LocalStorage...',
-          id: '[WindowManager] Menerima kredensial OAuth, menyinkronkan ke LocalStorage...',
-          es: '[WindowManager] Received OAuth credentials, synchronizing to main LocalStorage...',
-          fr: '[WindowManager] Received OAuth credentials, synchronizing to main LocalStorage...',
-          pt: '[WindowManager] Received OAuth credentials, synchronizing to main LocalStorage...',
-          de: '[WindowManager] Received OAuth credentials, synchronizing to main LocalStorage...',
-          it: '[WindowManager] Received OAuth credentials, synchronizing to main LocalStorage...',
-          ru: '[WindowManager] Received OAuth credentials, synchronizing to main LocalStorage...',
-          tr: '[WindowManager] Received OAuth credentials, synchronizing to main LocalStorage...',
-        }
-      },
-      {
-        pattern: /(?:\[WindowManager\]\s*)?凭证已注入[，,]?\s*正在引导主站进入已登录页[:：]\s*(.*)/i,
-        templates: {
-          zh: '[WindowManager] 凭证已注入，正在引导主站进入已登录页: $1',
-          en: '[WindowManager] Credentials injected, redirecting main site to authenticated page: $1',
-          ja: '[WindowManager] 認証情報を注入完了、ログイン済みページにリダイレクト中: $1',
-          ko: '[WindowManager] 자격 증명 주입 완료, 로그인 페이지로 리디렉션 중: $1',
-          vi: '[WindowManager] Đã chèn thông tin xác thực, chuyển hướng đến trang đã đăng nhập: $1',
-          th: '[WindowManager] ใส่ข้อมูลประจำตัวแล้ว กำลังนำทางไปยังหน้าที่เข้าสู่ระบบแล้ว: $1',
-          id: '[WindowManager] Kredensial disuntikkan, mengarahkan ke halaman masuk: $1',
-          es: '[WindowManager] Credentials injected, redirecting main site to authenticated page: $1',
-          fr: '[WindowManager] Credentials injected, redirecting main site to authenticated page: $1',
-          pt: '[WindowManager] Credentials injected, redirecting main site to authenticated page: $1',
-          de: '[WindowManager] Credentials injected, redirecting main site to authenticated page: $1',
-          it: '[WindowManager] Credentials injected, redirecting main site to authenticated page: $1',
-          ru: '[WindowManager] Credentials injected, redirecting main site to authenticated page: $1',
-          tr: '[WindowManager] Credentials injected, redirecting main site to authenticated page: $1',
-        }
-      },
-      {
-        pattern: /(?:\[WindowManager\]\s*)?检测到\s*OAuth\s*登录成功[，,]?\s*Token\s*已生成[，,]?\s*开始将凭证同步至桌面客户端主站\.\.\./i,
-        templates: {
-          zh: '[WindowManager] 检测到 OAuth 登录成功，Token 已生成，开始将凭证同步至桌面客户端主站...',
-          en: '[WindowManager] OAuth login succeeded, Token generated, syncing credentials to client...',
-          ja: '[WindowManager] OAuth ログイン成功、Token 生成完了、デスクトップクライアントに同期中...',
-          ko: '[WindowManager] OAuth 로그인 성공, 토큰 생성됨, 데스크톱 클라이언트에 동기화 시작...',
-          vi: '[WindowManager] Đăng nhập OAuth thành công, đã tạo Token, đang đồng bộ vào ứng dụng...',
-          th: '[WindowManager] เข้าสู่ระบบ OAuth สำเร็จ สร้างโทเค็นแล้ว กำลังซิงค์ข้อมูลประจำตัว...',
-          id: '[WindowManager] Login OAuth berhasil, Token dibuat, menyinkronkan ke klien...',
-          es: '[WindowManager] OAuth login succeeded, Token generated, syncing credentials to client...',
-          fr: '[WindowManager] OAuth login succeeded, Token generated, syncing credentials to client...',
-          pt: '[WindowManager] OAuth login succeeded, Token generated, syncing credentials to client...',
-          de: '[WindowManager] OAuth login succeeded, Token generated, syncing credentials to client...',
-          it: '[WindowManager] OAuth login succeeded, Token generated, syncing credentials to client...',
-          ru: '[WindowManager] OAuth login succeeded, Token generated, syncing credentials to client...',
-          tr: '[WindowManager] OAuth login succeeded, Token generated, syncing credentials to client...',
-        }
-      },
-      {
-        pattern: /(?:\[WindowManager\]\s*)?启动独立\s*OAuth\s*弹窗进行安全认证[:：]\s*(.*)/i,
-        templates: {
-          zh: '[WindowManager] 启动独立 OAuth 弹窗进行安全认证: $1',
-          en: '[WindowManager] Launching dedicated OAuth popup for secure auth: $1',
-          ja: '[WindowManager] 安全な認証のために独立した OAuth ポップアップを起動: $1',
-          ko: '[WindowManager] 보안 인증을 위한 독립 OAuth 팝업 실행: $1',
-          vi: '[WindowManager] Khởi chạy cửa sổ OAuth độc lập để xác thực an toàn: $1',
-          th: '[WindowManager] เปิดหน้าต่างป๊อปอัป OAuth เพื่อการรับรองความถูกต้องที่ปลอดภัย: $1',
-          id: '[WindowManager] Meluncurkan popup OAuth mandiri untuk autentikasi aman: $1',
-          es: '[WindowManager] Launching dedicated OAuth popup for secure auth: $1',
-          fr: '[WindowManager] Launching dedicated OAuth popup for secure auth: $1',
-          pt: '[WindowManager] Launching dedicated OAuth popup for secure auth: $1',
-          de: '[WindowManager] Launching dedicated OAuth popup for secure auth: $1',
-          it: '[WindowManager] Launching dedicated OAuth popup for secure auth: $1',
-          ru: '[WindowManager] Launching dedicated OAuth popup for secure auth: $1',
-          tr: '[WindowManager] Launching dedicated OAuth popup for secure auth: $1',
-        }
-      },
-      {
-        pattern: /(?:[🛑\s]*)?正在终止视频渲染进程\s*[（\(]PID[:：]\s*(\d+)[）\)]\.\.\./i,
-        templates: {
-          zh: '🛑 正在终止视频渲染进程 (PID: $1)...',
-          en: '🛑 Terminating video rendering process (PID: $1)...',
-          ja: '🛑 動画レンダリングプロセスを終了中 (PID: $1)...',
-          ko: '🛑 비디오 렌더링 프로세스 종료 중 (PID: $1)...',
-          vi: '🛑 Đang chấm dứt tiến trình kết xuất video (PID: $1)...',
-          th: '🛑 กำลังยุติกระบวนการเรนเดอร์วิดีโอ (PID: $1)...',
-          id: '🛑 Menghentikan proses rendering video (PID: $1)...',
-          es: '🛑 Terminating video rendering process (PID: $1)...',
-          fr: '🛑 Terminating video rendering process (PID: $1)...',
-          pt: '🛑 Terminating video rendering process (PID: $1)...',
-          de: '🛑 Terminating video rendering process (PID: $1)...',
-          it: '🛑 Terminating video rendering process (PID: $1)...',
-          ru: '🛑 Terminating video rendering process (PID: $1)...',
-          tr: '🛑 Terminating video rendering process (PID: $1)...',
-        }
-      },
-      {
-        pattern: /(?:[🛑\s]*)?视频渲染任务已由用户手动终止/i,
-        templates: {
-          zh: '🛑 视频渲染任务已由用户手动终止',
-          en: '🛑 Video rendering task was terminated manually by user',
-          ja: '🛑 動画レンダリングタスクはユーザーによって手動停止されました',
-          ko: '🛑 비디오 렌더링 작업이 사용자에 의해 수동 종료되었습니다',
-          vi: '🛑 Tác vụ kết xuất video đã được người dùng dừng thủ công',
-          th: '🛑 งานเรนเดอร์วิดีโอถูกยกเลิกด้วยตนเองโดยผู้ใช้',
-          id: '🛑 Tugas rendering video dihentikan secara manual oleh pengguna',
-          es: '🛑 Video rendering task was terminated manually by user',
-          fr: '🛑 Video rendering task was terminated manually by user',
-          pt: '🛑 Video rendering task was terminated manually by user',
-          de: '🛑 Video rendering task was terminated manually by user',
-          it: '🛑 Video rendering task was terminated manually by user',
-          ru: '🛑 Video rendering task was terminated manually by user',
-          tr: '🛑 Video rendering task was terminated manually by user',
-        }
-      },
-      {
-        pattern: /(?:[❌\s]*)?视频渲染任务异常退出\s*[（\(]退出代码[:：]\s*(\d+)[）\)]/i,
-        templates: {
-          zh: '❌ 视频渲染任务异常退出 (退出代码: $1)',
-          en: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
-          ja: '❌ 動画レンダリングタスクが異常終了しました (終了コード: $1)',
-          ko: '❌ 비디오 렌더링 작업이 비정상 종료되었습니다 (종료 코드: $1)',
-          vi: '❌ Tác vụ kết xuất video đã thoát bất thường (Mã thoát: $1)',
-          th: '❌ งานเรนเดอร์วิดีโอออกโดยไม่คาดคิด (รหัสออก: $1)',
-          id: '❌ Tugas rendering video keluar secara tidak normal (Kode keluar: $1)',
-          es: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
-          fr: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
-          pt: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
-          de: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
-          it: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
-          ru: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
-          tr: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
-        }
-      },
-      {
-        pattern: /\[Main\]\s*正在就绪[【\[]系统运行日志[】\]]与[【\[]视频渲染[】\]]TAB[，,]\s*主站保持激活选中\.\.\./i,
-        templates: {
-          zh: '[Main] 正在就绪【系统运行日志】与【视频渲染】TAB，主站保持激活选中...',
-          en: '[Main] Initializing [System Logs] & [Video Rendering] tabs, main view remains active...',
-          ja: '[Main] 【システムログ】と【動画レンダリング】タブを準備中、メインビューを維持...',
-          ko: '[Main] 【시스템 로그】및【비디오 렌더링】탭 준비 중, 메인 뷰 활성 유지...',
-          vi: '[Main] Đang chuẩn bị tab [Nhật ký hệ thống] & [Kết xuất video], duy trì tab chính...',
-          th: '[Main] กำลังเตรียมแท็บ [บันทึกระบบ] & [การเรนเดอร์วิดีโอ], รักษาหน้าหลักไว้...',
-          id: '[Main] Menyiapkan tab [Log Sistem] & [Rendering Video], tampilan utama tetap aktif...',
-          es: '[Main] Initializing [System Logs] & [Video Rendering] tabs, main view remains active...',
-          fr: '[Main] Initializing [System Logs] & [Video Rendering] tabs, main view remains active...',
-          pt: '[Main] Initializing [System Logs] & [Video Rendering] tabs, main view remains active...',
-          de: '[Main] Initializing [System Logs] & [Video Rendering] tabs, main view remains active...',
-          it: '[Main] Initializing [System Logs] & [Video Rendering] tabs, main view remains active...',
-          ru: '[Main] Initializing [System Logs] & [Video Rendering] tabs, main view remains active...',
-          tr: '[Main] Initializing [System Logs] & [Video Rendering] tabs, main view remains active...',
-        }
-      },
-      {
-        pattern: /\[UpdateManager\]\s*正在检查服务端是否有新版本\.\.\./i,
-        templates: {
-          zh: '[UpdateManager] 正在检查服务端是否有新版本...',
-          en: '[UpdateManager] Checking for updates on remote server...',
-          ja: '[UpdateManager] サーバー上に新しいバージョンがあるか確認中...',
-          ko: '[UpdateManager] 서버에서 새 버전 확인 중...',
-          vi: '[UpdateManager] Đang kiểm tra phiên bản mới từ máy chủ...',
-          th: '[UpdateManager] กำลังตรวจสอบการอัปเดตจากเซิร์ฟเวอร์...',
-          id: '[UpdateManager] Memeriksa pembaruan di server jarak jauh...',
-          es: '[UpdateManager] Checking for updates on remote server...',
-          fr: '[UpdateManager] Checking for updates on remote server...',
-          pt: '[UpdateManager] Checking for updates on remote server...',
-          de: '[UpdateManager] Checking for updates on remote server...',
-          it: '[UpdateManager] Checking for updates on remote server...',
-          ru: '[UpdateManager] Checking for updates on remote server...',
-          tr: '[UpdateManager] Checking for updates on remote server...',
-        }
-      },
-      {
-        pattern: /\[UpdateManager\]\s*发现客户端新版本[:：]\s*(v?[\d\.]+)\s*\(当前版本[:：]\s*(v?[\d\.]+)\)/i,
-        templates: {
-          zh: '[UpdateManager] 发现客户端新版本: $1 (当前版本: $2)',
-          en: '[UpdateManager] Found new client version: $1 (Current version: $2)',
-          ja: '[UpdateManager] 新しいバージョンが見つかりました: $1 (現在: $2)',
-          ko: '[UpdateManager] 새 버전 발견: $1 (현재 버전: $2)',
-          vi: '[UpdateManager] Tìm thấy phiên bản mới: $1 (Phiên bản hiện tại: $2)',
-          th: '[UpdateManager] พบเวอร์ชันใหม่: $1 (เวอร์ชันปัจจุบัน: $2)',
-          id: '[UpdateManager] Ditemukan versi baru: $1 (Versi saat ini: $2)',
-          es: '[UpdateManager] Found new client version: $1 (Current version: $2)',
-          fr: '[UpdateManager] Found new client version: $1 (Current version: $2)',
-          pt: '[UpdateManager] Found new client version: $1 (Current version: $2)',
-          de: '[UpdateManager] Found new client version: $1 (Current version: $2)',
-          it: '[UpdateManager] Found new client version: $1 (Current version: $2)',
-          ru: '[UpdateManager] Found new client version: $1 (Current version: $2)',
-          tr: '[UpdateManager] Found new client version: $1 (Current version: $2)',
+          es: '[AutoUpdater] Paquete de actualización autogenerado en el directorio resources: $1',
+          fr: '[AutoUpdater] Paquet de mise à jour généré automatiquement dans resources : $1',
+          pt: '[AutoUpdater] Pacote de atualização gerado automaticamente em resources: $1',
+          de: '[AutoUpdater] Update-Paket im Verzeichnis resources automatisch erstellt: $1',
+          it: '[AutoUpdater] Pacchetto di aggiornamento generato automaticamente in resources: $1',
+          ru: '[AutoUpdater] Пакет обновления автоматически создан в каталоге resources: $1',
+          tr: '[AutoUpdater] resources dizininde güncelleme paketi otomatik oluşturuldu: $1',
         }
       },
       {
@@ -2955,264 +2670,17 @@
           vi: '[UpdateManager] Hiện đã là phiên bản mới nhất (v$1), không cần cập nhật',
           th: '[UpdateManager] เป็นเวอร์ชันล่าสุดแล้ว (v$1) ไม่จำเป็นต้องอัปเดต',
           id: '[UpdateManager] Sudah versi terbaru (v$1), tidak perlu pembaruan',
-          es: '[UpdateManager] Currently the latest version (v$1), no update required',
-          fr: '[UpdateManager] Currently the latest version (v$1), no update required',
-          pt: '[UpdateManager] Currently the latest version (v$1), no update required',
-          de: '[UpdateManager] Currently the latest version (v$1), no update required',
-          it: '[UpdateManager] Currently the latest version (v$1), no update required',
-          ru: '[UpdateManager] Currently the latest version (v$1), no update required',
-          tr: '[UpdateManager] Currently the latest version (v$1), no update required',
+          es: '[UpdateManager] Ya tienes la última versión (v$1), no requiere actualización',
+          fr: '[UpdateManager] Vous disposez déjà de la dernière version (v$1), aucune mise à jour requise',
+          pt: '[UpdateManager] Você já está na versão mais recente (v$1), nenhuma atualização necessária',
+          de: '[UpdateManager] Sie verwenden bereits die neueste Version (v$1), kein Update erforderlich',
+          it: '[UpdateManager] Sei già all\'ultima versione (v$1), nessun aggiornamento necessario',
+          ru: '[UpdateManager] У вас уже установлена последняя версия (v$1), обновление не требуется',
+          tr: '[UpdateManager] Zaten en son sürümdesiniz (v$1), güncelleme gerekmiyor',
         }
       },
       {
-        pattern: /\[UpdateManager\]\s*(?:开始下载更新包|开始增量下载新版本)[:：]\s*(v?[\d\.]+)/i,
-        templates: {
-          zh: '[UpdateManager] 开始下载更新包: $1',
-          en: '[UpdateManager] Starting update package download: $1',
-          ja: '[UpdateManager] アップデートのダウンロードを開始: $1',
-          ko: '[UpdateManager] 업데이트 다운로드 시작: $1',
-          vi: '[UpdateManager] Bắt đầu tải xuống bản cập nhật: $1',
-          th: '[UpdateManager] เริ่มดาวน์โหลดการอัปเดต: $1',
-          id: '[UpdateManager] Memulai unduhan pembaruan: $1',
-          es: '[UpdateManager] Starting update package download: $1',
-          fr: '[UpdateManager] Starting update package download: $1',
-          pt: '[UpdateManager] Starting update package download: $1',
-          de: '[UpdateManager] Starting update package download: $1',
-          it: '[UpdateManager] Starting update package download: $1',
-          ru: '[UpdateManager] Starting update package download: $1',
-          tr: '[UpdateManager] Starting update package download: $1',
-        }
-      },
-      {
-        pattern: /\[UpdateManager\]\s*增量更新分块下载中\.\.\./i,
-        templates: {
-          zh: '[UpdateManager] 增量更新分块下载中...',
-          en: '[UpdateManager] Differential blockmap incremental downloading...',
-          ja: '[UpdateManager] 差分ブロックマップ増分ダウンロード中...',
-          ko: '[UpdateManager] 증분 차분 블록맵 다운로드 중...',
-          vi: '[UpdateManager] Đang tải xuống gia tăng blockmap vi phân...',
-          th: '[UpdateManager] กำลังดาวน์โหลดส่วนเพิ่ม blockmap...',
-          id: '[UpdateManager] Mengunduh bertahap diferensial blockmap...',
-          es: '[UpdateManager] Differential blockmap incremental downloading...',
-          fr: '[UpdateManager] Differential blockmap incremental downloading...',
-          pt: '[UpdateManager] Differential blockmap incremental downloading...',
-          de: '[UpdateManager] Differential blockmap incremental downloading...',
-          it: '[UpdateManager] Differential blockmap incremental downloading...',
-          ru: '[UpdateManager] Differential blockmap incremental downloading...',
-          tr: '[UpdateManager] Differential blockmap incremental downloading...',
-        }
-      },
-      {
-        pattern: /\[UpdateManager\]\s*更新包下载完成[，,]?\s*准备安装/i,
-        templates: {
-          zh: '[UpdateManager] 更新包下载完成，准备安装',
-          en: '[UpdateManager] Update download completed, ready to install',
-          ja: '[UpdateManager] アップデートのダウンロードが完了しました。インストールの準備が整いました',
-          ko: '[UpdateManager] 업데이트 다운로드 완료, 설치 준비 완료',
-          vi: '[UpdateManager] Đã tải xong bản cập nhật, sẵn sàng cài đặt',
-          th: '[UpdateManager] ดาวน์โหลดการอัปเดตเสร็จแล้ว พร้อมติดตั้ง',
-          id: '[UpdateManager] Unduhan pembaruan selesai, siap dipasang',
-          es: '[UpdateManager] Update download completed, ready to install',
-          fr: '[UpdateManager] Update download completed, ready to install',
-          pt: '[UpdateManager] Update download completed, ready to install',
-          de: '[UpdateManager] Update download completed, ready to install',
-          it: '[UpdateManager] Update download completed, ready to install',
-          ru: '[UpdateManager] Update download completed, ready to install',
-          tr: '[UpdateManager] Update download completed, ready to install',
-        }
-      },
-      {
-        pattern: /\[UpdateManager\]\s*新版本已就绪[，,]?\s*立即重启安装/i,
-        templates: {
-          zh: '[UpdateManager] 新版本已就绪，立即重启安装',
-          en: '[UpdateManager] New version is ready, restarting to install now',
-          ja: '[UpdateManager] 新しいバージョンの準備ができました。再起動してインストールします',
-          ko: '[UpdateManager] 새 버전이 준비되었습니다. 지금 재시작하여 설치합니다',
-          vi: '[UpdateManager] Phiên bản mới đã sẵn sàng, khởi động lại ngay để cài đặt',
-          th: '[UpdateManager] เวอร์ชันใหม่พร้อมแล้ว กำลังรีสตาร์ทเพื่อติดตั้งเดี๋ยวนี้',
-          id: '[UpdateManager] Versi baru siap, memulai ulang untuk memasang sekarang',
-          es: '[UpdateManager] New version is ready, restarting to install now',
-          fr: '[UpdateManager] New version is ready, restarting to install now',
-          pt: '[UpdateManager] New version is ready, restarting to install now',
-          de: '[UpdateManager] New version is ready, restarting to install now',
-          it: '[UpdateManager] New version is ready, restarting to install now',
-          ru: '[UpdateManager] New version is ready, restarting to install now',
-          tr: '[UpdateManager] New version is ready, restarting to install now',
-        }
-      },
-      {
-        pattern: /\[SessionKeeper\]\s*开启针对\s*([a-zA-Z0-9_\-]+)\s*的专属会话保活探针[（(]静默心跳\s*\+\s*活跃守护[，,]?\s*防止后台掉线[）)]/i,
-        templates: {
-          zh: '[SessionKeeper] 开启针对 $1 的专属会话保活探针（静默心跳 + 活跃守护，防止后台掉线）',
-          en: '[SessionKeeper] Started dedicated session keep-alive probe for $1 (silent heartbeat + active guard)',
-          ja: '[SessionKeeper] $1 向けセッション維持プローブを開始（ハートビート＋アクティブ保護）',
-          ko: '[SessionKeeper] $1 전용 세션 유지 프로브 시작 (무음 하트비트 + 활성 가드)',
-          vi: '[SessionKeeper] Khởi chạy thăm dò duy trì phiên cho $1 (nhịp tim im lặng + bảo vệ)',
-          th: '[SessionKeeper] เริ่มต้นโพรบรักษาเซสชันสำหรับ $1 (ฮาร์ทบีทเงียบ + การปกป้อง)',
-          id: '[SessionKeeper] Memulai probe penjaga sesi untuk $1 (detak jantung senyap + perlindungan aktif)',
-          es: '[SessionKeeper] Started dedicated session keep-alive probe for $1 (silent heartbeat + active guard)',
-          fr: '[SessionKeeper] Started dedicated session keep-alive probe for $1 (silent heartbeat + active guard)',
-          pt: '[SessionKeeper] Started dedicated session keep-alive probe for $1 (silent heartbeat + active guard)',
-          de: '[SessionKeeper] Started dedicated session keep-alive probe for $1 (silent heartbeat + active guard)',
-          it: '[SessionKeeper] Started dedicated session keep-alive probe for $1 (silent heartbeat + active guard)',
-          ru: '[SessionKeeper] Started dedicated session keep-alive probe for $1 (silent heartbeat + active guard)',
-          tr: '[SessionKeeper] Started dedicated session keep-alive probe for $1 (silent heartbeat + active guard)',
-        }
-      },
-      {
-        pattern: /\[SessionKeeper\]\s*停止针对\s*([a-zA-Z0-9_\-]+)\s*的会话保活探针/i,
-        templates: {
-          zh: '[SessionKeeper] 停止针对 $1 的会话保活探针',
-          en: '[SessionKeeper] Stopped session keep-alive probe for $1',
-          ja: '[SessionKeeper] $1 向けセッション維持プローブを停止',
-          ko: '[SessionKeeper] $1 세션 유지 프로브 중지',
-          vi: '[SessionKeeper] Đã dừng thăm dò duy trì phiên cho $1',
-          th: '[SessionKeeper] หยุดโพรบรักษาเซสชันสำหรับ $1',
-          id: '[SessionKeeper] Menghentikan probe penjaga sesi untuk $1',
-          es: '[SessionKeeper] Stopped session keep-alive probe for $1',
-          fr: '[SessionKeeper] Stopped session keep-alive probe for $1',
-          pt: '[SessionKeeper] Stopped session keep-alive probe for $1',
-          de: '[SessionKeeper] Stopped session keep-alive probe for $1',
-          it: '[SessionKeeper] Stopped session keep-alive probe for $1',
-          ru: '[SessionKeeper] Stopped session keep-alive probe for $1',
-          tr: '[SessionKeeper] Stopped session keep-alive probe for $1',
-        }
-      },
-      {
-        pattern: /\[SessionKeeper\]\s*平台\s*([a-zA-Z0-9_\-]+)\s*会话健康巡检正常/i,
-        templates: {
-          zh: '[SessionKeeper] 平台 $1 会话健康巡检正常',
-          en: '[SessionKeeper] Platform $1 session health check passed',
-          ja: '[SessionKeeper] プラットフォーム $1 のセッション状態は正常です',
-          ko: '[SessionKeeper] 플랫폼 $1 세션 상태 정상',
-          vi: '[SessionKeeper] Kiểm tra tình trạng phiên nền tảng $1 bình thường',
-          th: '[SessionKeeper] การตรวจสุขภาพเซสชันแพลตฟอร์ม $1 ปกติ',
-          id: '[SessionKeeper] Pemeriksaan kesehatan sesi platform $1 normal',
-          es: '[SessionKeeper] Platform $1 session health check passed',
-          fr: '[SessionKeeper] Platform $1 session health check passed',
-          pt: '[SessionKeeper] Platform $1 session health check passed',
-          de: '[SessionKeeper] Platform $1 session health check passed',
-          it: '[SessionKeeper] Platform $1 session health check passed',
-          ru: '[SessionKeeper] Platform $1 session health check passed',
-          tr: '[SessionKeeper] Platform $1 session health check passed',
-        }
-      },
-      {
-        pattern: /\[AutoUpdater\]\s*Checking for update/i,
-        templates: {
-          zh: '[AutoUpdater] 正在检查更新...',
-          en: '[AutoUpdater] Checking for update',
-          ja: '[AutoUpdater] アップデートを確認中...',
-          ko: '[AutoUpdater] 업데이트 확인 중...',
-          vi: '[AutoUpdater] Đang kiểm tra bản cập nhật...',
-          th: '[AutoUpdater] กำลังตรวจสอบการอัปเดต...',
-          id: '[AutoUpdater] Memeriksa pembaruan...',
-          es: '[AutoUpdater] Checking for update',
-          fr: '[AutoUpdater] Checking for update',
-          pt: '[AutoUpdater] Checking for update',
-          de: '[AutoUpdater] Checking for update',
-          it: '[AutoUpdater] Checking for update',
-          ru: '[AutoUpdater] Checking for update',
-          tr: '[AutoUpdater] Checking for update',
-        }
-      },
-      {
-        pattern: /\[AutoUpdater\]\s*Found version\s*([^\s]+)\s*\(url:\s*([^\)]+)\)/i,
-        templates: {
-          zh: '[AutoUpdater] 发现新版本 $1 (url: $2)',
-          en: '[AutoUpdater] Found version $1 (url: $2)',
-          ja: '[AutoUpdater] バージョン $1 が見つかりました (url: $2)',
-          ko: '[AutoUpdater] 버전 $1 발견됨 (url: $2)',
-          vi: '[AutoUpdater] Tìm thấy phiên bản $1 (url: $2)',
-          th: '[AutoUpdater] พบเวอร์ชัน $1 (url: $2)',
-          id: '[AutoUpdater] Ditemukan versi $1 (url: $2)',
-          es: '[AutoUpdater] Found version $1 (url: $2)',
-          fr: '[AutoUpdater] Found version $1 (url: $2)',
-          pt: '[AutoUpdater] Found version $1 (url: $2)',
-          de: '[AutoUpdater] Found version $1 (url: $2)',
-          it: '[AutoUpdater] Found version $1 (url: $2)',
-          ru: '[AutoUpdater] Found version $1 (url: $2)',
-          tr: '[AutoUpdater] Found version $1 (url: $2)',
-        }
-      },
-      {
-        pattern: /\[AutoUpdater\]\s*Update not available\.?/i,
-        templates: {
-          zh: '[AutoUpdater] 暂无可用的新版本',
-          en: '[AutoUpdater] Update not available.',
-          ja: '[AutoUpdater] 利用可能なアップデートはありません。',
-          ko: '[AutoUpdater] 사용 가능한 업데이트가 없습니다.',
-          vi: '[AutoUpdater] Không có bản cập nhật nào.',
-          th: '[AutoUpdater] ไม่มีการอัปเดตที่ใช้ได้',
-          id: '[AutoUpdater] Pembaruan tidak tersedia.',
-          es: '[AutoUpdater] Update not available.',
-          fr: '[AutoUpdater] Update not available.',
-          pt: '[AutoUpdater] Update not available.',
-          de: '[AutoUpdater] Update not available.',
-          it: '[AutoUpdater] Update not available.',
-          ru: '[AutoUpdater] Update not available.',
-          tr: '[AutoUpdater] Update not available.',
-        }
-      },
-      {
-        pattern: /\[System\]\s*(?:客户端主窗口与服务已完全就绪|系统已就绪)/i,
-        templates: {
-          zh: '[System] 客户端主窗口与服务已完全就绪',
-          en: '[System] Client main window and daemon services are fully ready',
-          ja: '[System] クライアントのメインウィンドウとサービスが完全に準備完了しました',
-          ko: '[System] 클라이언트 메인 윈도우 및 서비스가 완전히 준비되었습니다',
-          vi: '[System] Cửa sổ chính và dịch vụ đã hoàn toàn sẵn sàng',
-          th: '[System] หน้าต่างหลักของไคลเอนต์และบริการพร้อมใช้งานเต็มรูปแบบแล้ว',
-          id: '[System] Jendela utama dan layanan telah siap sepenuhnya',
-          es: '[System] Client main window and daemon services are fully ready',
-          fr: '[System] Client main window and daemon services are fully ready',
-          pt: '[System] Client main window and daemon services are fully ready',
-          de: '[System] Client main window and daemon services are fully ready',
-          it: '[System] Client main window and daemon services are fully ready',
-          ru: '[System] Client main window and daemon services are fully ready',
-          tr: '[System] Client main window and daemon services are fully ready',
-        }
-      },
-      {
-        pattern: /(?:\[Scheduler\]\s*)?本地定时发布调度服务已启动[，,]?\s*轮询周期[:：]\s*(.*)/i,
-        templates: {
-          zh: '[Scheduler] 本地定时发布调度服务已启动，轮询周期: $1',
-          en: '[Scheduler] Local scheduled publishing service started, polling interval: $1',
-          ja: '[Scheduler] ローカル予約投稿スケジューラーが起動しました、ポーリング間隔: $1',
-          ko: '[Scheduler] 로컬 예약 게시 스케줄러 서비스 시작됨, 폴링 주기: $1',
-          vi: '[Scheduler] Dịch vụ lập lịch đăng bài cục bộ đã khởi chạy, chu kỳ thăm dò: $1',
-          th: '[Scheduler] บริการกำหนดเวลาเผยแพร่ในเครื่องเริ่มต้นแล้ว, รอบการสำรวจ: $1',
-          id: '[Scheduler] Layanan penjadwalan rilis lokal dimulai, interval polling: $1',
-          es: '[Scheduler] Local scheduled publishing service started, polling interval: $1',
-          fr: '[Scheduler] Local scheduled publishing service started, polling interval: $1',
-          pt: '[Scheduler] Local scheduled publishing service started, polling interval: $1',
-          de: '[Scheduler] Local scheduled publishing service started, polling interval: $1',
-          it: '[Scheduler] Local scheduled publishing service started, polling interval: $1',
-          ru: '[Scheduler] Local scheduled publishing service started, polling interval: $1',
-          tr: '[Scheduler] Local scheduled publishing service started, polling interval: $1',
-        }
-      },
-      {
-        pattern: /(?:\[AutoUpdater\]\s*)?自动(?:扩产|生成)\s*resources\s*目录更新包[:：]\s*(.*)/i,
-        templates: {
-          zh: '[AutoUpdater] 自动生成 resources 目录更新包: $1',
-          en: '[AutoUpdater] Auto-generated update package in resources directory: $1',
-          ja: '[AutoUpdater] resources ディレクトリの更新パッケージを自動生成: $1',
-          ko: '[AutoUpdater] resources 디렉터리 업데이트 패키지 자동 생성: $1',
-          vi: '[AutoUpdater] Tự động tạo gói cập nhật thư mục resources: $1',
-          th: '[AutoUpdater] สร้างแพ็กเกจอัปเดตในไดเรกทอรี resources อัตโนมัติ: $1',
-          id: '[AutoUpdater] Paket pembaruan dibuat otomatis di direktori resources: $1',
-          es: '[AutoUpdater] Auto-generated update package in resources directory: $1',
-          fr: '[AutoUpdater] Auto-generated update package in resources directory: $1',
-          pt: '[AutoUpdater] Auto-generated update package in resources directory: $1',
-          de: '[AutoUpdater] Auto-generated update package in resources directory: $1',
-          it: '[AutoUpdater] Auto-generated update package in resources directory: $1',
-          ru: '[AutoUpdater] Auto-generated update package in resources directory: $1',
-          tr: '[AutoUpdater] Auto-generated update package in resources directory: $1',
-        }
-      },
-      {
-        pattern: /(?:\[UpdateManager\]\s*)?当前已是最新版本\s*\(?([^\)]*)\)?/i,
+        pattern: /(?:\[UpdateManager\]\s*)?当前已是最新版本\s*[（\(]?([^\)）]*)[）\)]?/i,
         templates: {
           zh: '[UpdateManager] 当前已是最新版本 ($1)',
           en: '[UpdateManager] Already on the latest version ($1)',
@@ -3221,13 +2689,51 @@
           vi: '[UpdateManager] Hiện đã là phiên bản mới nhất ($1)',
           th: '[UpdateManager] ปัจจุบันเป็นเวอร์ชันล่าสุดแล้ว ($1)',
           id: '[UpdateManager] Sudah menggunakan versi terbaru ($1)',
-          es: '[UpdateManager] Already on the latest version ($1)',
-          fr: '[UpdateManager] Already on the latest version ($1)',
-          pt: '[UpdateManager] Already on the latest version ($1)',
-          de: '[UpdateManager] Already on the latest version ($1)',
-          it: '[UpdateManager] Already on the latest version ($1)',
-          ru: '[UpdateManager] Already on the latest version ($1)',
-          tr: '[UpdateManager] Already on the latest version ($1)',
+          es: '[UpdateManager] Ya estás en la última versión ($1)',
+          fr: '[UpdateManager] Déjà sur la dernière version ($1)',
+          pt: '[UpdateManager] Já está na versão mais recente ($1)',
+          de: '[UpdateManager] Bereits auf der neuesten Version ($1)',
+          it: '[UpdateManager] Già all\'ultima versione ($1)',
+          ru: '[UpdateManager] Уже установлена последняя версия ($1)',
+          tr: '[UpdateManager] Zaten en son sürümde ($1)',
+        }
+      },
+      {
+        pattern: /(?:\[WindowManager\]\s*)?切换客户端语言至[:：]\s*(?:zh\s*[（\(]中文[）\)]|zh\b)/i,
+        templates: {
+          zh: '[WindowManager] 切换客户端语言至: zh (中文)',
+          en: '[WindowManager] Switched client language to: zh (Chinese)',
+          ja: '[WindowManager] クライアント言語を zh (中国語) に切り替えました',
+          ko: '[WindowManager] 클라이언트 언어를 zh (중국어) 로 전환했습니다',
+          vi: '[WindowManager] Đã chuyển ngôn ngữ ứng dụng sang: zh (Tiếng Trung)',
+          th: '[WindowManager] สลับภาษาของไคลเอนต์เป็น: zh (ภาษาจีน)',
+          id: '[WindowManager] Beralih bahasa klien ke: zh (Bahasa Mandarin)',
+          es: '[WindowManager] Idioma del cliente cambiado a: zh (Chino)',
+          fr: '[WindowManager] Langue du client passée à : zh (Chinois)',
+          pt: '[WindowManager] Idioma do cliente alterado para: zh (Chinês)',
+          de: '[WindowManager] Client-Sprache gewechselt auf: zh (Chinesisch)',
+          it: '[WindowManager] Lingua del client cambiata in: zh (Cinese)',
+          ru: '[WindowManager] Язык клиента переключён на: zh (Китайский)',
+          tr: '[WindowManager] İstemci dili değiştirildi: zh (Çince)',
+        }
+      },
+      {
+        pattern: /(?:\[WindowManager\]\s*)?切换客户端语言至[:：]\s*(?:ja\s*[（\(]日本語[）\)]|ja\b)/i,
+        templates: {
+          zh: '[WindowManager] 切换客户端语言至: ja (日语)',
+          en: '[WindowManager] Switched client language to: ja (Japanese)',
+          ja: '[WindowManager] クライアント言語を ja (日本語) に切り替えました',
+          ko: '[WindowManager] 클라이언트 언어를 ja (일본어) 로 전환했습니다',
+          vi: '[WindowManager] Đã chuyển ngôn ngữ ứng dụng sang: ja (Tiếng Nhật)',
+          th: '[WindowManager] สลับภาษาของไคลเอนต์เป็น: ja (ภาษาญี่ปุ่น)',
+          id: '[WindowManager] Beralih bahasa klien ke: ja (Bahasa Jepang)',
+          es: '[WindowManager] Idioma del cliente cambiado a: ja (Japonés)',
+          fr: '[WindowManager] Langue du client passée à : ja (Japonais)',
+          pt: '[WindowManager] Idioma do cliente alterado para: ja (Japonês)',
+          de: '[WindowManager] Client-Sprache gewechselt auf: ja (Japanisch)',
+          it: '[WindowManager] Lingua del client cambiata in: ja (Giapponese)',
+          ru: '[WindowManager] Язык клиента переключён на: ja (Японский)',
+          tr: '[WindowManager] İstemci dili değiştirildi: ja (Japonca)',
         }
       },
       {
@@ -3240,55 +2746,112 @@
           vi: '[WindowManager] Đã chuyển ngôn ngữ ứng dụng sang: $1',
           th: '[WindowManager] สลับภาษาของไคลเอนต์เป็น: $1',
           id: '[WindowManager] Beralih bahasa klien ke: $1',
-          es: '[WindowManager] Switched client language to: $1',
-          fr: '[WindowManager] Switched client language to: $1',
-          pt: '[WindowManager] Switched client language to: $1',
-          de: '[WindowManager] Switched client language to: $1',
-          it: '[WindowManager] Switched client language to: $1',
-          ru: '[WindowManager] Switched client language to: $1',
-          tr: '[WindowManager] Switched client language to: $1',
+          es: '[WindowManager] Idioma del cliente cambiado a: $1',
+          fr: '[WindowManager] Langue du client passée à : $1',
+          pt: '[WindowManager] Idioma do cliente alterado para: $1',
+          de: '[WindowManager] Client-Sprache gewechselt auf: $1',
+          it: '[WindowManager] Lingua del client cambiata in: $1',
+          ru: '[WindowManager] Язык клиента переключён на: $1',
+          tr: '[WindowManager] İstemci dili değiştirildi: $1',
         }
       },
       {
-        pattern: /(?:\[SessionKeeper\]\s*)?已启动对\s*(\w+)\s*的专属会话保活探针\s*\(静默心跳\s*\+\s*活跃守护[，,]?\s*防止后台掉线\)/i,
+        pattern: /(?:\[WindowManager\]\s*)?捕获到\s*OAuth\s*认证窗口请求[（\(]window\.open[）\)]，开启独立认证弹窗[:：]\s*(.*)/i,
         templates: {
-          zh: '[SessionKeeper] 已启动对 $1 的专属会话保活探针 (静默心跳 + 活跃守护，防止后台掉线)',
-          en: '[SessionKeeper] Started session keep-alive probe for $1 (Silent heartbeat + active guard)',
-          ja: '[SessionKeeper] $1 専用のセッション維持プローブを起動しました (サイレントハートビート + アクティブガード)',
-          ko: '[SessionKeeper] $1 전용 세션 유지 프로브 시작됨 (무음 하트비트 + 활성 가드)',
-          vi: '[SessionKeeper] Đã khởi chạy đầu dò duy trì phiên cho $1 (Nhịp tim im lặng + bảo vệ tích cực)',
-          th: '[SessionKeeper] เริ่มต้นโพรบรักษาเซสชันสำหรับ $1 แล้ว (ฮาร์ทบีทเงียบ + การป้องกันที่ใช้งานอยู่)',
-          id: '[SessionKeeper] Memulai probe penjaga sesi untuk $1 (Detak jantung senyap + pelindung aktif)',
-          es: '[SessionKeeper] Started session keep-alive probe for $1 (Silent heartbeat + active guard)',
-          fr: '[SessionKeeper] Started session keep-alive probe for $1 (Silent heartbeat + active guard)',
-          pt: '[SessionKeeper] Started session keep-alive probe for $1 (Silent heartbeat + active guard)',
-          de: '[SessionKeeper] Started session keep-alive probe for $1 (Silent heartbeat + active guard)',
-          it: '[SessionKeeper] Started session keep-alive probe for $1 (Silent heartbeat + active guard)',
-          ru: '[SessionKeeper] Started session keep-alive probe for $1 (Silent heartbeat + active guard)',
-          tr: '[SessionKeeper] Started session keep-alive probe for $1 (Silent heartbeat + active guard)',
+          zh: '[WindowManager] 捕获到 OAuth 认证窗口请求(window.open)，开启独立认证弹窗: $1',
+          en: '[WindowManager] Caught OAuth popup request (window.open), opened dedicated auth window: $1',
+          ja: '[WindowManager] OAuth 認証ポップアップ要求 (window.open) を検出、独立ウィンドウを開きました: $1',
+          ko: '[WindowManager] OAuth 인증 팝업 요청(window.open) 감지, 독립 인증 창 열기: $1',
+          vi: '[WindowManager] Bắt được yêu cầu cửa sổ xác thực OAuth, mở cửa sổ xác thực độc lập: $1',
+          th: '[WindowManager] ตรวจพบคำขอการรับรองความถูกต้อง OAuth เปิดหน้าต่างอิสระ: $1',
+          id: '[WindowManager] Menangkap permintaan popup OAuth, membuka jendela autentikasi mandiri: $1',
+          es: '[WindowManager] Solicitud de ventana emergente OAuth capturada (window.open), ventana dedicada abierta: $1',
+          fr: '[WindowManager] Requête popup OAuth interceptée (window.open), fenêtre d\'authentification dédiée ouverte : $1',
+          pt: '[WindowManager] Solicitação de popup OAuth capturada (window.open), janela dedicada aberta: $1',
+          de: '[WindowManager] OAuth-Popup-Anfrage abgefangen (window.open), separates Auth-Fenster geöffnet: $1',
+          it: '[WindowManager] Richiesta popup OAuth intercettata (window.open), finestra di autenticazione aperta: $1',
+          ru: '[WindowManager] Перехвачен запрос окна OAuth (window.open), открыто отдельное окно авторизации: $1',
+          tr: '[WindowManager] OAuth açılır pencere isteği yakalandı (window.open), özel kimlik doğrulama penceresi açıldı: $1',
         }
       },
       {
-        pattern: /(?:\[SessionKeeper\]\s*)?已停止对\s*(\w+)\s*的会话守护/i,
+        pattern: /(?:\[WindowManager\]\s*)?收到来自\s*OAuth\s*流程的凭证[，,]?\s*开始同步至主站\s*LocalStorage\.\.\./i,
         templates: {
-          zh: '[SessionKeeper] 已停止对 $1 的会话守护',
-          en: '[SessionKeeper] Stopped session guard for $1',
-          ja: '[SessionKeeper] $1 のセッション保護を停止しました',
-          ko: '[SessionKeeper] $1 의 세션 가드를 중지했습니다',
-          vi: '[SessionKeeper] Đã dừng bảo vệ phiên cho $1',
-          th: '[SessionKeeper] หยุดการป้องกันเซสชันสำหรับ $1 แล้ว',
-          id: '[SessionKeeper] Menghentikan penjaga sesi untuk $1',
-          es: '[SessionKeeper] Stopped session guard for $1',
-          fr: '[SessionKeeper] Stopped session guard for $1',
-          pt: '[SessionKeeper] Stopped session guard for $1',
-          de: '[SessionKeeper] Stopped session guard for $1',
-          it: '[SessionKeeper] Stopped session guard for $1',
-          ru: '[SessionKeeper] Stopped session guard for $1',
-          tr: '[SessionKeeper] Stopped session guard for $1',
+          zh: '[WindowManager] 收到来自 OAuth 流程的凭证，开始同步至主站 LocalStorage...',
+          en: '[WindowManager] Received OAuth credentials, synchronizing to main LocalStorage...',
+          ja: '[WindowManager] OAuth 認証情報を取得、LocalStorage への同期を開始...',
+          ko: '[WindowManager] OAuth 자격 증명 수신, 메인 사이트 LocalStorage 로 동기화 시작...',
+          vi: '[WindowManager] Nhận được thông tin xác thực OAuth, đang đồng bộ hóa vào LocalStorage...',
+          th: '[WindowManager] ได้รับข้อมูลประจำตัว OAuth กำลังซิงค์กับ LocalStorage...',
+          id: '[WindowManager] Menerima kredensial OAuth, menyinkronkan ke LocalStorage...',
+          es: '[WindowManager] Credenciales OAuth recibidas, sincronizando con LocalStorage...',
+          fr: '[WindowManager] Identifiants OAuth reçus, synchronisation avec le LocalStorage principal...',
+          pt: '[WindowManager] Credenciais OAuth recebidas, sincronizando com o LocalStorage principal...',
+          de: '[WindowManager] OAuth-Anmeldedaten empfangen, Synchronisierung mit LocalStorage gestartet...',
+          it: '[WindowManager] Credenziali OAuth ricevute, sincronizzazione con LocalStorage principale...',
+          ru: '[WindowManager] Получены учётные данные OAuth, синхронизация с основным LocalStorage...',
+          tr: '[WindowManager] OAuth kimlik bilgileri alındı, ana LocalStorage ile eşitleniyor...',
         }
       },
       {
-        pattern: /(?:[🛑\s]*)?正在终止视频渲染进程\s*\(PID[:：]\s*(\d+)\)\.\.\./i,
+        pattern: /(?:\[WindowManager\]\s*)?凭证已注入[，,]?\s*正在引导主站进入已登录页[:：]\s*(.*)/i,
+        templates: {
+          zh: '[WindowManager] 凭证已注入，正在引导主站进入已登录页: $1',
+          en: '[WindowManager] Credentials injected, redirecting main site to authenticated page: $1',
+          ja: '[WindowManager] 認証情報を注入完了、ログイン済みページにリダイレクト中: $1',
+          ko: '[WindowManager] 자격 증명 주입 완료, 로그인 페이지로 리디렉션 중: $1',
+          vi: '[WindowManager] Đã chèn thông tin xác thực, chuyển hướng đến trang đã đăng nhập: $1',
+          th: '[WindowManager] ใส่ข้อมูลประจำตัวแล้ว กำลังนำทางไปยังหน้าที่เข้าสู่ระบบแล้ว: $1',
+          id: '[WindowManager] Kredensial disuntikkan, mengarahkan ke halaman masuk: $1',
+          es: '[WindowManager] Credenciales inyectadas, redirigiendo a la página autenticada: $1',
+          fr: '[WindowManager] Identifiants injectés, redirection vers la page authentifiée : $1',
+          pt: '[WindowManager] Credenciais injetadas, redirecionando para a página autenticada: $1',
+          de: '[WindowManager] Anmeldedaten eingefügt, Weiterleitung zur angemeldeten Seite: $1',
+          it: '[WindowManager] Credenziali inserite, reindirizzamento alla pagina autenticata: $1',
+          ru: '[WindowManager] Учётные данные внедрены, переход на авторизованную страницу: $1',
+          tr: '[WindowManager] Kimlik bilgileri enjekte edildi, oturum açılmış sayfaya yönlendiriliyor: $1',
+        }
+      },
+      {
+        pattern: /(?:\[WindowManager\]\s*)?检测到\s*OAuth\s*登录成功[，,]?\s*Token\s*已生成[，,]?\s*开始将凭证同步至桌面客户端主站\.\.\./i,
+        templates: {
+          zh: '[WindowManager] 检测到 OAuth 登录成功，Token 已生成，开始将凭证同步至桌面客户端主站...',
+          en: '[WindowManager] OAuth login succeeded, Token generated, syncing credentials to client...',
+          ja: '[WindowManager] OAuth ログイン成功、Token 生成完了、デスクトップクライアントに同期中...',
+          ko: '[WindowManager] OAuth 로그인 성공, 토큰 생성됨, 데스크톱 클라이언트에 동기화 시작...',
+          vi: '[WindowManager] Đăng nhập OAuth thành công, đã tạo Token, đang đồng bộ vào ứng dụng...',
+          th: '[WindowManager] เข้าสู่ระบบ OAuth สำเร็จ สร้างโทเค็นแล้ว กำลังซิงค์ข้อมูลประจำตัว...',
+          id: '[WindowManager] Login OAuth berhasil, Token dibuat, menyinkronkan ke klien...',
+          es: '[WindowManager] Inicio de sesión OAuth exitoso, token generado, sincronizando credenciales con el cliente...',
+          fr: '[WindowManager] Connexion OAuth réussie, jeton généré, synchronisation des identifiants...',
+          pt: '[WindowManager] Login OAuth bem-sucedido, token gerado, sincronizando credenciais com o cliente...',
+          de: '[WindowManager] OAuth-Anmeldung erfolgreich, Token generiert, Anmeldedaten werden synchronisiert...',
+          it: '[WindowManager] Accesso OAuth riuscito, token generato, sincronizzazione credenziali con il client...',
+          ru: '[WindowManager] Вход OAuth выполнен, токен создан, синхронизация данных с клиентом...',
+          tr: '[WindowManager] OAuth girişi başarılı, Token oluşturuldu, kimlik bilgileri istemciye eşitleniyor...',
+        }
+      },
+      {
+        pattern: /(?:\[WindowManager\]\s*)?启动独立\s*OAuth\s*弹窗进行安全认证[:：]\s*(.*)/i,
+        templates: {
+          zh: '[WindowManager] 启动独立 OAuth 弹窗进行安全认证: $1',
+          en: '[WindowManager] Launching dedicated OAuth popup for secure auth: $1',
+          ja: '[WindowManager] 安全な認証のために独立した OAuth ポップアップを起動: $1',
+          ko: '[WindowManager] 보안 인증을 위한 독립 OAuth 팝업 실행: $1',
+          vi: '[WindowManager] Khởi chạy cửa sổ OAuth độc lập để xác thực an toàn: $1',
+          th: '[WindowManager] เปิดหน้าต่างป๊อปอัป OAuth เพื่อการรับรองความถูกต้องที่ปลอดภัย: $1',
+          id: '[WindowManager] Meluncurkan popup OAuth mandiri untuk autentikasi aman: $1',
+          es: '[WindowManager] Iniciando ventana emergente OAuth dedicada para autenticación segura: $1',
+          fr: '[WindowManager] Lancement d\'une fenêtre OAuth dédiée pour une authentification sécurisée : $1',
+          pt: '[WindowManager] Iniciando popup OAuth dedicado para autenticação segura: $1',
+          de: '[WindowManager] Separates OAuth-Popup für sichere Authentifizierung wird gestartet: $1',
+          it: '[WindowManager] Avvio popup OAuth dedicato per autenticazione sicura: $1',
+          ru: '[WindowManager] Запуск отдельного окна OAuth для безопасной авторизации: $1',
+          tr: '[WindowManager] Güvenli kimlik doğrulama için özel OAuth penceresi başlatılıyor: $1',
+        }
+      },
+      {
+        pattern: /(?:[🛑\s]*)?正在终止视频渲染进程\s*[（\(]PID[:：]\s*(\d+)[）\)]\.\.\./i,
         templates: {
           zh: '🛑 正在终止视频渲染进程 (PID: $1)...',
           en: '🛑 Terminating video rendering process (PID: $1)...',
@@ -3297,13 +2860,13 @@
           vi: '🛑 Đang chấm dứt tiến trình kết xuất video (PID: $1)...',
           th: '🛑 กำลังยุติกระบวนการเรนเดอร์วิดีโอ (PID: $1)...',
           id: '🛑 Menghentikan proses rendering video (PID: $1)...',
-          es: '🛑 Terminating video rendering process (PID: $1)...',
-          fr: '🛑 Terminating video rendering process (PID: $1)...',
-          pt: '🛑 Terminating video rendering process (PID: $1)...',
-          de: '🛑 Terminating video rendering process (PID: $1)...',
-          it: '🛑 Terminating video rendering process (PID: $1)...',
-          ru: '🛑 Terminating video rendering process (PID: $1)...',
-          tr: '🛑 Terminating video rendering process (PID: $1)...',
+          es: '🛑 Finalizando proceso de renderizado de video (PID: $1)...',
+          fr: '🛑 Arrêt du processus de rendu vidéo (PID : $1)...',
+          pt: '🛑 Encerrando processo de renderização de vídeo (PID: $1)...',
+          de: '🛑 Videorendering-Prozess wird beendet (PID: $1)...',
+          it: '🛑 Terminazione processo di rendering video (PID: $1)...',
+          ru: '🛑 Завершение процесса рендеринга видео (PID: $1)...',
+          tr: '🛑 Video işleme süreci sonlandırılıyor (PID: $1)...',
         }
       },
       {
@@ -3311,22 +2874,22 @@
         templates: {
           zh: '🛑 视频渲染任务已由用户手动终止',
           en: '🛑 Video rendering task was terminated manually by user',
-          ja: '🛑 動画レンダリングタスクはユーザーによって手动停止されました',
+          ja: '🛑 動画レンダリングタスクはユーザーによって手動停止されました',
           ko: '🛑 비디오 렌더링 작업이 사용자에 의해 수동 종료되었습니다',
           vi: '🛑 Tác vụ kết xuất video đã được người dùng dừng thủ công',
           th: '🛑 งานเรนเดอร์วิดีโอถูกยกเลิกด้วยตนเองโดยผู้ใช้',
           id: '🛑 Tugas rendering video dihentikan secara manual oleh pengguna',
-          es: '🛑 Video rendering task was terminated manually by user',
-          fr: '🛑 Video rendering task was terminated manually by user',
-          pt: '🛑 Video rendering task was terminated manually by user',
-          de: '🛑 Video rendering task was terminated manually by user',
-          it: '🛑 Video rendering task was terminated manually by user',
-          ru: '🛑 Video rendering task was terminated manually by user',
-          tr: '🛑 Video rendering task was terminated manually by user',
+          es: '🛑 Tarea de renderizado de video cancelada manualmente por el usuario',
+          fr: '🛑 Tâche de rendu vidéo arrêtée manuellement par l\'utilisateur',
+          pt: '🛑 Tarefa de renderização de vídeo encerrada manualmente pelo usuário',
+          de: '🛑 Videorendering-Aufgabe vom Benutzer manuell abgebrochen',
+          it: '🛑 Attività di rendering video interrotta manualmente dall\'utente',
+          ru: '🛑 Задача рендеринга видео остановлена пользователем вручную',
+          tr: '🛑 Video işleme görevi kullanıcı tarafından manuel olarak durduruldu',
         }
       },
       {
-        pattern: /(?:[❌\s]*)?视频渲染任务异常退出\s*\(退出代码[:：]\s*(\d+)\)/i,
+        pattern: /(?:[❌\s]*)?视频渲染任务异常退出\s*[（\(]退出代码[:：]\s*(\d+)[）\)]/i,
         templates: {
           zh: '❌ 视频渲染任务异常退出 (退出代码: $1)',
           en: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
@@ -3335,13 +2898,241 @@
           vi: '❌ Tác vụ kết xuất video đã thoát bất thường (Mã thoát: $1)',
           th: '❌ งานเรนเดอร์วิดีโอออกโดยไม่คาดคิด (รหัสออก: $1)',
           id: '❌ Tugas rendering video keluar secara tidak normal (Kode keluar: $1)',
-          es: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
-          fr: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
-          pt: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
-          de: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
-          it: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
-          ru: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
-          tr: '❌ Video rendering task exited unexpectedly (Exit code: $1)',
+          es: '❌ La tarea de renderizado de video finalizó inesperadamente (Código de salida: $1)',
+          fr: '❌ La tâche de rendu vidéo s\'est arrêtée de manière inattendue (Code de sortie : $1)',
+          pt: '❌ A tarefa de renderização de vídeo foi encerrada inesperadamente (Código de saída: $1)',
+          de: '❌ Videorendering-Aufgabe unerwartet beendet (Exit-Code: $1)',
+          it: '❌ Attività di rendering video terminata inaspettatamente (Codice di uscita: $1)',
+          ru: '❌ Задача рендеринга видео завершилась аварийно (Код выхода: $1)',
+          tr: '❌ Video işleme görevi beklenmedik şekilde sonlandı (Çıkış kodu: $1)',
+        }
+      },
+      {
+        pattern: /\[UpdateManager\]\s*正在检查服务端是否有新版本\.\.\./i,
+        templates: {
+          zh: '[UpdateManager] 正在检查服务端是否有新版本...',
+          en: '[UpdateManager] Checking for updates on remote server...',
+          ja: '[UpdateManager] サーバー上に新しいバージョンがあるか確認中...',
+          ko: '[UpdateManager] 서버에서 새 버전 확인 중...',
+          vi: '[UpdateManager] Đang kiểm tra phiên bản mới từ máy chủ...',
+          th: '[UpdateManager] กำลังตรวจสอบการอัปเดตจากเซิร์ฟเวอร์...',
+          id: '[UpdateManager] Memeriksa pembaruan di server jarak jauh...',
+          es: '[UpdateManager] Buscando actualizaciones en el servidor remoto...',
+          fr: '[UpdateManager] Vérification des mises à jour sur le serveur distant...',
+          pt: '[UpdateManager] Verificando atualizações no servidor remoto...',
+          de: '[UpdateManager] Suche auf dem Remote-Server nach Updates...',
+          it: '[UpdateManager] Verifica degli aggiornamenti sul server remoto...',
+          ru: '[UpdateManager] Проверка наличия обновлений на удалённом сервере...',
+          tr: '[UpdateManager] Uzak sunucuda güncelleme kontrol ediliyor...',
+        }
+      },
+      {
+        pattern: /\[UpdateManager\]\s*发现客户端新版本[:：]\s*(v?[\d\.]+)\s*\(当前版本[:：]\s*(v?[\d\.]+)\)/i,
+        templates: {
+          zh: '[UpdateManager] 发现客户端新版本: $1 (当前版本: $2)',
+          en: '[UpdateManager] Found new client version: $1 (Current version: $2)',
+          ja: '[UpdateManager] 新しいバージョンが見つかりました: $1 (現在: $2)',
+          ko: '[UpdateManager] 새 버전 발견: $1 (현재 버전: $2)',
+          vi: '[UpdateManager] Tìm thấy phiên bản mới: $1 (Phiên bản hiện tại: $2)',
+          th: '[UpdateManager] พบเวอร์ชันใหม่: $1 (เวอร์ชันปัจจุบัน: $2)',
+          id: '[UpdateManager] Ditemukan versi baru: $1 (Versi saat ini: $2)',
+          es: '[UpdateManager] Nueva versión del cliente encontrada: $1 (Versión actual: $2)',
+          fr: '[UpdateManager] Nouvelle version du client trouvée : $1 (Version actuelle : $2)',
+          pt: '[UpdateManager] Nova versão do cliente encontrada: $1 (Versão atual: $2)',
+          de: '[UpdateManager] Neue Client-Version gefunden: $1 (Aktuelle Version: $2)',
+          it: '[UpdateManager] Nuova versione del client trovata: $1 (Versione attuale: $2)',
+          ru: '[UpdateManager] Найдена новая версия клиента: $1 (Текущая версия: $2)',
+          tr: '[UpdateManager] Yeni istemci sürümü bulundu: $1 (Mevcut sürüm: $2)',
+        }
+      },
+      {
+        pattern: /\[UpdateManager\]\s*(?:开始下载更新包|开始增量下载新版本)[:：]\s*(v?[\d\.]+)/i,
+        templates: {
+          zh: '[UpdateManager] 开始下载更新包: $1',
+          en: '[UpdateManager] Starting update package download: $1',
+          ja: '[UpdateManager] アップデートのダウンロードを開始: $1',
+          ko: '[UpdateManager] 업데이트 다운로드 시작: $1',
+          vi: '[UpdateManager] Bắt đầu tải xuống bản cập nhật: $1',
+          th: '[UpdateManager] เริ่มดาวน์โหลดการอัปเดต: $1',
+          id: '[UpdateManager] Memulai unduhan pembaruan: $1',
+          es: '[UpdateManager] Iniciando descarga del paquete de actualización: $1',
+          fr: '[UpdateManager] Démarrage du téléchargement du paquet de mise à jour : $1',
+          pt: '[UpdateManager] Iniciando download do pacote de atualização: $1',
+          de: '[UpdateManager] Download des Update-Pakets gestartet: $1',
+          it: '[UpdateManager] Avvio download del pacchetto di aggiornamento: $1',
+          ru: '[UpdateManager] Начало загрузки пакета обновления: $1',
+          tr: '[UpdateManager] Güncelleme paketi indiriliyor: $1',
+        }
+      },
+      {
+        pattern: /\[UpdateManager\]\s*增量更新分块下载中\.\.\./i,
+        templates: {
+          zh: '[UpdateManager] 增量更新分块下载中...',
+          en: '[UpdateManager] Differential blockmap incremental downloading...',
+          ja: '[UpdateManager] 差分ブロックマップ増分ダウンロード中...',
+          ko: '[UpdateManager] 증분 차분 블록맵 다운로드 중...',
+          vi: '[UpdateManager] Đang tải xuống gia tăng blockmap vi phân...',
+          th: '[UpdateManager] กำลังดาวน์โหลดส่วนเพิ่ม blockmap...',
+          id: '[UpdateManager] Mengunduh bertahap diferensial blockmap...',
+          es: '[UpdateManager] Descarga incremental por bloques diferenciales en curso...',
+          fr: '[UpdateManager] Téléchargement incrémentiel différentiel par blocs...',
+          pt: '[UpdateManager] Download incremental diferencial por blocos em andamento...',
+          de: '[UpdateManager] Differentieller Blockmap-Download läuft...',
+          it: '[UpdateManager] Download incrementale differenziale dei blocchi in corso...',
+          ru: '[UpdateManager] Идёт инкрементальная загрузка дифференциальных блоков...',
+          tr: '[UpdateManager] Artımlı fark bloğu indirmesi devam ediyor...',
+        }
+      },
+      {
+        pattern: /\[UpdateManager\]\s*更新包下载完成[，,]?\s*准备安装/i,
+        templates: {
+          zh: '[UpdateManager] 更新包下载完成，准备安装',
+          en: '[UpdateManager] Update download completed, ready to install',
+          ja: '[UpdateManager] アップデートのダウンロードが完了しました。インストールの準備が整いました',
+          ko: '[UpdateManager] 업데이트 다운로드 완료, 설치 준비 완료',
+          vi: '[UpdateManager] Đã tải xong bản cập nhật, sẵn sàng cài đặt',
+          th: '[UpdateManager] ดาวน์โหลดการอัปเดตเสร็จแล้ว พร้อมติดตั้ง',
+          id: '[UpdateManager] Unduhan pembaruan selesai, siap dipasang',
+          es: '[UpdateManager] Descarga de actualización completada, listo para instalar',
+          fr: '[UpdateManager] Téléchargement de la mise à jour terminé, prêt à installer',
+          pt: '[UpdateManager] Download da atualização concluído, pronto para instalar',
+          de: '[UpdateManager] Update-Download abgeschlossen, bereit zur Installation',
+          it: '[UpdateManager] Download aggiornamento completato, pronto per l\'installazione',
+          ru: '[UpdateManager] Загрузка обновления завершена, готово к установке',
+          tr: '[UpdateManager] Güncelleme indirmesi tamamlandı, kuruluma hazır',
+        }
+      },
+      {
+        pattern: /\[UpdateManager\]\s*新版本已就绪[，,]?\s*立即重启安装/i,
+        templates: {
+          zh: '[UpdateManager] 新版本已就绪，立即重启安装',
+          en: '[UpdateManager] New version is ready, restarting to install now',
+          ja: '[UpdateManager] 新しいバージョンの準備ができました。再起動してインストールします',
+          ko: '[UpdateManager] 새 버전이 준비되었습니다. 지금 재시작하여 설치합니다',
+          vi: '[UpdateManager] Phiên bản mới đã sẵn sàng, khởi động lại ngay để cài đặt',
+          th: '[UpdateManager] เวอร์ชันใหม่พร้อมแล้ว กำลังรีสตาร์ทเพื่อติดตั้งเดี๋ยวนี้',
+          id: '[UpdateManager] Versi baru siap, memulai ulang untuk memasang sekarang',
+          es: '[UpdateManager] Nueva versión lista, reiniciando para instalar ahora',
+          fr: '[UpdateManager] Nouvelle version prête, redémarrage pour installer maintenant',
+          pt: '[UpdateManager] Nova versão pronta, reiniciando para instalar agora',
+          de: '[UpdateManager] Neue Version bereit, Neustart zur Installation läuft',
+          it: '[UpdateManager] Nuova versione pronta, riavvio per installare ora',
+          ru: '[UpdateManager] Новая версия готова, перезапуск для установки...',
+          tr: '[UpdateManager] Yeni sürüm hazır, kurulum için şimdi yeniden başlatılıyor',
+        }
+      },
+      {
+        pattern: /(?:\[SessionKeeper\]\s*)?(?:⚠️\s*)?检测到微信视频号出现登录过期弹窗[，,]\s*需要重新扫码/i,
+        templates: {
+          zh: '[SessionKeeper] ⚠️ 检测到微信视频号出现登录过期弹窗，需要重新扫码',
+          en: '[SessionKeeper] ⚠️ Detected WeChat Channels session expiration dialog, QR re-scan required',
+          ja: '[SessionKeeper] ⚠️ WeChat Channels のセッション期限切れダイアログを検出、QR コードの再スキャンが必要です',
+          ko: '[SessionKeeper] ⚠️ 위챗 채널 로그인 만료 팝업이 감지되었습니다. QR 코드를 다시 스캔하세요',
+          vi: '[SessionKeeper] ⚠️ Phát hiện hộp thoại hết hạn đăng nhập WeChat Channels, cần quét lại mã QR',
+          th: '[SessionKeeper] ⚠️ ตรวจพบหน้าต่างหมดอายุเซสชัน WeChat Channels ต้องสแกน QR ใหม่',
+          id: '[SessionKeeper] ⚠️ Mendeteksi dialog sesi kedaluwarsa WeChat Channels, perlu pindai ulang QR',
+          es: '[SessionKeeper] ⚠️ Diálogo de sesión caducada de WeChat Channels detectado, requiere escanear QR de nuevo',
+          fr: '[SessionKeeper] ⚠️ Boîte de dialogue d\'expiration WeChat Channels détectée, nouveau scan QR requis',
+          pt: '[SessionKeeper] ⚠️ Caixa de diálogo de sessão expirada do WeChat Channels detectada, novo scan de QR necessário',
+          de: '[SessionKeeper] ⚠️ WeChat Channels Sitzungsablauf-Dialog erkannt, erneuter QR-Scan erforderlich',
+          it: '[SessionKeeper] ⚠️ Rilevata finestra di sessione scaduta su WeChat Channels, richiesta nuova scansione QR',
+          ru: '[SessionKeeper] ⚠️ Обнаружено окно истечения сессии WeChat Channels, требуется повторное сканирование QR',
+          tr: '[SessionKeeper] ⚠️ WeChat Channels oturum süresi doldu penceresi algılandı, yeniden QR taraması gerekiyor',
+        }
+      },
+      {
+        pattern: /(?:\[WindowManager\]\s*)?(?:🚨\s*)?检测到用户已关闭【([^】]+)】标签页[，,]\s*正在即刻强行中止发布任务\.\.\./i,
+        templates: {
+          zh: '[WindowManager] 🚨 检测到用户已关闭【$1】标签页，正在即刻强行中止发布任务...',
+          en: '[WindowManager] 🚨 Detected tab [$1] closed by user, forcibly aborting publishing task...',
+          ja: '[WindowManager] 🚨 ユーザーが「$1」タブを閉じたため、投稿タスクを強制中止しています...',
+          ko: '[WindowManager] 🚨 사용자가 [$1] 탭을 닫아 게시 작업을 즉시 강제 중단합니다...',
+          vi: '[WindowManager] 🚨 Phát hiện người dùng đã đóng tab [$1], đang ép buộc hủy tác vụ đăng...',
+          th: '[WindowManager] 🚨 ตรวจพบว่าผู้ใช้ปิดแท็บ [$1] กำลังบังคับยกเลิกงานเผยแพร่ทันที...',
+          id: '[WindowManager] 🚨 Mendeteksi pengguna menutup tab [$1], membatalkan paksa tugas publikasi...',
+          es: '[WindowManager] 🚨 El usuario cerró la pestaña [$1], abortando la tarea de publicación de inmediato...',
+          fr: '[WindowManager] 🚨 Onglet [$1] fermé par l\'utilisateur, annulation forcée de la publication...',
+          pt: '[WindowManager] 🚨 Usuário fechou a aba [$1], abortando a tarefa de publicação imediatamente...',
+          de: '[WindowManager] 🚨 Tab [$1] vom Benutzer geschlossen, Veröffentlichung wird sofort abgebrochen...',
+          it: '[WindowManager] 🚨 Scheda [$1] chiusa dall\'utente, interruzione forzata della pubblicazione...',
+          ru: '[WindowManager] 🚨 Пользователь закрыл вкладку [$1], принудительная остановка публикации...',
+          tr: '[WindowManager] 🚨 Kullanıcı [$1] sekmesini kapattı, yayınlama görevi derhal durduruluyor...',
+        }
+      },
+      {
+        pattern: /(?:\[IPC\]\s*)?Video download failed\s*\/\s*素材下载失败[:：]\s*(.*)/i,
+        templates: {
+          zh: '[IPC] 素材下载失败: $1',
+          en: '[IPC] Video download failed: $1',
+          ja: '[IPC] 動画素材のダウンロードに失敗しました: $1',
+          ko: '[IPC] 영상 자료 다운로드 실패: $1',
+          vi: '[IPC] Tải xuống tài nguyên video thất bại: $1',
+          th: '[IPC] ดาวน์โหลดไฟล์วิดีโอล้มเหลว: $1',
+          id: '[IPC] Unduhan materi video gagal: $1',
+          es: '[IPC] Error al descargar el video: $1',
+          fr: '[IPC] Échec du téléchargement de la vidéo : $1',
+          pt: '[IPC] Falha no download do vídeo: $1',
+          de: '[IPC] Video-Download fehlgeschlagen: $1',
+          it: '[IPC] Download del video non riuscito: $1',
+          ru: '[IPC] Ошибка загрузки видеоматериала: $1',
+          tr: '[IPC] Video materyali indirilemedi: $1',
+        }
+      },
+      {
+        pattern: /(?:\[IPC\]\s*)?(?:🛑\s*)?发布至\s*([a-zA-Z0-9_\-]+)\s*已被主动中止[:：]\s*(.*)/i,
+        templates: {
+          zh: '[IPC] 🛑 发布至 $1 已被主动中止: $2',
+          en: '[IPC] 🛑 Publishing to $1 was actively aborted: $2',
+          ja: '[IPC] 🛑 $1 への投稿は手動で中止されました: $2',
+          ko: '[IPC] 🛑 $1 게시가 사용자에 의해 중단되었습니다: $2',
+          vi: '[IPC] 🛑 Đã chủ động hủy đăng lên $1: $2',
+          th: '[IPC] 🛑 การเผยแพร่ไปยัง $1 ถูกยกเลิกโดยผู้ใช้: $2',
+          id: '[IPC] 🛑 Publikasi ke $1 dibatalkan secara aktif: $2',
+          es: '[IPC] 🛑 La publicación en $1 fue cancelada activamente: $2',
+          fr: '[IPC] 🛑 La publication vers $1 a été interrompue volontairement : $2',
+          pt: '[IPC] 🛑 A publicação para $1 foi abortada ativamente: $2',
+          de: '[IPC] 🛑 Veröffentlichung auf $1 wurde aktiv abgebrochen: $2',
+          it: '[IPC] 🛑 Pubblicazione su $1 interrotta attivamente: $2',
+          ru: '[IPC] 🛑 Публикация в $1 была принудительно прервана: $2',
+          tr: '[IPC] 🛑 $1 platformuna yayınlama aktif olarak durduruldu: $2',
+        }
+      },
+      {
+        pattern: /(?:\[IPC\]\s*)?发布至\s*([a-zA-Z0-9_\-]+)\s*异常[:：]\s*(.*)/i,
+        templates: {
+          zh: '[IPC] 发布至 $1 异常: $2',
+          en: '[IPC] Error publishing to $1: $2',
+          ja: '[IPC] $1 への投稿中にエラーが発生しました: $2',
+          ko: '[IPC] $1 게시 중 오류 발생: $2',
+          vi: '[IPC] Lỗi khi đăng lên $1: $2',
+          th: '[IPC] ข้อผิดพลาดในการเผยแพร่ไปยัง $1: $2',
+          id: '[IPC] Kesalahan saat mempublikasikan ke $1: $2',
+          es: '[IPC] Error al publicar en $1: $2',
+          fr: '[IPC] Erreur lors de la publication sur $1 : $2',
+          pt: '[IPC] Erro ao publicar em $1: $2',
+          de: '[IPC] Fehler bei der Veröffentlichung auf $1: $2',
+          it: '[IPC] Errore durante la pubblicazione su $1: $2',
+          ru: '[IPC] Ошибка при публикации в $1: $2',
+          tr: '[IPC] $1 platformuna yayınlama hatası: $2',
+        }
+      },
+      {
+        pattern: /(?:\[Main\]\s*)?自动初始化\s*TAB\s*失败[:：]\s*(.*)/i,
+        templates: {
+          zh: '[Main] 自动初始化 TAB 失败: $1',
+          en: '[Main] Failed to auto-initialize tabs: $1',
+          ja: '[Main] TAB の自動初期化に失敗しました: $1',
+          ko: '[Main] TAB 자동 초기화 실패: $1',
+          vi: '[Main] Tự động khởi tạo TAB thất bại: $1',
+          th: '[Main] การเริ่มต้น TAB อัตโนมัติล้มเหลว: $1',
+          id: '[Main] Gagal menginisialisasi TAB otomatis: $1',
+          es: '[Main] Error al inicializar automáticamente las pestañas: $1',
+          fr: '[Main] Échec de l\'initialisation automatique des onglets : $1',
+          pt: '[Main] Falha ao inicializar abas automaticamente: $1',
+          de: '[Main] Automatische Tab-Initialisierung fehlgeschlagen: $1',
+          it: '[Main] Inizializzazione automatica delle schede non riuscita: $1',
+          ru: '[Main] Не удалось автоматически инициализировать вкладки: $1',
+          tr: '[Main] Sekmeler otomatik başlatılamadı: $1',
         }
       },
     
@@ -4066,53 +3857,85 @@
         .replace(/'/g, '&#39;');
     }
 
-    function linkifyMediaText(html) {
-      if (!html) return '';
+    function getPlayVideoTip() {
+      const tipMap = { zh: '点击播放该视频', en: 'Click to play video', ja: 'クリックして動画を再生', ko: '클릭하여 동영상 재생', vi: 'Nhấp để phát video', th: 'คลิกเพื่อเล่นวิดีโอ', id: 'Klik untuk memutar video', es: 'Clic para reproducir', fr: 'Cliquer pour lire la vidéo', pt: 'Clique para reproduzir', de: 'Klicken zum Abspielen', it: 'Fai clic per riprodurre', ru: 'Нажмите для воспроизведения', tr: 'Oynatmak için tıklayın' };
+      return escapeAttr(tipMap[currentLogLang] || tipMap.en);
+    }
 
-      // 1. 先安全解析远程 URL：只对 .mp4 视频文件增加链接，普通 URL 不加链接保持纯文本
-      const urlRegex = /(<[^>]+>)|(https?:\/\/[^\s<>"'\r\n]+)/gi;
-      html = html.replace(urlRegex, (match, tag, url) => {
-        if (tag) return tag;
-        if (!url) return match;
-        let cleanUrl = url;
-        let trailing = '';
-        const trailingMatch = cleanUrl.match(/([.,;!?:)\]>]+)$/);
-        if (trailingMatch) {
-          trailing = trailingMatch[1];
-          cleanUrl = cleanUrl.slice(0, -trailing.length);
+    function renderLogMessageHtml(rawText, query) {
+      const source = String(rawText || '');
+      if (!source) return '';
+      const mediaTokenRegex = /(https?:\/\/[^\s<>"'\r\n]+)|([A-Za-z]:[\\/](?:[^<>\r\n"':*?|]+?)\.mp4\b)|(\/(?:Users|home|root|var|tmp|Volumes)\/(?:[^<>\r\n"':*?|]+?)\.mp4\b)/gi;
+      let out = '';
+      let lastIdx = 0;
+      let m;
+      while ((m = mediaTokenRegex.exec(source)) !== null) {
+        if (m.index > lastIdx) {
+          out += highlightText(source.slice(lastIdx, m.index), query);
         }
-
-        // 仅对 .mp4 格式的视频添加播放链接，普通 URL 绝不加链接
-        const isMp4 = /\.mp4(\?.*)?$/i.test(cleanUrl);
-        if (!isMp4) {
-          return match;
+        const remoteUrl = m[1];
+        const localPath = m[2] || m[3];
+        if (remoteUrl) {
+          let cleanUrl = remoteUrl;
+          let trailing = '';
+          const trailingMatch = cleanUrl.match(/([.,;!?:)\]>]+)$/);
+          if (trailingMatch) {
+            trailing = trailingMatch[1];
+            cleanUrl = cleanUrl.slice(0, -trailing.length);
+          }
+          if (/\.mp4(\?.*)?$/i.test(cleanUrl)) {
+            const tip = getPlayVideoTip();
+            const safeUrl = escapeAttr(cleanUrl);
+            out += `<a href="#" class="media-link remote-media-link" data-url="${safeUrl}" title="${tip}">🎬 ${highlightText(cleanUrl, query)}</a>${highlightText(trailing, query)}`;
+          } else {
+            out += highlightText(remoteUrl, query);
+          }
+        } else if (localPath) {
+          const tip = getPlayVideoTip();
+          const safePath = escapeAttr(localPath);
+          out += `<a href="#" class="media-link local-media-link" data-path="${safePath}" title="${tip}">▶️ ${highlightText(localPath, query)}</a>`;
+        } else {
+          out += highlightText(m[0], query);
         }
+        lastIdx = m.index + m[0].length;
+      }
+      if (lastIdx < source.length) {
+        out += highlightText(source.slice(lastIdx), query);
+      }
+      return out;
+    }
 
-        const tipMap = { zh: '点击播放该视频', en: 'Click to play video', ja: 'クリックして動画を再生', ko: '클릭하여 동영상 재생', vi: 'Nhấp để phát video', th: 'คลิกเพื่อเล่นวิดีโอ', id: 'Klik untuk memutar video', es: 'Clic para reproducir', fr: 'Cliquer pour lire la vidéo', pt: 'Clique para reproduzir', de: 'Klicken zum Abspielen', it: 'Fai clic per riprodurre', ru: 'Нажмите для воспроизведения', tr: 'Oynatmak için tıklayın' };
-        const tip = escapeAttr(tipMap[currentLogLang] || tipMap.en);
-        const safeUrl = escapeAttr(decodeBasicHtmlEntities(cleanUrl));
-        return `<a href="javascript:void(0)" class="media-link remote-media-link" data-url="${safeUrl}" title="${tip}">🎬 ${cleanUrl}</a>${trailing}`;
-      });
-
-      // 2. 解析 Windows 和 Unix 本地媒体文件绝对路径：只对 .mp4 视频文件增加链接
-      const localMediaRegex = /(<[^>]+>)|([A-Za-z]:[\\/](?:[^<>\r\n"':*?|]+?)\.mp4\b)|(\/(?:Users|home|root|var|tmp|Volumes)\/(?:[^<>\r\n"':*?|]+?)\.mp4\b)/gi;
-      html = html.replace(localMediaRegex, (match, tag, winPath, unixPath) => {
-        if (tag) return tag;
-        const targetPath = winPath || unixPath;
-        if (!targetPath) return match;
-        const tipMap = { zh: '点击播放该视频', en: 'Click to play video', ja: 'クリックして動画を再生', ko: '클릭하여 동영상 재생', vi: 'Nhấp để phát video', th: 'คลิกเพื่อเล่นวิดีโอ', id: 'Klik untuk memutar video', es: 'Clic para reproducir', fr: 'Cliquer pour lire la vidéo', pt: 'Clique para reproduzir', de: 'Klicken zum Abspielen', it: 'Fai clic per riprodurre', ru: 'Нажмите для воспроизведения', tr: 'Oynatmak için tıklayın' };
-        const tip = escapeAttr(tipMap[currentLogLang] || tipMap.en);
-        const safePath = escapeAttr(decodeBasicHtmlEntities(targetPath));
-        return `<a href="javascript:void(0)" class="media-link local-media-link" data-path="${safePath}" title="${tip}">▶️ ${targetPath}</a>`;
-      });
-      return html;
+    const LOCALIZED_CACHE = new WeakMap();
+    function getLocalizedEntryField(entry, fieldName, lang) {
+      if (!entry || typeof entry !== 'object') return '';
+      const rawVal = typeof entry[fieldName] === 'string' ? entry[fieldName] : String(entry[fieldName] || '');
+      const cleanVal = rawVal.trim();
+      if (!cleanVal) return '';
+      const targetLang = (lang || 'zh').toLowerCase();
+      if (targetLang === 'zh') return cleanVal;
+      let cache = LOCALIZED_CACHE.get(entry);
+      if (!cache || cache.lang !== targetLang) {
+        cache = { lang: targetLang, msg: null, details: null };
+        LOCALIZED_CACHE.set(entry, cache);
+      }
+      if (fieldName === 'message') {
+        if (cache.msg === null) cache.msg = localizeLogMessage(cleanVal, targetLang);
+        return cache.msg;
+      }
+      if (fieldName === 'details') {
+        if (cache.details === null) cache.details = localizeLogMessage(cleanVal, targetLang);
+        return cache.details;
+      }
+      return localizeLogMessage(cleanVal, targetLang);
     }
 
     // 渲染单条日志（严格消除任何模板换行与缩进空格，保证单行流式排版紧凑）
     function createLogElement(entry) {
+      const rawLevel = typeof entry?.level === 'string' ? entry.level : 'info';
+      const safeLevel = ['info', 'warn', 'error', 'success'].includes(rawLevel) ? rawLevel : 'info';
       const el = document.createElement('div');
-      el.className = `log-entry ${entry.level}`;
-      el.dataset.id = entry.id;
+      el.className = `log-entry ${safeLevel}`;
+      el.dataset.id = entry?.id ?? '';
 
       const category = getLogCategory(entry);
       const c = getLogLocale();
@@ -4125,19 +3948,18 @@
         catTagHtml = `<span class="platform-tag tag-system">${escapeHtml(c.tagSys || 'System')}</span>`;
       }
 
-      const badgeClass = `badge-${entry.level}`;
-      const cleanMsg = (entry.message || '').trim();
-      const displayMsg = localizeLogMessage(cleanMsg, currentLogLang);
-      const msgHtml = linkifyMediaText(highlightText(displayMsg, searchQuery));
-      const timeDisplay = formatTime(entry.timestamp);
+      const badgeClass = `badge-${safeLevel}`;
+      const displayMsg = getLocalizedEntryField(entry, 'message', currentLogLang);
+      const msgHtml = renderLogMessageHtml(displayMsg, searchQuery);
+      const timeDisplay = formatTime(entry?.timestamp);
 
       let detailsHtml = '';
-      if (entry.details) {
-        const localizedDetails = localizeLogMessage(entry.details.trim(), currentLogLang);
+      if (entry?.details) {
+        const localizedDetails = getLocalizedEntryField(entry, 'details', currentLogLang);
         detailsHtml = `<div class="log-details">${escapeHtml(localizedDetails)}</div>`;
       }
 
-      el.innerHTML = `<span class="log-id">#${escapeHtml(entry.id)}</span><span class="log-time" title="${escapeAttr(entry.timestamp)}">[${escapeHtml(timeDisplay)}]</span>${catTagHtml}<span class="log-badge ${escapeAttr(badgeClass)}">${escapeHtml(entry.level)}</span><div class="log-message">${msgHtml}${detailsHtml}</div>`;
+      el.innerHTML = `<span class="log-id">#${escapeHtml(entry?.id ?? '')}</span><span class="log-time" title="${escapeAttr(entry?.timestamp || '')}">[${escapeHtml(timeDisplay)}]</span>${catTagHtml}<span class="log-badge ${escapeAttr(badgeClass)}">${escapeHtml(safeLevel)}</span><div class="log-message">${msgHtml}${detailsHtml}</div>`;
 
       return el;
     }
@@ -4202,17 +4024,17 @@
         const cat = getLogCategory(entry);
         if (cat !== currentCategory) return false;
       }
-      if (currentFilterLevel !== 'all' && entry.level !== currentFilterLevel) {
+      if (currentFilterLevel !== 'all' && entry?.level !== currentFilterLevel) {
         return false;
       }
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
-        const rawMsg = (entry.message || '').toLowerCase();
-        const locMsg = localizeLogMessage(entry.message || '', currentLogLang).toLowerCase();
+        const rawMsg = String(entry?.message || '').toLowerCase();
+        const locMsg = getLocalizedEntryField(entry, 'message', currentLogLang).toLowerCase();
         const inMsg = rawMsg.includes(q) || locMsg.includes(q);
-        const inDetails = (entry.details || '').toLowerCase().includes(q) ||
-          localizeLogMessage(entry.details || '', currentLogLang).toLowerCase().includes(q);
-        const inTime = (entry.timestamp || '').toLowerCase().includes(q);
+        const inDetails = String(entry?.details || '').toLowerCase().includes(q) ||
+          getLocalizedEntryField(entry, 'details', currentLogLang).toLowerCase().includes(q);
+        const inTime = String(entry?.timestamp || '').toLowerCase().includes(q);
         if (!inMsg && !inDetails && !inTime) return false;
       }
       return true;
@@ -4285,8 +4107,9 @@
     });
 
     // 接收来自外部或顶层导航栏的分类切换广播
+    const VALID_LOG_CATEGORIES = new Set(['all', 'wechat', 'xiaohongshu', 'system']);
     ipcRenderer.on('syslog:set-category', (_event, cat) => {
-      if (cat && cat !== currentCategory) {
+      if (typeof cat === 'string' && VALID_LOG_CATEGORIES.has(cat) && cat !== currentCategory) {
         currentCategory = cat;
         document.querySelectorAll('.category-tab').forEach((t) => {
           t.classList.toggle('active', (t.dataset.cat || 'all') === cat);
@@ -4343,24 +4166,33 @@
       renderLogs();
     });
 
+    let copyAllTimer = null;
     // 复制全部当前可见日志（按当前界面语言格式化）
     btnCopyAll.addEventListener('click', () => {
       const matched = allLogs.filter(matchLog);
       if (matched.length === 0) return;
       const text = matched
         .map((e) => {
-          const locMsg = localizeLogMessage(e.message || '', currentLogLang);
-          const locDet = e.details ? localizeLogMessage(e.details, currentLogLang) : '';
-          return `[${e.timestamp}] [${getLogCategory(e).toUpperCase()}] [${e.level.toUpperCase()}] ${locMsg}${locDet ? '\n' + locDet : ''}`;
+          const locMsg = getLocalizedEntryField(e, 'message', currentLogLang);
+          const locDet = e?.details ? getLocalizedEntryField(e, 'details', currentLogLang) : '';
+          const lvl = String(e?.level || 'info').toUpperCase();
+          return `[${e?.timestamp || ''}] [${getLogCategory(e).toUpperCase()}] [${lvl}] ${locMsg}${locDet ? '\n' + locDet : ''}`;
         })
         .join('\n');
-      navigator.clipboard.writeText(text);
-      const originalHtml = btnCopyAll.innerHTML;
-      const c = getLogLocale();
-      btnCopyAll.textContent = c.copied || 'Copied!';
-      setTimeout(() => {
-        btnCopyAll.innerHTML = originalHtml;
-      }, 1500);
+      navigator.clipboard.writeText(text).then(() => {
+        const copyTextEl = document.getElementById('btn-copy-all-text');
+        const c = getLogLocale();
+        if (copyTextEl) {
+          copyTextEl.textContent = c.copied || 'Copied!';
+          if (copyAllTimer) clearTimeout(copyAllTimer);
+          copyAllTimer = setTimeout(() => {
+            copyAllTimer = null;
+            copyTextEl.textContent = getLogLocale().copyAll || 'Copy All';
+          }, 1500);
+        }
+      }).catch((err) => {
+        console.warn('复制日志失败:', err);
+      });
     });
 
     // 导出日志文件
@@ -4373,22 +4205,40 @@
       await ipcRenderer.invoke('syslog:open-folder');
     });
 
-    // 接收最新追加单条日志
-    ipcRenderer.on('syslog:entry', (_event, entry) => {
-      allLogs.push(entry);
-      if (allLogs.length > 2500) allLogs.shift();
-      updateCounts();
-
-      if (matchLog(entry)) {
-        if (emptyState.style.display === 'flex') {
-          emptyState.style.display = 'none';
-        }
-        container.appendChild(createLogElement(entry));
-        statDisplayedEl.textContent = parseInt(statDisplayedEl.textContent || '0', 10) + 1;
+    let liveFlushTimer = null;
+    function scheduleLiveFlush() {
+      if (liveFlushTimer !== null) return;
+      liveFlushTimer = setTimeout(() => {
+        liveFlushTimer = null;
+        updateCounts();
         if (autoScroll) {
           scrollToBottom();
         }
+      }, 60);
+    }
+
+    // 接收最新追加单条日志
+    ipcRenderer.on('syslog:entry', (_event, entry) => {
+      if (!entry || typeof entry !== 'object') return;
+      allLogs.push(entry);
+      if (allLogs.length > 2500) allLogs.shift();
+
+      if (matchLog(entry)) {
+        if (emptyState.parentNode === container) {
+          emptyState.remove();
+        }
+        container.appendChild(createLogElement(entry));
+        while (container.children.length > 2500) {
+          const first = container.firstElementChild;
+          if (first && first !== emptyState) {
+            first.remove();
+          } else {
+            break;
+          }
+        }
+        statDisplayedEl.textContent = container.children.length;
       }
+      scheduleLiveFlush();
     });
 
     // 接收清空广播
@@ -4416,7 +4266,7 @@
 
         const history = await ipcRenderer.invoke('syslog:get-history');
         if (Array.isArray(history)) {
-          allLogs = history;
+          allLogs = history.slice(-2500);
         }
 
         const info = await ipcRenderer.invoke('syslog:get-info');
@@ -4453,22 +4303,17 @@
         try {
           const res = await ipcRenderer.invoke('app:open-local-file', localPath);
           if (res && res.success === false) {
-            console.warn('[MediaLink] 打开本地文件提示:', res.message);
-            try {
-              const { shell } = require('electron');
-              if (shell && shell.openPath) await shell.openPath(localPath);
-            } catch (fallbackErr) {}
+            console.warn('[MediaLink] Main process rejected local file open:', res.message);
           }
         } catch (err) {
-          console.error('[MediaLink] 调用系统播放器异常:', err);
-          try {
-            const { shell } = require('electron');
-            if (shell && shell.openPath) await shell.openPath(localPath);
-          } catch (fallbackErr) {}
+          console.error('[MediaLink] Failed to open local file via IPC:', err);
         }
       } else if (remoteUrl) {
         try {
-          await ipcRenderer.invoke('app:open-external-url', remoteUrl);
+          const res = await ipcRenderer.invoke('app:open-external-url', remoteUrl);
+          if (res && res.success === false) {
+            console.warn('[MediaLink] Main process rejected external URL open:', res.message);
+          }
         } catch (err) {
           console.error('[MediaLink] 弹窗播放远程视频异常:', err);
         }

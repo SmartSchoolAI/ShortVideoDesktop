@@ -1064,8 +1064,8 @@ export const I18N_LOCALES: Record<SupportedLangCode, I18nDictionary> = {
       system: "Journaux",
     },
     steps: {
-      wechat: ['Page prête', 'Téléverser vidéo', 'Titre court', 'Description & Tags', 'Paramètres avancés', 'Transcoder & Publier'],
-      xiaohongshu: ['Page prête', 'Téléverser vidéo', 'Titre de note', 'Contenu & Tags', 'Paramètres avancés', 'Vérifier & Publier'],
+      wechat: ['Page prête', 'Téléverser vidéo', 'Titre court', 'Description et balises', 'Paramètres avancés', 'Transcoder & Publier'],
+      xiaohongshu: ['Page prête', 'Téléverser vidéo', 'Titre de note', 'Contenu et balises', 'Paramètres avancés', 'Vérifier & Publier'],
     },
   },
   pt: {

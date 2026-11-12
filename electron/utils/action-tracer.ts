@@ -460,10 +460,10 @@ export class ActionTracer {
 
           // 确保物理聚焦在目标输入控件，移动至末尾，并连续派发物理退格键删除多余字
           await client.mouseClick(targetCoord.x, targetCoord.y);
-          await sleep(100);
+          await sleep(100, this.signal);
           await client.pressEnd();
           await client.backspace(excess);
-          await sleep(200);
+          await sleep(200, this.signal);
 
           // 重新读取检查删除后的实际内容
           const afterTrimVal = await client.evaluate(
@@ -522,6 +522,7 @@ export class ActionTracer {
     let editorCoord: { x: number; y: number; width: number; height: number } | null = null;
 
     for (let waitAttempt = 0; waitAttempt < 10; waitAttempt++) {
+      this.checkAborted();
       editorCoord = await client.evaluate((selectors) => {
         const isElementVisible = (el: Element | null): boolean => {
           if (!el) return false;
@@ -631,7 +632,7 @@ export class ActionTracer {
         break;
       }
 
-      await sleep(1000);
+      await sleep(1000, this.signal);
     }
 
     if (!editorCoord || !editorCoord.x || !editorCoord.y) {
@@ -677,7 +678,20 @@ export class ActionTracer {
         return true;
       } else {
         await this.track(`[${descriptionName}] ⚠️ 富文本内容检测为空，尝试备用注入`, null, 'warn');
-        return true;
+        this.checkAborted();
+        await client.mouseClick(editorCoord.x, editorCoord.y);
+        await sleep(180, this.signal);
+        await client.typeTextHumanLike(targetValue, { enableTypo: false });
+        await sleep(300, this.signal);
+        const retryRes = await client.evaluate(() => {
+          const active = document.activeElement;
+          const text = (active?.textContent || (active as any)?.value || '').trim();
+          return { textLen: text.length, preview: text.slice(0, 60) };
+        }).catch(() => ({ textLen: 0, preview: '' }));
+        if (retryRes.textLen > 0) {
+          await this.track(`[${descriptionName}] ✅ 富文本简介注入成功！(字符数: ${retryRes.textLen})`, { 预览: retryRes.preview }, 'success');
+        }
+        return retryRes.textLen > 0;
       }
     } catch (err: any) {
       if (err instanceof PublishAbortedError || err?.isAborted || this.isAborted()) {

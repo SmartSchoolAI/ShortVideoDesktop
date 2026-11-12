@@ -9,6 +9,26 @@ const CHANNEL_PORT_OFFSET: Record<string, number> = { A: 0, B: 1, C: 2 };
 const channelOffset = CHANNEL_PORT_OFFSET[APP_CONFIG?.channel || 'A'] || 0;
 export const DEFAULT_CDP_PORT = 8315 + channelOffset;
 
+const QWERTY_ADJACENT_MAP: Record<string, string> = {
+  q: 'wa', w: 'qase', e: 'wsdr', r: 'edft', t: 'rfgy', y: 'tghu', u: 'yhji', i: 'ujko', o: 'iklp', p: 'ol',
+  a: 'qwsz', s: 'wedxza', d: 'erfcxs', f: 'rtgvcd', g: 'tyhbvf', h: 'yujnbg', j: 'uikmnh', k: 'iolmj', l: 'opk',
+  z: 'asx', x: 'zsdc', c: 'xdfv', v: 'cfgb', b: 'vghn', n: 'bhjm', m: 'njk',
+  '0': '9o', '1': '2q', '2': '13qw', '3': '24we', '4': '35er', '5': '46rt', '6': '57ty', '7': '68yu', '8': '79ui', '9': '80io',
+};
+
+/**
+ * 基于真实 QWERTY 物理键盘分布选择邻近错键（保证不与原字符相同且不跨越字符集边界）
+ */
+export function pickRealisticAdjacentTypo(char: string): string {
+  const lower = char.toLowerCase();
+  const neighbors = QWERTY_ADJACENT_MAP[lower];
+  if (!neighbors || neighbors.length === 0) {
+    return lower === 'a' ? 's' : 'a';
+  }
+  const picked = neighbors[Math.floor(Math.random() * neighbors.length)];
+  return char >= 'A' && char <= 'Z' ? picked.toUpperCase() : picked;
+}
+
 export interface CdpTargetInfo {
   id: string;
   title: string;
@@ -26,11 +46,48 @@ export class CdpPageClient {
   private messageId: number = 1;
   private pendingCallbacks: Map<number, { resolve: (res: any) => void; reject: (err: any) => void }> = new Map();
   private eventListeners: Map<string, Set<(params: any) => void>> = new Map();
+  private activeWaits: Set<(err: Error) => void> = new Set();
   public targetInfo: CdpTargetInfo;
   private isClosed: boolean = false;
+  private connectPromise: Promise<void> | null = null;
 
   constructor(targetInfo: CdpTargetInfo) {
     this.targetInfo = targetInfo;
+  }
+
+  private async wait(ms: number, signal?: AbortSignal): Promise<void> {
+    if (this.isClosed || signal?.aborted) {
+      throw new Error('[CdpPageClient] Aborted or closed');
+    }
+    if (ms <= 0) return;
+
+    return new Promise((resolve, reject) => {
+      let timer: NodeJS.Timeout | null = null;
+      const cleanup = () => {
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        this.activeWaits.delete(abortWait);
+        if (signal) {
+          signal.removeEventListener('abort', onSignalAbort);
+        }
+      };
+      const abortWait = (err: Error) => {
+        cleanup();
+        reject(err);
+      };
+      const onSignalAbort = () => abortWait(new Error('[CdpPageClient] Aborted by signal'));
+
+      this.activeWaits.add(abortWait);
+      if (signal) {
+        signal.addEventListener('abort', onSignalAbort, { once: true });
+      }
+      timer = setTimeout(() => {
+        cleanup();
+        resolve();
+      }, ms);
+    });
   }
 
   /**
@@ -47,15 +104,36 @@ export class CdpPageClient {
     this.eventListeners.get(event)?.delete(listener);
   }
 
+  private rejectAllPending(reason: string) {
+    if (this.pendingCallbacks.size === 0) return;
+    const entries = Array.from(this.pendingCallbacks.values());
+    this.pendingCallbacks.clear();
+    for (const cb of entries) {
+      try {
+        cb.reject(new Error(reason));
+      } catch {}
+    }
+  }
+
   /**
    * 建立 WebSocket 连接
    */
   public async connect(timeoutMs: number = 8000): Promise<void> {
+    if (this.isClosed) {
+      throw new Error('[CdpPageClient] Client is closed');
+    }
     if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
+    if (this.connectPromise) return this.connectPromise;
 
-    return new Promise((resolve, reject) => {
+    this.connectPromise = new Promise((resolve, reject) => {
+      let settled = false;
       const timer = setTimeout(() => {
-        reject(new Error(`[CdpPageClient] Connection timeout (${timeoutMs}ms): ${this.targetInfo.webSocketDebuggerUrl}`));
+        if (!settled) {
+          settled = true;
+          this.connectPromise = null;
+          try { this.ws?.close(); } catch {}
+          reject(new Error(`[CdpPageClient] Connection timeout (${timeoutMs}ms): ${this.targetInfo.webSocketDebuggerUrl}`));
+        }
       }, timeoutMs);
 
       try {
@@ -63,6 +141,9 @@ export class CdpPageClient {
 
         this.ws.on('open', () => {
           clearTimeout(timer);
+          if (settled) return;
+          settled = true;
+          this.connectPromise = null;
           // 激活常用 CDP 域
           this.sendCommand('Page.enable').catch(() => {});
           this.sendCommand('DOM.enable').catch(() => {});
@@ -98,25 +179,50 @@ export class CdpPageClient {
 
         this.ws.on('error', (err) => {
           clearTimeout(timer);
-          reject(err);
+          this.ws = null;
+          this.connectPromise = null;
+          this.rejectAllPending(`[CdpPageClient] WebSocket error: ${err?.message || err}`);
+          if (!settled) {
+            settled = true;
+            reject(err);
+          }
         });
 
         this.ws.on('close', () => {
+          clearTimeout(timer);
           this.ws = null;
+          this.connectPromise = null;
+          this.rejectAllPending('[CdpPageClient] WebSocket closed');
+          if (!settled) {
+            settled = true;
+            reject(new Error('[CdpPageClient] WebSocket closed before open'));
+          }
         });
       } catch (e) {
         clearTimeout(timer);
-        reject(e);
+        this.connectPromise = null;
+        if (!settled) {
+          settled = true;
+          reject(e);
+        }
       }
     });
+
+    return this.connectPromise;
   }
 
   /**
    * 发送底层 CDP 命令
    */
   public async sendCommand(method: string, params: any = {}, timeoutMs: number = 30000): Promise<any> {
+    if (this.isClosed) {
+      throw new Error(`[CdpPageClient] Client is closed: ${method}`);
+    }
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       await this.connect();
+    }
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      throw new Error(`[CdpPageClient] WebSocket not open after connect: ${method}`);
     }
 
     const id = this.messageId++;
@@ -132,7 +238,13 @@ export class CdpPageClient {
         resolve: (res: any) => { clearTimeout(timer); resolve(res); },
         reject: (err: any) => { clearTimeout(timer); reject(err); },
       });
-      this.ws!.send(JSON.stringify({ id, method, params }));
+      try {
+        this.ws!.send(JSON.stringify({ id, method, params }));
+      } catch (sendErr) {
+        clearTimeout(timer);
+        this.pendingCallbacks.delete(id);
+        reject(sendErr);
+      }
     });
   }
 
@@ -208,6 +320,7 @@ export class CdpPageClient {
     })()`;
 
     // 1. 穿透递归查找 input[type="file"] 并直接获取其 RemoteObject 的 objectId
+    let remoteObjId: string | null = null;
     try {
       const evalRes = await this.sendCommand('Runtime.evaluate', {
         expression: FIND_FILE_INPUT_EXPR,
@@ -215,24 +328,31 @@ export class CdpPageClient {
       });
 
       if (evalRes?.result?.objectId) {
+        remoteObjId = evalRes.result.objectId;
         await this.sendCommand('DOM.setFileInputFiles', {
           files: [filePath],
-          objectId: evalRes.result.objectId,
+          objectId: remoteObjId,
         });
         return true;
       }
-    } catch {}
+    } catch {} finally {
+      if (remoteObjId) {
+        await this.sendCommand('Runtime.releaseObject', { objectId: remoteObjId }).catch(() => {});
+      }
+    }
 
     // 2. 备用兜底：深度扫描 DOM performSearch (包含 UserAgentShadowDOM)
+    let searchId: string | null = null;
     try {
       const searchRes = await this.sendCommand('DOM.performSearch', {
         query: '//input[@type="file"] | //input[contains(@accept,"video")]',
         includeUserAgentShadowDOM: true,
       });
+      searchId = searchRes?.searchId || null;
 
-      if (searchRes?.searchId && searchRes.resultCount > 0) {
+      if (searchId && searchRes.resultCount > 0) {
         const results = await this.sendCommand('DOM.getSearchResults', {
-          searchId: searchRes.searchId,
+          searchId,
           fromIndex: 0,
           toIndex: 1,
         });
@@ -244,7 +364,11 @@ export class CdpPageClient {
           return true;
         }
       }
-    } catch {}
+    } catch {} finally {
+      if (searchId) {
+        await this.sendCommand('DOM.discardSearchResults', { searchId }).catch(() => {});
+      }
+    }
 
     return false;
   }
@@ -290,7 +414,7 @@ export class CdpPageClient {
       curY += Math.round((Math.random() - 0.5) * 2);
 
       await this.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', x: curX, y: curY, buttons: 0 });
-      await new Promise((r) => setTimeout(r, Math.floor(Math.random() * 8) + 10));
+      await this.wait(Math.floor(Math.random() * 8) + 10);
     }
 
     // 模拟终点轻微过冲与微校准 (Overshoot & Correction, 真人 Fitts 定律特征)
@@ -300,7 +424,7 @@ export class CdpPageClient {
       const overX = Math.round(targetX + Math.cos(angle) * overshootDist);
       const overY = Math.round(targetY + Math.sin(angle) * overshootDist);
       await this.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', x: overX, y: overY, buttons: 0 });
-      await new Promise((r) => setTimeout(r, Math.floor(Math.random() * 15) + 20));
+      await this.wait(Math.floor(Math.random() * 15) + 20);
     }
 
     // 精确到达终点目标
@@ -325,15 +449,15 @@ export class CdpPageClient {
     await this.mouseMove(targetX, targetY, { jitter: false });
 
     // 悬停感知（模拟人眼确认目标元素 60ms ~ 120ms）
-    await new Promise((r) => setTimeout(r, Math.floor(Math.random() * 60) + 60));
+    await this.wait(Math.floor(Math.random() * 60) + 60);
 
     // 2. 模拟真实手指按压鼠标按键 (W3C规范: mousedown 阶段 buttons 掩码必须为 1)
     await this.sendCommand('Input.dispatchMouseEvent', { type: 'mousePressed', x: targetX, y: targetY, button: 'left', buttons: 1, clickCount });
-    await new Promise((r) => setTimeout(r, delayMs));
+    await this.wait(delayMs);
 
     // 3. 模拟按键抬起释放 (W3C规范: mouseup 阶段 buttons 掩码必须为 0)
     await this.sendCommand('Input.dispatchMouseEvent', { type: 'mouseReleased', x: targetX, y: targetY, button: 'left', buttons: 0, clickCount });
-    await new Promise((r) => setTimeout(r, Math.floor(Math.random() * 40) + 60));
+    await this.wait(Math.floor(Math.random() * 40) + 60);
   }
 
   /**
@@ -343,8 +467,12 @@ export class CdpPageClient {
   public async typeText(text: string, options: { minDelay?: number; maxDelay?: number } = {}): Promise<void> {
     const minDelay = options.minDelay ?? 35;
     const maxDelay = options.maxDelay ?? 90;
+    const chars = Array.from(String(text || '').replace(/\r\n/g, '\n'));
 
-    for (const char of text) {
+    for (const char of chars) {
+      if (this.isClosed) {
+        throw new Error('[CdpPageClient] Client is closed during typing');
+      }
       if (char === '\n') {
         await this.sendCommand('Input.dispatchKeyEvent', { type: 'rawKeyDown', windowsVirtualKeyCode: 13, unmodifiedText: '\r', text: '\r' });
         await this.sendCommand('Input.dispatchKeyEvent', { type: 'char', text: '\r' });
@@ -353,7 +481,7 @@ export class CdpPageClient {
         await this.sendCommand('Input.dispatchKeyEvent', { type: 'char', text: char });
       }
       const delay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
-      await new Promise((r) => setTimeout(r, delay));
+      await this.wait(delay);
     }
   }
 
@@ -366,11 +494,11 @@ export class CdpPageClient {
     const modifierMask = isMac ? 4 : 2;
     await this.sendCommand('Input.dispatchKeyEvent', { type: 'rawKeyDown', windowsVirtualKeyCode: 65, code: 'KeyA', key: 'a', modifiers: modifierMask });
     await this.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', windowsVirtualKeyCode: 65, code: 'KeyA', key: 'a', modifiers: modifierMask });
-    await new Promise((r) => setTimeout(r, 80));
+    await this.wait(80);
     // 派发 Backspace 退格删除键 (windowsVirtualKeyCode: 8)
     await this.sendCommand('Input.dispatchKeyEvent', { type: 'rawKeyDown', windowsVirtualKeyCode: 8, code: 'Backspace', key: 'Backspace' });
     await this.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', windowsVirtualKeyCode: 8, code: 'Backspace', key: 'Backspace' });
-    await new Promise((r) => setTimeout(r, 100));
+    await this.wait(100);
   }
 
   /**
@@ -378,10 +506,13 @@ export class CdpPageClient {
    */
   public async backspace(times: number = 1): Promise<void> {
     for (let i = 0; i < times; i++) {
+      if (this.isClosed) {
+        throw new Error('[CdpPageClient] Client is closed during backspace');
+      }
       await this.sendCommand('Input.dispatchKeyEvent', { type: 'rawKeyDown', windowsVirtualKeyCode: 8, code: 'Backspace', key: 'Backspace' });
       await this.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', windowsVirtualKeyCode: 8, code: 'Backspace', key: 'Backspace' });
       if (times > 1) {
-        await new Promise((r) => setTimeout(r, Math.floor(Math.random() * 30) + 40));
+        await this.wait(Math.floor(Math.random() * 30) + 40);
       }
     }
   }
@@ -392,7 +523,7 @@ export class CdpPageClient {
   public async pressEnd(): Promise<void> {
     await this.sendCommand('Input.dispatchKeyEvent', { type: 'rawKeyDown', windowsVirtualKeyCode: 35, code: 'End', key: 'End' });
     await this.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', windowsVirtualKeyCode: 35, code: 'End', key: 'End' });
-    await new Promise((r) => setTimeout(r, 60));
+    await this.wait(60);
   }
 
   /**
@@ -407,7 +538,7 @@ export class CdpPageClient {
     const mapped = codeMap[key] || { code: key, vk: windowsVirtualKeyCode || 0 };
     await this.sendCommand('Input.dispatchKeyEvent', { type: 'rawKeyDown', windowsVirtualKeyCode: mapped.vk, code: mapped.code, key });
     await this.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', windowsVirtualKeyCode: mapped.vk, code: mapped.code, key });
-    await new Promise((r) => setTimeout(r, 60));
+    await this.wait(60);
   }
 
   /**
@@ -419,28 +550,32 @@ export class CdpPageClient {
    */
   public async typeTextHumanLike(text: string, options: { enableTypo?: boolean } = {}): Promise<void> {
     const enableTypo = options.enableTypo !== false;
+    const chars = Array.from(String(text || '').replace(/\r\n/g, '\n'));
 
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i];
+    for (let i = 0; i < chars.length; i++) {
+      if (this.isClosed) {
+        throw new Error('[CdpPageClient] Client is closed during human-like typing');
+      }
+      const char = chars[i];
 
-      // 偶发模拟手误打错：针对普通字母或数字
+      // 偶发模拟手误打错：针对普通字母或数字，选用 QWERTY 邻近错键
       if (enableTypo && Math.random() < 0.03 && /[a-zA-Z0-9]/.test(char)) {
-        const typoChar = String.fromCharCode(char.charCodeAt(0) + 1);
+        const typoChar = pickRealisticAdjacentTypo(char);
         await this.sendCommand('Input.insertText', { text: typoChar });
         // 模拟人眼发现打错了的认知停顿 (160ms ~ 280ms)
-        await new Promise((r) => setTimeout(r, Math.floor(Math.random() * 120) + 160));
+        await this.wait(Math.floor(Math.random() * 120) + 160);
         // 模拟按下物理 Backspace 退格删除 (具备 40ms ~ 70ms 真实物理弹起时间差)
         await this.sendCommand('Input.dispatchKeyEvent', { type: 'rawKeyDown', windowsVirtualKeyCode: 8, code: 'Backspace', key: 'Backspace' });
-        await new Promise((r) => setTimeout(r, Math.floor(Math.random() * 30) + 40));
+        await this.wait(Math.floor(Math.random() * 30) + 40);
         await this.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', windowsVirtualKeyCode: 8, code: 'Backspace', key: 'Backspace' });
         // 修正后短暂停顿
-        await new Promise((r) => setTimeout(r, Math.floor(Math.random() * 80) + 100));
+        await this.wait(Math.floor(Math.random() * 80) + 100);
       }
 
       // 输入真实字符 (支持多国语言、中文及符号)
       if (char === '\n') {
         await this.sendCommand('Input.dispatchKeyEvent', { type: 'rawKeyDown', windowsVirtualKeyCode: 13, code: 'Enter', key: 'Enter', text: '\r', unmodifiedText: '\r' });
-        await new Promise((r) => setTimeout(r, Math.floor(Math.random() * 30) + 40));
+        await this.wait(Math.floor(Math.random() * 30) + 40);
         await this.sendCommand('Input.dispatchKeyEvent', { type: 'char', text: '\r' });
         await this.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', windowsVirtualKeyCode: 13, code: 'Enter', key: 'Enter' });
       } else {
@@ -449,7 +584,7 @@ export class CdpPageClient {
 
       // 字符间自然手部微间隔 (45ms ~ 115ms)
       const charDelay = Math.floor(Math.random() * 70) + 45;
-      await new Promise((r) => setTimeout(r, charDelay));
+      await this.wait(charDelay);
     }
   }
 
@@ -460,6 +595,9 @@ export class CdpPageClient {
   public async clickSelector(selector: string, timeoutMs: number = 6000): Promise<boolean> {
     const startTime = Date.now();
     while (Date.now() - startTime < timeoutMs) {
+      if (this.isClosed) {
+        return false;
+      }
       const rect = await this.evaluate((sel: string) => {
         const el: any = document.querySelector(sel);
         if (!el) return null;
@@ -478,7 +616,7 @@ export class CdpPageClient {
         await this.mouseClick(rect.x, rect.y);
         return true;
       }
-      await new Promise((r) => setTimeout(r, 350));
+      await this.wait(350);
     }
     return false;
   }
@@ -488,20 +626,20 @@ export class CdpPageClient {
    * 彻底解决第三方 Web Component 组件封闭导致的 JS 查找失灵问题
    */
   public async getElementBoxModel(query: string): Promise<{ x: number; y: number; width: number; height: number } | null> {
+    let searchId: string | null = null;
     try {
       const searchRes = await this.sendCommand('DOM.performSearch', {
         query,
         includeUserAgentShadowDOM: true,
       });
+      searchId = searchRes?.searchId || null;
 
-      if (searchRes?.searchId && searchRes.resultCount > 0) {
+      if (searchId && searchRes.resultCount > 0) {
         const results = await this.sendCommand('DOM.getSearchResults', {
-          searchId: searchRes.searchId,
+          searchId,
           fromIndex: 0,
           toIndex: Math.min(searchRes.resultCount, 5),
         });
-
-        await this.sendCommand('DOM.discardSearchResults', { searchId: searchRes.searchId }).catch(() => {});
 
         if (results?.nodeIds && results.nodeIds.length > 0) {
           for (const nodeId of results.nodeIds) {
@@ -521,7 +659,11 @@ export class CdpPageClient {
           }
         }
       }
-    } catch {}
+    } catch {} finally {
+      if (searchId) {
+        await this.sendCommand('DOM.discardSearchResults', { searchId }).catch(() => {});
+      }
+    }
     return null;
   }
 
@@ -591,13 +733,20 @@ export class CdpPageClient {
    */
   public close(): void {
     this.isClosed = true;
+    this.connectPromise = null;
+    for (const abortWait of Array.from(this.activeWaits)) {
+      try {
+        abortWait(new Error('[CdpPageClient] Closed'));
+      } catch {}
+    }
+    this.activeWaits.clear();
     if (this.ws) {
       try {
         this.ws.close();
       } catch {}
       this.ws = null;
     }
-    this.pendingCallbacks.clear();
+    this.rejectAllPending('[CdpPageClient] Closed');
     this.eventListeners.clear();
   }
 
@@ -667,7 +816,12 @@ export class CdpBridgeService {
   /**
    * 快速、精准获取对应平台的 CDP 客户端 (直连 Target WebSocket，0超时)
    */
-  public async getClientForPlatform(platform: 'wechat' | 'xiaohongshu', webContents?: WebContents, timeoutMs: number = 10000): Promise<CdpPageClient> {
+  public async getClientForPlatform(
+    platform: 'wechat' | 'xiaohongshu',
+    webContents?: WebContents,
+    timeoutMs: number = 10000,
+    signal?: AbortSignal
+  ): Promise<CdpPageClient> {
     const startTime = Date.now();
 
     const isPlatformUrl = (url: string) => {
@@ -681,6 +835,9 @@ export class CdpBridgeService {
     };
 
     while (Date.now() - startTime < timeoutMs) {
+      if (signal?.aborted || (webContents && webContents.isDestroyed())) {
+        throw new Error(`[CdpBridge] Aborted waiting for CDP target for ${platform}`);
+      }
       const targets = await this.getTargets();
 
       // 1. 优先匹配明确包含平台关键词且拥有 WebSocket 调试地址的 Target
@@ -729,7 +886,27 @@ export class CdpBridgeService {
         }
       }
 
-      await new Promise((r) => setTimeout(r, 300));
+      if (signal?.aborted || (webContents && webContents.isDestroyed())) {
+        throw new Error(`[CdpBridge] Aborted waiting for CDP target for ${platform}`);
+      }
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          if (signal) signal.removeEventListener('abort', onAbort);
+          resolve();
+        }, 300);
+        const onAbort = () => {
+          clearTimeout(timer);
+          reject(new Error(`[CdpBridge] Aborted waiting for CDP target for ${platform}`));
+        };
+        if (signal) {
+          if (signal.aborted) {
+            clearTimeout(timer);
+            reject(new Error(`[CdpBridge] Aborted waiting for CDP target for ${platform}`));
+            return;
+          }
+          signal.addEventListener('abort', onAbort, { once: true });
+        }
+      });
     }
 
     throw new Error(`[CdpBridge] Timed out waiting for CDP page target for ${platform}`);

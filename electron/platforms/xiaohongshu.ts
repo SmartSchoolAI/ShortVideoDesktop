@@ -221,6 +221,7 @@ export class XiaohongshuPlatform extends BasePlatform {
    * 严格遵守规则：不要一开始就是发布视频页面，必须先判断登录，已登录后再点击新建视频页面
    */
   async navigateToNewPostPage(client: CdpPageClient, tracer: ActionTracer, adapter?: PlatformTabAdapter): Promise<boolean> {
+    const signal = tracer.getSignal();
     await tracer.track(tPlatform('findingPublishEntry', undefined, { btn: '发布笔记/新建视频' }));
 
     // 模拟人工浏览审视主页 1.5 ~ 2.5 秒
@@ -277,7 +278,7 @@ export class XiaohongshuPlatform extends BasePlatform {
         await tracer.track(tPlatform('clickedPublishEntry', undefined, { btn: clickResult.text }), null, 'success');
         // 关键断言：循环等待 URL 真正变更为包含 /publish 的发布页面，并核验是否真正渲染出了发布组件
         for (let i = 0; i < 6; i++) {
-          await sleep(500);
+          await sleep(500, signal);
           const nowUrl = adapter.webContents.getURL();
           if (nowUrl.includes('/publish') && !nowUrl.includes('/new/home')) {
             const hasPublishComponent = await client.evaluate(() => {
@@ -294,23 +295,27 @@ export class XiaohongshuPlatform extends BasePlatform {
         }
       }
 
-      await sleep(1000);
+      await sleep(1000, signal);
     }
 
     // 强力确定性保障：若主页拟人化点击未能促成发布页面渲染，直接导航至发布页确保 100% 进入！
     if (adapter) {
       await tracer.track(tPlatform('fallbackDirectNav'), null, 'info');
       await adapter.loadURL(this.publishUrl);
-      await sleep(2500);
+      await sleep(2500, signal);
       while (adapter.webContents.isLoading()) {
-        await sleep(500);
+        if (signal?.aborted || adapter.isClosed() || tracer.isAborted()) {
+          throw new PublishAbortedError(this.t('tabClosed', undefined, { platform: this.getDisplayName() }));
+        }
+        await sleep(500, signal);
       }
-      await sleep(1000);
+      await sleep(1000, signal);
     }
     return true;
   }
 
   async dismissDialogs(client: CdpPageClient, tracer: ActionTracer): Promise<void> {
+    const signal = tracer.getSignal();
     // 多轮扫描，确保弹窗链（A 弹窗关闭后触发 B 弹窗）也能被处理
     for (let round = 0; round < 5; round++) {
       try {
@@ -367,12 +372,13 @@ export class XiaohongshuPlatform extends BasePlatform {
         if (result.clicked && (result as any).x && (result as any).y) {
           await client.mouseClick((result as any).x, (result as any).y);
           await tracer.track(tPlatform('dismissedDialog', undefined, { btn: result.text }));
-          await sleep(700);
+          await sleep(700, signal);
           // 继续下一轮，确认是否有新弹窗
         } else {
           break; // 无弹窗，退出扫描
         }
-      } catch {
+      } catch (err: any) {
+        if (err instanceof PublishAbortedError || tracer.isAborted()) throw err;
         break;
       }
     }
@@ -506,7 +512,7 @@ export class XiaohongshuPlatform extends BasePlatform {
         // B. 点击上传区域唤起文件选择器 (通过 CDP 硬件物理点击)
         await client.clickSelector('.upload-container, .upload-content, .uploader, [class*="upload"]', 2000).catch(() => { });
 
-        await new Promise((r) => setTimeout(r, 1000));
+        await sleep(1000, tracer.getSignal?.());
 
         // C. 检查无感拦截的文件选择器
         if (interceptedBackendNodeId) {
@@ -540,6 +546,7 @@ export class XiaohongshuPlatform extends BasePlatform {
     tracer: ActionTracer,
     timeoutMs = 30000
   ): Promise<boolean> {
+    const signal = tracer.getSignal();
     const startTime = Date.now();
     const platformName = this.getDisplayName();
     await tracer.track(tPlatform('waitingFormReady', undefined, { platform: platformName }), null, 'info', { persistent: true });
@@ -555,7 +562,7 @@ export class XiaohongshuPlatform extends BasePlatform {
         await tracer.track('✅ 小红书发布表单已加载就绪！', null, 'success');
         return true;
       }
-      await sleep(1000);
+      await sleep(1000, signal);
     }
     return false;
   }
@@ -564,6 +571,7 @@ export class XiaohongshuPlatform extends BasePlatform {
    * 检查并配置小红书发布高级选项（原创声明、AI创作声明、定时发布等）
    */
   async configurePublishOptions(client: CdpPageClient, tracer: ActionTracer, payload?: PublishPayload): Promise<void> {
+    const signal = tracer.getSignal();
     await tracer.track('⚙️ 开始检查并配置小红书高级发布选项 (原创声明 / AI创作声明 / 定时发布)...');
 
     // 1. 全容器平滑滚动到底部，确保延迟加载的设置组件完整呈现在视口中
@@ -579,7 +587,7 @@ export class XiaohongshuPlatform extends BasePlatform {
         }
       } catch { }
     });
-    await sleep(800);
+    await sleep(800, signal);
 
     // 2. 检查是否有折叠的“高级设置”或“更多设置”并通过物理鼠标展开
     const expandCoord = await client.evaluate(() => {
@@ -600,7 +608,7 @@ export class XiaohongshuPlatform extends BasePlatform {
     if (expandCoord && expandCoord.x && expandCoord.y) {
       await client.mouseClick(expandCoord.x, expandCoord.y);
     }
-    await sleep(600);
+    await sleep(600, signal);
 
     // 3. 处理【原创声明】
     await tracer.track('正在检查并处理【原创声明】...');
@@ -679,7 +687,7 @@ export class XiaohongshuPlatform extends BasePlatform {
 
       if (!origLocation || !origLocation.found) {
         await tracer.track(`⚠️ 第 ${attempt} 次探测未找到【原创声明】控件，稍候重试...`, origLocation, 'warn');
-        await sleep(1000);
+        await sleep(1000, signal);
         continue;
       }
 
@@ -694,7 +702,7 @@ export class XiaohongshuPlatform extends BasePlatform {
       await client.mouseClick(origLocation.x, origLocation.y, { delayMs: 120 });
 
       // 点击后等待弹窗出现（小红书通常会弹出 .creator-modal-style 权益须知确认框）
-      await sleep(1500);
+      await sleep(1500, signal);
 
       // 4. 检查是否有原创协议声明确认弹窗（.creator-modal-style / .d-modal / .d-new-modal 等）
       // 注意：fixed 布局的模态弹窗在所有标准浏览器中 offsetParent 均为 null，绝对不能用 offsetParent 判定可见性！
@@ -810,7 +818,7 @@ export class XiaohongshuPlatform extends BasePlatform {
         if (!dialogInfo.hasModal) {
           // 首次未检测到先等待 500ms 重试，连续未检测到则判定为无弹窗直接生效
           if (poll < 2) {
-            await sleep(500);
+            await sleep(500, signal);
             continue;
           }
           break;
@@ -819,12 +827,12 @@ export class XiaohongshuPlatform extends BasePlatform {
         // 如果需要勾选“我已阅读并同意”
         if (dialogInfo.needAgree && dialogInfo.agreeCoord) {
           await tracer.track('📜 检测到原创权益须知弹窗，正在勾选【我已阅读并同意《原创声明须知》】...');
-          await sleep(400); // 模拟人类阅读协议停顿
-          await client.mouseClick(dialogInfo.agreeCoord.x, dialogInfo.agreeCoord.y, { delayMs: 120 });
-          await sleep(500);
+          await sleep(getRandomDelay(380, 620), tracer.getSignal?.()); // 模拟人类阅读协议停顿
+          await client.mouseClick(dialogInfo.agreeCoord.x, dialogInfo.agreeCoord.y, { delayMs: getRandomDelay(95, 150) });
+          await sleep(getRandomDelay(450, 700), tracer.getSignal?.());
 
-          // 双保险：若 Vue 响应式状态由于事件代理未触发更新，主动触发底层事件与属性变更
-          await client.evaluate(() => {
+          // 双保险：若初次点击因动画过渡未命中复选框文字/方框本体，再通过精确计算 simulator 物理坐标补点一次（绝不派发合成 DOM 事件）
+          const retryAgreeCoord = await client.evaluate(() => {
             const candidateModals = Array.from(
               document.querySelectorAll('.creator-modal-style, .d-modal, .d-new-modal, [class*="modal"], [role="dialog"]')
             ) as HTMLElement[];
@@ -832,51 +840,55 @@ export class XiaohongshuPlatform extends BasePlatform {
               const s = window.getComputedStyle(m);
               return s.display !== 'none' && s.visibility !== 'hidden' && (m.textContent || '').includes('原创');
             });
-            if (!modal) return;
+            if (!modal) return null;
 
-            let cb = (modal.querySelector('.footerLeft .d-checkbox, .d-checkbox') ||
-              modal.querySelector('label')) as HTMLElement | null;
-            if (!cb) {
-              const allCandidates = Array.from(modal.querySelectorAll('label, div, span')) as HTMLElement[];
-              cb = allCandidates.find((el) => (el.textContent || '').includes('阅读并同意')) || null;
+            const cb = (modal.querySelector('.footerLeft .d-checkbox, .d-checkbox') ||
+              modal.querySelector('label') ||
+              Array.from(modal.querySelectorAll('label, div, span')).find((el) => (el.textContent || '').includes('阅读并同意'))) as HTMLElement | null;
+            if (!cb) return null;
+
+            const input = cb.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+            const isChecked = Boolean(
+              input?.checked ||
+              cb.classList.contains('checked') ||
+              cb.classList.contains('is-checked') ||
+              cb.querySelector('.checked, .is-checked')
+            );
+            if (isChecked) return null;
+
+            const sim = cb.querySelector('.d-checkbox-simulator, [class*="simulator"]') as HTMLElement | null;
+            const target = sim || cb;
+            const r = target.getBoundingClientRect();
+            if (r.width > 0 && r.height > 0) {
+              return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
             }
+            return null;
+          }).catch(() => null);
 
-            if (cb) {
-              const input = cb.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
-              if (input) {
-                input.checked = true;
-                input.dispatchEvent(new Event('input', { bubbles: true }));
-                input.dispatchEvent(new Event('change', { bubbles: true }));
-              }
-              const sim = cb.querySelector('.d-checkbox-simulator, [class*="simulator"]') as HTMLElement | null;
-              const target = sim || cb;
-              ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach((evtType) => {
-                target.dispatchEvent(new MouseEvent(evtType, { bubbles: true, cancelable: true, view: window }));
-              });
-              cb.click();
-            }
-          }).catch(() => { });
+          if (retryAgreeCoord) {
+            await client.mouseClick(retryAgreeCoord.x, retryAgreeCoord.y, { delayMs: getRandomDelay(80, 140) });
+          }
 
-          await sleep(600); // 等待“声明原创”按钮解除 disabled
+          await sleep(600, tracer.getSignal?.()); // 等待“声明原创”按钮解除 disabled
           continue; // 下一轮循环检查按钮是否变为可用状态
         }
 
         // 如果弹窗中有确认按钮且已解除禁用
         if (dialogInfo.hasBtn && dialogInfo.btnCoord) {
           if (dialogInfo.btnDisabled) {
-            await sleep(500);
+            await sleep(500, signal);
             continue;
           }
 
           await tracer.track(`🖱️ 正在点击【${dialogInfo.btnText || '声明原创'}】确认按钮...`);
-          await sleep(getRandomDelay(320, 560)); // 模拟人类确认前微小停顿
+          await sleep(getRandomDelay(320, 560), signal); // 模拟人类确认前微小停顿
           const origBtnX = dialogInfo.btnCoord.x + Math.round((Math.random() - 0.5) * 4);
           const origBtnY = dialogInfo.btnCoord.y + Math.round((Math.random() - 0.5) * 4);
           await client.mouseClick(origBtnX, origBtnY, { delayMs: getRandomDelay(90, 150) });
 
           // 核心断言：循环等待弹窗彻底关闭
           for (let w = 0; w < 10; w++) {
-            await sleep(getRandomDelay(320, 520));
+            await sleep(getRandomDelay(320, 520), signal);
             const modalStillVisible = await client.evaluate(() => {
               const candidateModals = Array.from(
                 document.querySelectorAll('.creator-modal-style, .d-modal, .d-new-modal, [class*="modal"], [role="dialog"]')
@@ -898,11 +910,11 @@ export class XiaohongshuPlatform extends BasePlatform {
           break;
         }
 
-        await sleep(500);
+        await sleep(500, signal);
       }
 
-      // 安全兜底防护：如果轮询结束后弹窗依然未关闭，强制点击右上角关闭按钮 [X] 或 Esc 键，绝不让模态遮罩阻挡后续流程！
-      await client.evaluate(() => {
+      // 安全兜底防护：如果轮询结束后弹窗依然未关闭，获取右上角关闭按钮 [X] 真实物理坐标点击或按 Esc 键
+      const xhsCloseCoord = await client.evaluate(() => {
         const candidateModals = Array.from(
           document.querySelectorAll('.creator-modal-style, .d-modal, .d-new-modal, [class*="modal"], [role="dialog"]')
         ) as HTMLElement[];
@@ -914,17 +926,23 @@ export class XiaohongshuPlatform extends BasePlatform {
         });
 
         if (openModal) {
-          // 查找右上角关闭图标/按钮
           const closeBtn = openModal.querySelector(
-            '.d-modal-close, [class*="close"], [aria-label*="close"], button:has(svg), svg'
+            '.d-modal-close, [class*="close"], [aria-label*="close"], button:has(svg)'
           ) as HTMLElement | null;
           if (closeBtn) {
-            closeBtn.click();
+            const r = closeBtn.getBoundingClientRect();
+            if (r.width > 0 && r.height > 0) {
+              return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+            }
           }
         }
-      }).catch(() => { });
+        return null;
+      }).catch(() => null);
+      if (xhsCloseCoord) {
+        await client.mouseClick(xhsCloseCoord.x, xhsCloseCoord.y, { delayMs: getRandomDelay(60, 120) }).catch(() => { });
+      }
       await client.pressKey('Escape').catch(() => { });
-      await sleep(600);
+      await sleep(600, signal);
 
       // 5. 回检【原创声明】是否成功生效（必须保证弹窗已关闭且开关为开启状态）
       const verifyResult = await client.evaluate(() => {
@@ -964,7 +982,7 @@ export class XiaohongshuPlatform extends BasePlatform {
         break;
       } else {
         await tracer.track(`⚠️ 第 ${attempt} 次配置【原创声明】后回检未生效，准备重试...`, null, 'warn');
-        await sleep(1200);
+        await sleep(1200, signal);
       }
     }
 
@@ -1081,13 +1099,13 @@ export class XiaohongshuPlatform extends BasePlatform {
 
         await tracer.track(`🖱️ 正在模拟微随机物理鼠标点击展开【添加内容类型声明】(第 ${attempt} 次: ${clickX}, ${clickY})...`);
         await client.mouseMove(clickX, clickY);
-        await sleep(80);
+        await sleep(80, signal);
         await client.mouseClick(clickX, clickY, { delayMs: 100 });
 
         // B. 轮询等待下拉选项弹层（.d-select-dropdown / 全局 options 菜单）呈现
         let optionInfo: { x: number; y: number; text: string } | null = null;
         for (let poll = 0; poll < 12; poll++) {
-          await sleep(250);
+          await sleep(250, signal);
           optionInfo = await client.evaluate((keywords: string[]) => {
             const isVisible = (el: HTMLElement | null): boolean => {
               if (!el) return false;
@@ -1148,10 +1166,10 @@ export class XiaohongshuPlatform extends BasePlatform {
           const optY = optionInfo.y + randomJitter(2);
           await tracer.track(`🎯 锁定下拉选项【${optionInfo.text || TARGET_TEXT}】，发起拟人物理鼠标点击 (${optX}, ${optY})...`);
           await client.mouseMove(optX, optY);
-          await sleep(getRandomDelay(65, 130));
+          await sleep(getRandomDelay(65, 130), signal);
           await client.mouseClick(optX, optY, { delayMs: getRandomDelay(80, 140) });
 
-          await sleep(getRandomDelay(650, 980));
+          await sleep(getRandomDelay(650, 980), signal);
 
           // D. 确认回检是否生效
           const isConfirmed = await client.evaluate((keywords: string[]) => {
@@ -1178,11 +1196,11 @@ export class XiaohongshuPlatform extends BasePlatform {
             break;
           } else {
             await tracer.track(`⚠️ 第 ${attempt} 次点击选项后回检尚未更新，准备重试...`, null, 'warn');
-            await sleep(800);
+            await sleep(800, signal);
           }
         } else {
           await tracer.track(`⚠️ 未能在下拉列表中定位到【${TARGET_TEXT}】选项，微调坐标重试 (第 ${attempt} 次)...`, null, 'warn');
-          await sleep(600);
+          await sleep(600, signal);
         }
       }
 
@@ -1190,6 +1208,7 @@ export class XiaohongshuPlatform extends BasePlatform {
         await tracer.track('ℹ️ 【AI创作声明】配置已尽最大努力尝试，继续后续发布流程', null, 'info');
       }
     } catch (e: any) {
+      if (e instanceof PublishAbortedError || tracer.isAborted()) throw e;
       await tracer.track(`⚠️ 【AI创作声明】处理异常: ${e?.message || e}`, null, 'warn');
     }
 
@@ -1219,7 +1238,7 @@ export class XiaohongshuPlatform extends BasePlatform {
 
         if (timedCoord && timedCoord.found && timedCoord.x && timedCoord.y) {
           await client.mouseClick(timedCoord.x, timedCoord.y);
-          await sleep(600);
+          await sleep(600, signal);
 
           // 尝试查找并点击激活日期时间输入控件
           const dateInputCoord = await client.evaluate(() => {
@@ -1235,7 +1254,7 @@ export class XiaohongshuPlatform extends BasePlatform {
 
           if (dateInputCoord.found && dateInputCoord.x && dateInputCoord.y) {
             await client.mouseClick(dateInputCoord.x, dateInputCoord.y);
-            await sleep(400);
+            await sleep(400, signal);
           }
 
           await tracer.track(`✅ 已切换为小红书定时发布模式 (${timeStr})`, null, 'success');
@@ -1244,6 +1263,7 @@ export class XiaohongshuPlatform extends BasePlatform {
         await tracer.track('⚡ [定时发布] 未指定计划发布时间，保持【立即发布】模式', null, 'info');
       }
     } catch (e: any) {
+      if (e instanceof PublishAbortedError || tracer.isAborted()) throw e;
       await tracer.track(`⚠️ [定时发布] 处理略过: ${e?.message || e}`, null, 'warn');
     }
 
@@ -1251,7 +1271,7 @@ export class XiaohongshuPlatform extends BasePlatform {
     await client.evaluate(() => {
       window.scrollTo({ top: document.body.scrollHeight, behavior: 'auto' });
     });
-    await sleep(500);
+    await sleep(500, signal);
   }
 
   /**
@@ -1265,6 +1285,13 @@ export class XiaohongshuPlatform extends BasePlatform {
     lang?: string
   ): Promise<PlatformPublishResult> {
     const activeLang = this.getCurrentLang(lang);
+    if (this.isPublishing()) {
+      return {
+        success: false,
+        platform: 'xiaohongshu',
+        message: this.t('publishAlreadyRunning', activeLang, { platform: this.getDisplayName(activeLang) }),
+      };
+    }
     this.currentAbortController = new AbortController();
     const signal = this.currentAbortController.signal;
     let client: CdpPageClient | null = null;
@@ -1358,7 +1385,6 @@ export class XiaohongshuPlatform extends BasePlatform {
       }
 
     // 2. 第二步：确认登录成功后，建立或刷新 CDP 客户端
-    let client: CdpPageClient;
     try {
       client = await adapter.getCdpClient();
       tracer.setClient(client);
@@ -1384,14 +1410,18 @@ export class XiaohongshuPlatform extends BasePlatform {
       await sleep(1000, signal);
     }
 
-    // 页面进入发布页后，刷新 CDP 连接避免旧 Target 销毁
+    // 页面进入发布页后，刷新 CDP 连接避免旧 Target 销毁（先安全关闭旧连接防止 WebSocket 泄漏）
     await sleep(1000, signal);
     while (adapter.webContents.isLoading()) {
       await sleep(500, signal);
     }
     try {
-      client = await adapter.getCdpClient();
-      tracer.setClient(client);
+      const refreshedClient = await adapter.getCdpClient();
+      if (refreshedClient && refreshedClient !== client) {
+        try { client?.close(); } catch {}
+        client = refreshedClient;
+        tracer.setClient(client);
+      }
     } catch { }
 
     // 4. 第四步：严格等待发布页面脱离白屏、组件渲染完成
@@ -1430,7 +1460,7 @@ export class XiaohongshuPlatform extends BasePlatform {
     if (tabCoord && tabCoord.x && tabCoord.y) {
       await client.mouseClick(tabCoord.x, tabCoord.y);
     }
-    await sleep(600);
+    await sleep(600, signal);
 
     if (localVideoPath && fs.existsSync(localVideoPath)) {
       const uploaded = await this.uploadVideoViaCdp(client, localVideoPath, tracer);
@@ -1678,12 +1708,12 @@ export class XiaohongshuPlatform extends BasePlatform {
 
             if (uploadState.reuploadCoord) {
               await client.mouseClick(uploadState.reuploadCoord.x, uploadState.reuploadCoord.y);
-              await sleep(1000);
+              await sleep(1000, signal);
             }
 
             await tracer.track('正在重新注入本地短视频素材并等待上传...');
             await this.uploadVideoViaCdp(client, localVideoPath, tracer);
-            await sleep(3000);
+            await sleep(3000, signal);
             i = 0; // 重置计数器，重新进入等待
             uploadActiveStart = Date.now();
             continue;
@@ -1783,7 +1813,9 @@ export class XiaohongshuPlatform extends BasePlatform {
         } else if (pageHealth?.hasError) {
           await tracer.track(`⚠️ 检测到表单提示项: ${pageHealth.errorMsg || '请核对表单输入'}`, null, 'warn');
         }
-      } catch { }
+      } catch (err: any) {
+        if (err instanceof PublishAbortedError || tracer.isAborted()) throw err;
+      }
       await sleep(1500, signal);
     }
 
@@ -1870,11 +1902,11 @@ export class XiaohongshuPlatform extends BasePlatform {
               await tracer.track(`⚠️ [发布前最终检查] 检测到视频上传失败，正在执行重新上传 (第 ${finalRetryCount} 次)...`, null, 'warn', { persistent: true });
               if (uploadState.reuploadCoord) {
                 await client.mouseClick(uploadState.reuploadCoord.x, uploadState.reuploadCoord.y);
-                await sleep(1000);
+                await sleep(1000, signal);
               }
               await tracer.track('正在重新注入本地短视频素材，等待重新上传启动...');
               await this.uploadVideoViaCdp(client, localVideoPath, tracer);
-              await sleep(5000); // 多等 5 秒让上传真正启动后再轮询
+              await sleep(5000, signal); // 多等 5 秒让上传真正启动后再轮询
               fwait = -1; // 修正：continue 后 fwait++ 使其从 0 重新开始完整轮询
               continue;
             } else {
@@ -1893,7 +1925,9 @@ export class XiaohongshuPlatform extends BasePlatform {
           // 上传已完成且无失败标志，可以继续发布
           finalUploadOk = true;
           break;
-        } catch { }
+        } catch (err: any) {
+          if (err instanceof PublishAbortedError || tracer.isAborted()) throw err;
+        }
         await sleep(2000, signal);
       }
 
@@ -1906,6 +1940,52 @@ export class XiaohongshuPlatform extends BasePlatform {
       // ────────────────────────────────────────────────────────────────────────────
 
       await tracer.track('正在精准定位小红书【发布】按钮并自动点击提交...');
+      let publishNetworkState: { status: 'idle' | 'success' | 'error'; msg: string } = { status: 'idle', msg: '' };
+      const trackedPublishRequestIds = new Set<string>();
+      const onPublishNetworkResponse = (params: any) => {
+        try {
+          const reqUrl = String(params?.response?.url || '');
+          const reqId = String(params?.requestId || '');
+          if (
+            reqId &&
+            (reqUrl.includes('/publish') ||
+              reqUrl.includes('/post') ||
+              reqUrl.includes('/item/video') ||
+              reqUrl.includes('/item/note') ||
+              reqUrl.includes('/creator/note'))
+          ) {
+            trackedPublishRequestIds.add(reqId);
+          }
+        } catch {}
+      };
+      const onPublishLoadingFinished = (params: any) => {
+        const reqId = String(params?.requestId || '');
+        if (!reqId || !trackedPublishRequestIds.has(reqId)) return;
+        trackedPublishRequestIds.delete(reqId);
+        client?.sendCommand('Network.getResponseBody', { requestId: reqId }, 5000)
+          .then((bodyRes) => {
+            try {
+              const rawBody = bodyRes?.base64Encoded
+                ? Buffer.from(bodyRes.body || '', 'base64').toString('utf8')
+                : String(bodyRes?.body || '');
+              const data = JSON.parse(rawBody);
+              if (data && (data.code === 0 || data.success === true || data.data?.note_id || data.data?.id)) {
+                publishNetworkState = { status: 'success', msg: '' };
+              } else if (data && typeof data.code === 'number' && data.code !== 0) {
+                publishNetworkState = { status: 'error', msg: data.msg || data.message || '发布接口返回异常' };
+              }
+            } catch {}
+          })
+          .catch(() => {});
+      };
+      const onPublishLoadingFailed = (params: any) => {
+        const reqId = String(params?.requestId || '');
+        if (reqId) trackedPublishRequestIds.delete(reqId);
+      };
+      client.on('Network.responseReceived', onPublishNetworkResponse);
+      client.on('Network.loadingFinished', onPublishLoadingFinished);
+      client.on('Network.loadingFailed', onPublishLoadingFailed);
+      await client.sendCommand('Network.enable').catch(() => {});
       try {
         const pubBtnCoord = await client.evaluate(() => {
           // 辅助函数：判断元素是否在视口可见
@@ -2078,57 +2158,7 @@ export class XiaohongshuPlatform extends BasePlatform {
           await sleep(getRandomDelay(850, 1250), signal);
         }
 
-        // 注入发布接口轻量透明监听器（用于 100% 精准捕获小红书后端真实返回结果）
-        await client.evaluate(() => {
-          if ((window as any).__xhs_publish_interceptor_installed__) return;
-          (window as any).__xhs_publish_interceptor_installed__ = true;
-          (window as any).__xhs_publish_state__ = { status: 'idle', time: 0, code: null, msg: '' };
-
-          try {
-            const origFetch = window.fetch;
-            window.fetch = async function(...args) {
-              const res = await origFetch.apply(this, args);
-              try {
-                const url = typeof args[0] === 'string' ? args[0] : ((args[0] as any)?.url || '');
-                if (url.includes('/publish') || url.includes('/post') || url.includes('/item/video') || url.includes('/item/note') || url.includes('/creator/note')) {
-                  const clone = res.clone();
-                  clone.json().then((data: any) => {
-                    if (data && (data.code === 0 || data.success === true || data.data?.note_id || data.data?.id)) {
-                      (window as any).__xhs_publish_state__ = { status: 'success', time: Date.now(), data };
-                    } else if (data && typeof data.code === 'number' && data.code !== 0) {
-                      (window as any).__xhs_publish_state__ = { status: 'error', time: Date.now(), msg: data.msg || data.message || '发布接口返回异常' };
-                    }
-                  }).catch(() => {});
-                }
-              } catch (e) {}
-              return res;
-            };
-
-            const origOpen = XMLHttpRequest.prototype.open;
-            const origSend = XMLHttpRequest.prototype.send;
-            XMLHttpRequest.prototype.open = function(method: string, url: string) {
-              (this as any).__xhr_url = url;
-              return origOpen.apply(this, arguments as any);
-            };
-            XMLHttpRequest.prototype.send = function() {
-              this.addEventListener('load', function() {
-                try {
-                  const url = (this as any).__xhr_url || '';
-                  if (url.includes('/publish') || url.includes('/post') || url.includes('/item/video') || url.includes('/item/note') || url.includes('/creator/note')) {
-                    const data = JSON.parse(this.responseText);
-                    if (data && (data.code === 0 || data.success === true || data.data?.note_id || data.data?.id)) {
-                      (window as any).__xhs_publish_state__ = { status: 'success', time: Date.now(), data };
-                    } else if (data && typeof data.code === 'number' && data.code !== 0) {
-                      (window as any).__xhs_publish_state__ = { status: 'error', time: Date.now(), msg: data.msg || data.message || '发布接口返回异常' };
-                    }
-                  }
-                } catch (e) {}
-              });
-              return origSend.apply(this, arguments as any);
-            };
-          } catch (e) {}
-        }).catch(() => {});
-
+        // 通过非侵入式 CDP Network 协议捕获小红书后端发布接口真实结果（不在页面注入任何 fetch/XHR 钩子）
         // 严谨状态轮询：等待小红书发布完成（支持定时发布与即时发布），严格检测页面错误与成功反馈
         let publishSuccessConfirmed = false;
         let publishErrorMessage = '';
@@ -2140,7 +2170,7 @@ export class XiaohongshuPlatform extends BasePlatform {
             throw new PublishAbortedError(this.t('tabClosed', activeLang, { platform: this.getDisplayName(activeLang) }), activeLang);
           }
 
-          const publishCheck = await client.evaluate(() => {
+          const domCheck = await client.evaluate(() => {
             const curUrl = window.location.href;
 
             // 穿透 Shadow DOM 的全页面文本提取函数
@@ -2171,12 +2201,6 @@ export class XiaohongshuPlatform extends BasePlatform {
               const r = el.getBoundingClientRect();
               return r.width > 0 && r.height > 0;
             };
-
-            // 0. 网络拦截器直接凭据（若小红书后端接口已明确返回成功）
-            const netState = (window as any).__xhs_publish_state__;
-            const isNetworkSuccess = Boolean(netState && netState.status === 'success');
-            const isNetworkError = Boolean(netState && netState.status === 'error');
-            const networkErrorMsg = netState?.msg || '';
 
             // 1. 精准检测可见的表单错误提示（红字校验）
             const errorSelectors = [
@@ -2255,12 +2279,10 @@ export class XiaohongshuPlatform extends BasePlatform {
               }
             }
 
-            const hasError = isNetworkError || visibleErrorTexts.length > 0 || Boolean(toastError) || Boolean(modalError) || Boolean(matchedErrorKeyword);
-            const errorDetail = isNetworkError
-              ? networkErrorMsg
-              : (visibleErrorTexts.length > 0
-                ? visibleErrorTexts.join('；')
-                : (toastError || modalError || matchedErrorKeyword));
+            const hasDomError = visibleErrorTexts.length > 0 || Boolean(toastError) || Boolean(modalError) || Boolean(matchedErrorKeyword);
+            const domErrorDetail = visibleErrorTexts.length > 0
+              ? visibleErrorTexts.join('；')
+              : (toastError || modalError || matchedErrorKeyword);
 
             // 4. 成功特征匹配（多维度覆盖）：
             // a) URL 路由发生跳转（离开单纯的发布页或进入内容列表/首页/管理页）
@@ -2339,8 +2361,7 @@ export class XiaohongshuPlatform extends BasePlatform {
             const isSubmitLoading = Boolean(xhsHost && xhsHost.getAttribute('submit-loading') === 'true');
             const isSubmitDisabled = Boolean(xhsHost && xhsHost.getAttribute('submit-disabled') === 'true');
 
-            const hasConfirmedSuccess = Boolean(
-              isNetworkSuccess ||
+            const hasDomSuccess = Boolean(
               isLeftPublishPage ||
               toastSuccess ||
               successDomFound ||
@@ -2348,16 +2369,26 @@ export class XiaohongshuPlatform extends BasePlatform {
             );
 
             return {
-              hasSuccess: hasConfirmedSuccess && !hasError,
-              hasError,
-              errorDetail,
+              hasDomSuccess,
+              hasDomError,
+              domErrorDetail,
               isSubmitLoading,
               isSubmitDisabled,
               curUrl,
               matchedSuccessKeyword,
-              isNetworkSuccess,
             };
           }).catch(() => null);
+
+          const isNetworkSuccess = publishNetworkState.status === 'success';
+          const isNetworkError = publishNetworkState.status === 'error';
+          const publishCheck = {
+            hasError: isNetworkError || Boolean(domCheck?.hasDomError),
+            errorDetail: isNetworkError ? publishNetworkState.msg : (domCheck?.domErrorDetail || ''),
+            hasSuccess: (isNetworkSuccess || Boolean(domCheck?.hasDomSuccess)) && !(isNetworkError || Boolean(domCheck?.hasDomError)),
+            isSubmitLoading: Boolean(domCheck?.isSubmitLoading),
+            matchedSuccessKeyword: domCheck?.matchedSuccessKeyword || '',
+            isNetworkSuccess,
+          };
 
           // 一旦检测到明确的异常错误信息提示，立即判定为发布失败
           if (publishCheck?.hasError) {
@@ -2392,21 +2423,22 @@ export class XiaohongshuPlatform extends BasePlatform {
 
         // 终极保底检查（防止循环结束瞬间刚刚完成渲染或已跳转）
         if (!publishSuccessConfirmed && !publishErrorMessage) {
-          const finalCheck = await client.evaluate(() => {
+          const finalDomCheck = await client.evaluate(() => {
             const bodyText = document.body ? (document.body.innerText || '') : '';
             const curUrl = window.location.href;
-            const netState = (window as any).__xhs_publish_state__;
-            const isNetOk = Boolean(netState && netState.status === 'success');
             const hasSuccessWord = /(发布成功|发表成功|笔记发布成功|定时成功|已发布|已提交|查看笔记|继续发布|作品管理|内容管理)/.test(bodyText);
             const isLeftPage = !curUrl.includes('/publish/publish');
             const hasErrorWord = /(发布失败|包含违规|已被封禁|已被限制)/.test(bodyText);
             return {
-              isSuccess: (isNetOk || hasSuccessWord || isLeftPage) && !hasErrorWord,
+              hasDomSuccess: hasSuccessWord || isLeftPage,
+              hasDomError: hasErrorWord,
               bodySample: bodyText.slice(0, 150),
             };
           }).catch(() => null);
 
-          if (finalCheck?.isSuccess) {
+          const isNetOk = publishNetworkState.status === 'success';
+          const isNetErr = publishNetworkState.status === 'error';
+          if ((isNetOk || finalDomCheck?.hasDomSuccess) && !isNetErr && !finalDomCheck?.hasDomError) {
             publishSuccessConfirmed = true;
             await tracer.track('✅ 终极状态核验确认小红书已成功提交发布！', null, 'success');
           }
@@ -2442,6 +2474,12 @@ export class XiaohongshuPlatform extends BasePlatform {
           platform: 'xiaohongshu',
           message: this.t('publishFailed', activeLang, { platform: this.getDisplayName(activeLang), error: err.message }),
         };
+      } finally {
+        client?.off('Network.responseReceived', onPublishNetworkResponse);
+        client?.off('Network.loadingFinished', onPublishLoadingFinished);
+        client?.off('Network.loadingFailed', onPublishLoadingFailed);
+        trackedPublishRequestIds.clear();
+        client?.sendCommand('Network.disable').catch(() => {});
       }
     }
 

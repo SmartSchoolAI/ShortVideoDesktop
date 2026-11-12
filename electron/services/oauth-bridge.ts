@@ -39,6 +39,7 @@ class OAuthBridgeService {
   private idleTimer: NodeJS.Timeout | null = null;
   private shutdownTimer: NodeJS.Timeout | null = null;
   private pendingStates: Map<string, number> = new Map();
+  private listenRetries: number = 0;
 
   private getAuthCacheFilePath(): string {
     try {
@@ -54,7 +55,7 @@ class OAuthBridgeService {
     try {
       const file = this.getAuthCacheFilePath();
       if (file) {
-        fs.writeFileSync(file, JSON.stringify(auth), 'utf8');
+        fs.writeFileSync(file, JSON.stringify(auth), { encoding: 'utf8', mode: 0o600 });
       }
     } catch {}
   }
@@ -127,6 +128,7 @@ class OAuthBridgeService {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ state, code_verifier: verifier }),
+          signal: AbortSignal.timeout(10000),
         });
 
         if (!res.ok) return;
@@ -162,6 +164,7 @@ class OAuthBridgeService {
     };
 
     this.savePendingAuth(auth);
+    this.registerPendingState(state);
     this.startPolling(state, verifier);
 
     return { state, verifier, challenge };
@@ -206,13 +209,18 @@ class OAuthBridgeService {
   }
 
   /**
-   * 校验回调返回的 state 是否由客户端发起
+   * 校验回调返回的 state 是否由客户端发起（严格 fail-closed：无有效待验证 state 一律拒绝）
    */
   public isValidState(state: string | null): boolean {
-    if (!state) return false;
+    if (!state || typeof state !== 'string') return false;
+    const trimmed = state.trim();
+    if (!trimmed) return false;
     this.cleanExpiredStates();
-    if (this.pendingStates.size === 0) return true; // 若未预先注册则宽容兼容
-    return this.pendingStates.has(state);
+    if (this.pendingStates.has(trimmed)) {
+      return true;
+    }
+    const pending = this.loadPendingAuth();
+    return Boolean(pending && pending.state === trimmed);
   }
 
   /**
@@ -744,6 +752,7 @@ class OAuthBridgeService {
                 redirect_uri: redirectUri,
                 state: state || 'zh_google',
               }),
+              signal: AbortSignal.timeout(15000),
             });
 
             let responseData: any = null;
@@ -805,10 +814,9 @@ class OAuthBridgeService {
           this.cleanExpiredStates();
           const pending = this.loadPendingAuth();
           const stateOk = Boolean(
-            (state && this.isValidState(state)) ||
-            (state && pending && pending.state === state)
+            state && (this.isValidState(state) || (pending && pending.state === state))
           );
-          if (!stateOk && (this.pendingStates.size > 0 || !pending)) {
+          if (!stateOk) {
             console.warn('[OAuthBridge] Token 直传回调缺少有效 State/PendingAuth，拒绝跨站会话注入');
             const csrfHtml = this.renderAuthResultHtml(
               false,
@@ -874,23 +882,45 @@ class OAuthBridgeService {
           return;
         }
 
-        let body = '';
-        req.on('data', (chunk) => {
-          body += chunk;
-          if (body.length > 1024 * 1024) {
+        const chunks: Buffer[] = [];
+        let totalBytes = 0;
+        let payloadTooLarge = false;
+
+        req.on('error', (err) => {
+          console.warn('[OAuthBridge] POST 请求流读取异常:', err?.message || err);
+        });
+
+        req.on('data', (chunk: Buffer | string) => {
+          if (payloadTooLarge) return;
+          const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          totalBytes += buf.length;
+          if (totalBytes > 1024 * 1024) {
+            payloadTooLarge = true;
+            if (!res.headersSent) {
+              res.writeHead(413, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: false, error: 'Payload Too Large' }));
+            }
             req.destroy();
+            return;
           }
+          chunks.push(buf);
         });
 
         req.on('end', async () => {
+          if (payloadTooLarge || res.writableEnded) return;
           try {
-            const data = JSON.parse(body);
+            const rawBody = Buffer.concat(chunks).toString('utf8');
+            const data = JSON.parse(rawBody);
+            if (!data || typeof data !== 'object' || Array.isArray(data)) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: false, error: 'Invalid payload' }));
+              return;
+            }
             const dataState = typeof data?.state === 'string' ? data.state.trim() : '';
             const pending = this.loadPendingAuth();
             const isOriginOwnSite = Boolean(reqOrigin && isOwnSiteUrl(reqOrigin));
             const hasValidPendingState = Boolean(
-              (dataState && (this.isValidState(dataState) || (pending && pending.state === dataState))) ||
-              (!reqOrigin && (pending || this.pendingStates.size > 0))
+              dataState && (this.isValidState(dataState) || (pending && pending.state === dataState))
             );
 
             if (!isOriginOwnSite && !hasValidPendingState) {
@@ -941,7 +971,12 @@ class OAuthBridgeService {
 
     this.server.on('error', (err: any) => {
       console.warn(`[OAuthBridge] HTTP 监听端口 ${this.port} 异常:`, err?.message || err);
-      if (err.code === 'EADDRINUSE') {
+      if (err.code === 'EADDRINUSE' && this.server) {
+        if (this.listenRetries >= 5) {
+          console.warn('[OAuthBridge] 已达到端口冲突最大重试次数 (5次)，停止绑定尝试');
+          return;
+        }
+        this.listenRetries++;
         this.port = 39282 + Math.floor(Math.random() * 50);
         try {
           this.server?.listen(this.port, '127.0.0.1');
@@ -950,7 +985,9 @@ class OAuthBridgeService {
     });
 
     try {
+      this.listenRetries = 0;
       this.server.listen(this.port, '127.0.0.1', () => {
+        this.listenRetries = 0;
         this.isListening = true;
         console.log(`[OAuthBridge] 本地认证同步服务已就绪: http://127.0.0.1:${this.port}`);
       });

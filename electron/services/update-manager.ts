@@ -4,6 +4,8 @@ import { app, ipcMain, Notification, dialog, shell } from 'electron';
 import { autoUpdater, UpdateInfo } from 'electron-updater';
 import { APP_CONFIG } from '../config';
 import { getLocale, formatI18n } from '../utils/i18n';
+import { isTrustedIpcSender } from '../utils/ipc-security';
+import { isSafeHttpTargetUrl } from '../utils/url-safety';
 import { windowManager } from './window-manager';
 
 export interface UpdateStatusState {
@@ -27,10 +29,14 @@ export class UpdateManager {
     bytesPerSecond: 0,
     error: null,
   };
+  private startupTimer: NodeJS.Timeout | null = null;
   private checkIntervalTimer: NodeJS.Timeout | null = null;
   private isInitialized: boolean = false;
   private isManualCheck: boolean = false;
   private silentDialog: boolean = false;
+  private isChecking: boolean = false;
+  private isDownloading: boolean = false;
+  private lastLoggedPercent: number = -1;
 
   public static getInstance(): UpdateManager {
     if (!UpdateManager.instance) {
@@ -40,6 +46,19 @@ export class UpdateManager {
   }
 
   private constructor() {}
+
+  private writeFileAtomic(targetPath: string, content: string): void {
+    const tmpPath = `${targetPath}.${process.pid}.${Date.now()}.tmp`;
+    try {
+      fs.writeFileSync(tmpPath, content, 'utf-8');
+      fs.renameSync(tmpPath, targetPath);
+    } catch (err) {
+      try {
+        if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+      } catch {}
+      throw err;
+    }
+  }
 
   /**
    * 确保更新配置文件 app-update.yml 存在
@@ -97,14 +116,14 @@ export class UpdateManager {
           try {
             const existing = fs.readFileSync(defaultYmlPath, 'utf-8');
             if (!existing.includes('updaterCacheDirName') || !existing.includes('shortvideo/update')) {
-              fs.writeFileSync(defaultYmlPath, yamlContent, 'utf-8');
+              this.writeFileAtomic(defaultYmlPath, yamlContent);
               console.log('[UpdateManager] 🔄 同步校准已有 resources 目录更新配置为 shortvideo/update:', defaultYmlPath);
             }
           } catch (_) {}
           hasValidConfig = true;
         } else {
           try {
-            fs.writeFileSync(defaultYmlPath, yamlContent, 'utf-8');
+            this.writeFileAtomic(defaultYmlPath, yamlContent);
             console.log('[UpdateManager] 自动补齐 resources 目录更新配置:', defaultYmlPath);
             hasValidConfig = true;
           } catch {
@@ -127,7 +146,7 @@ export class UpdateManager {
               }
             }
             if (needWrite) {
-              fs.writeFileSync(fallbackYmlPath, yamlContent, 'utf-8');
+              this.writeFileAtomic(fallbackYmlPath, yamlContent);
               console.log('[UpdateManager] 写入/更新 userData 目录更新配置:', fallbackYmlPath);
             }
           } catch (_) {}
@@ -194,13 +213,16 @@ export class UpdateManager {
 
     // 在生产环境下，应用启动 6 秒后执行首次静默检测，之后每 4 小时轮询检查一次
     if (app.isPackaged) {
-      setTimeout(() => {
+      this.startupTimer = setTimeout(() => {
+        this.startupTimer = null;
         this.checkForUpdates(false).catch(() => {});
       }, 6000);
+      this.startupTimer.unref?.();
 
       this.checkIntervalTimer = setInterval(() => {
         this.checkForUpdates(false).catch(() => {});
       }, 4 * 60 * 60 * 1000);
+      this.checkIntervalTimer.unref?.();
     } else {
       console.log('[UpdateManager] 开发模式运行中 (已配置更新源: %s)，静默跳过自动热更新下载', feedUrl);
     }
@@ -213,6 +235,7 @@ export class UpdateManager {
 
   private setupListeners(): void {
     autoUpdater.on('checking-for-update', () => {
+      this.lastLoggedPercent = -1;
       this.state.status = 'checking';
       this.state.error = null;
       this.broadcastState();
@@ -238,8 +261,8 @@ export class UpdateManager {
             buttons: [loc.dialogs.btnGoWebsite, loc.dialogs.btnRemindLater],
             defaultId: 0,
           }).then((res) => {
-            if (res.response === 0) {
-              shell.openExternal(APP_CONFIG.downloadUrl);
+            if (res.response === 0 && isSafeHttpTargetUrl(APP_CONFIG.downloadUrl)) {
+              shell.openExternal(APP_CONFIG.downloadUrl).catch(() => {});
             }
           }).catch(() => {});
         }
@@ -275,7 +298,6 @@ export class UpdateManager {
       this.isManualCheck = false;
     });
 
-    let lastLoggedPercent = -1;
     autoUpdater.on('download-progress', (progressObj) => {
       this.state.status = 'downloading';
       const pct = Math.round(progressObj.percent || 0);
@@ -286,26 +308,28 @@ export class UpdateManager {
       this.broadcastState();
 
       // 每跨越 25% 阶段输出一次系统日志，避免频繁刷屏的同时保证升级轨迹清晰留痕
-      if (pct === 0 && lastLoggedPercent < 0) {
-        lastLoggedPercent = 0;
+      if (pct === 0 && this.lastLoggedPercent < 0) {
+        this.lastLoggedPercent = 0;
         const totalMb = (progressObj.total / (1024 * 1024)).toFixed(2);
         console.log(`[UpdateManager] ⏬ 正在通过 [.blockmap] 差量下载新版本变动数据块 (待传输体积: ${totalMb} MB)...`);
-      } else if (pct >= 25 && lastLoggedPercent < 25) {
-        lastLoggedPercent = 25;
+      } else if (pct >= 25 && this.lastLoggedPercent < 25) {
+        this.lastLoggedPercent = 25;
         const speedMb = (progressObj.bytesPerSecond / (1024 * 1024)).toFixed(2);
         console.log(`[UpdateManager] ⏬ [.blockmap] 差量分块下载中 (进度: 25%, 速度: ${speedMb} MB/s)`);
-      } else if (pct >= 50 && lastLoggedPercent < 50) {
-        lastLoggedPercent = 50;
+      } else if (pct >= 50 && this.lastLoggedPercent < 50) {
+        this.lastLoggedPercent = 50;
         const speedMb = (progressObj.bytesPerSecond / (1024 * 1024)).toFixed(2);
         console.log(`[UpdateManager] ⏬ [.blockmap] 差量分块下载中 (进度: 50%, 速度: ${speedMb} MB/s)`);
-      } else if (pct >= 75 && lastLoggedPercent < 75) {
-        lastLoggedPercent = 75;
+      } else if (pct >= 75 && this.lastLoggedPercent < 75) {
+        this.lastLoggedPercent = 75;
         const speedMb = (progressObj.bytesPerSecond / (1024 * 1024)).toFixed(2);
         console.log(`[UpdateManager] ⏬ [.blockmap] 差量分块下载中 (进度: 75%, 速度: ${speedMb} MB/s)`);
       }
     });
 
     autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
+      this.isDownloading = false;
+      this.lastLoggedPercent = -1;
       this.state.status = 'downloaded';
       this.state.info = info;
       this.state.progressPercent = 100;
@@ -327,6 +351,9 @@ export class UpdateManager {
     });
 
     autoUpdater.on('error', (err) => {
+      this.isChecking = false;
+      this.isDownloading = false;
+      this.lastLoggedPercent = -1;
       this.state.status = 'error';
       this.state.error = err?.message || String(err);
       this.broadcastState();
@@ -347,7 +374,10 @@ export class UpdateManager {
   }
 
   private registerIpc(): void {
-    ipcMain.handle('app:check-for-updates', async (_event, options?: { silentDialog?: boolean }) => {
+    ipcMain.handle('app:check-for-updates', async (event, options?: { silentDialog?: boolean }) => {
+      if (!isTrustedIpcSender(event)) {
+        return { success: false, status: 'error', message: 'Forbidden IPC sender' };
+      }
       try {
         return await this.checkForUpdates(true, options);
       } catch (err: any) {
@@ -355,22 +385,36 @@ export class UpdateManager {
       }
     });
 
-    ipcMain.handle('app:get-update-status', () => {
+    ipcMain.handle('app:get-update-status', (event) => {
+      if (!isTrustedIpcSender(event)) {
+        return { status: 'idle', error: 'Forbidden IPC sender' };
+      }
       return this.getState();
     });
 
-    ipcMain.handle('app:start-download-update', async () => {
+    ipcMain.handle('app:start-download-update', async (event) => {
+      if (!isTrustedIpcSender(event)) {
+        return { success: false, status: 'error', message: 'Forbidden IPC sender' };
+      }
       try {
         if (!app.isPackaged) {
-          shell.openExternal(APP_CONFIG.downloadUrl);
+          if (isSafeHttpTargetUrl(APP_CONFIG.downloadUrl)) {
+            shell.openExternal(APP_CONFIG.downloadUrl).catch(() => {});
+          }
           return { success: true, status: 'dev-mode' };
         }
+        if (this.isDownloading) {
+          return { success: true, status: 'downloading' };
+        }
+        this.isDownloading = true;
+        this.lastLoggedPercent = -1;
         console.log('[UpdateManager] 用户主动触发新版本安装包下载...');
         this.state.status = 'downloading';
         this.broadcastState();
         await autoUpdater.downloadUpdate();
         return { success: true, status: 'downloading' };
       } catch (err: any) {
+        this.isDownloading = false;
         console.error('[UpdateManager] 手动下载更新失败:', err);
         this.state.status = 'error';
         this.state.error = err?.message || String(err);
@@ -379,12 +423,16 @@ export class UpdateManager {
       }
     });
 
-    ipcMain.handle('app:quit-and-install', () => {
+    ipcMain.handle('app:quit-and-install', (event) => {
+      if (!isTrustedIpcSender(event)) {
+        return { success: false, message: 'Forbidden IPC sender' };
+      }
       this.quitAndInstall();
       return { success: true };
     });
 
-    ipcMain.on('app:quit-and-install', () => {
+    ipcMain.on('app:quit-and-install', (event) => {
+      if (!isTrustedIpcSender(event)) return;
       this.quitAndInstall();
     });
   }
@@ -398,6 +446,9 @@ export class UpdateManager {
     isManual: boolean = false,
     options?: { silentDialog?: boolean }
   ): Promise<{ success: boolean; status?: string; message?: string }> {
+    if (this.isChecking) {
+      return { success: true, status: 'checking' };
+    }
     this.isManualCheck = isManual;
     this.silentDialog = Boolean(options?.silentDialog);
 
@@ -420,6 +471,7 @@ export class UpdateManager {
       return { success: false, status: 'dev-mode', message: '开发环境跳过' };
     }
 
+    this.isChecking = true;
     try {
       this.ensureUpdateConfig();
       await autoUpdater.checkForUpdates();
@@ -438,6 +490,8 @@ export class UpdateManager {
       }
       this.isManualCheck = false;
       return { success: false, status: 'error', message: err?.message || '检查更新失败' };
+    } finally {
+      this.isChecking = false;
     }
   }
 
@@ -471,6 +525,10 @@ export class UpdateManager {
   }
 
   public destroy(): void {
+    if (this.startupTimer) {
+      clearTimeout(this.startupTimer);
+      this.startupTimer = null;
+    }
     if (this.checkIntervalTimer) {
       clearInterval(this.checkIntervalTimer);
       this.checkIntervalTimer = null;

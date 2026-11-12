@@ -1,6 +1,7 @@
 import { app, ipcMain, shell, dialog, WebContents, BrowserWindow } from 'electron';
 import fs from 'fs';
 import path from 'path';
+import { isTrustedIpcSender } from './ipc-security';
 
 /**
  * 结构化系统日志条目
@@ -48,13 +49,43 @@ class SystemLoggerService {
   private static instance: SystemLoggerService;
   private logBuffer: SystemLogEntry[] = [];
   private readonly MAX_BUFFER_SIZE = 2500;
+  private readonly MAX_LOG_FILE_BYTES = 20 * 1024 * 1024;
   private nextId = 1;
   private logDirectory: string = '';
+  private currentLogDate: string = '';
   private currentLogFilePath: string = '';
   private isInitialized = false;
   private subscribers: Set<WebContents> = new Set();
 
   private constructor() {}
+
+  private getLocalDateStr(date = new Date()): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private ensureLogFilePath(now = new Date()): string {
+    if (!this.logDirectory) return '';
+    const localDate = this.getLocalDateStr(now);
+    if (!this.currentLogFilePath || this.currentLogDate !== localDate) {
+      this.currentLogDate = localDate;
+      this.currentLogFilePath = path.join(this.logDirectory, `shortvideo-${localDate}.log`);
+    }
+    try {
+      if (fs.existsSync(this.currentLogFilePath)) {
+        const stat = fs.statSync(this.currentLogFilePath);
+        if (stat.size >= this.MAX_LOG_FILE_BYTES) {
+          const hh = String(now.getHours()).padStart(2, '0');
+          const mm = String(now.getMinutes()).padStart(2, '0');
+          const ss = String(now.getSeconds()).padStart(2, '0');
+          this.currentLogFilePath = path.join(this.logDirectory, `shortvideo-${localDate}-${hh}${mm}${ss}.log`);
+        }
+      }
+    } catch {}
+    return this.currentLogFilePath;
+  }
 
   public static getInstance(): SystemLoggerService {
     if (!SystemLoggerService.instance) {
@@ -78,7 +109,8 @@ class SystemLoggerService {
         fs.mkdirSync(this.logDirectory, { recursive: true });
       }
 
-      const todayStr = new Date().toISOString().slice(0, 10);
+      const todayStr = this.getLocalDateStr();
+      this.currentLogDate = todayStr;
       this.currentLogFilePath = path.join(this.logDirectory, `shortvideo-${todayStr}.log`);
 
       const appVersion = (() => {
@@ -229,10 +261,11 @@ class SystemLoggerService {
    * 追加写入文件
    */
   private writeLineToFile(entry: SystemLogEntry): void {
-    if (!this.currentLogFilePath) return;
+    const targetPath = this.ensureLogFilePath();
+    if (!targetPath) return;
     try {
       const line = `[${entry.timestamp}] [${entry.level.toUpperCase()}] ${entry.message}${entry.details ? '\n' + entry.details : ''}\n`;
-      fs.appendFile(this.currentLogFilePath, line, 'utf-8', () => {});
+      fs.appendFile(targetPath, line, 'utf-8', () => {});
     } catch {}
   }
 
@@ -280,15 +313,15 @@ class SystemLoggerService {
   /**
    * 打开日志所在系统文件夹
    */
-  public openLogFolder(): boolean {
+  public async openLogFolder(): Promise<boolean> {
     try {
       if (this.currentLogFilePath && fs.existsSync(this.currentLogFilePath)) {
         shell.showItemInFolder(this.currentLogFilePath);
         return true;
       }
       if (this.logDirectory && fs.existsSync(this.logDirectory)) {
-        shell.openPath(this.logDirectory);
-        return true;
+        const openErr = await shell.openPath(this.logDirectory);
+        return !openErr;
       }
       return false;
     } catch {
@@ -309,7 +342,7 @@ class SystemLoggerService {
       const { getLocale } = require('./i18n');
       const loc = getLocale(lang);
 
-      const defaultName = `shortvideo-logs-${new Date().toISOString().slice(0, 10)}.log`;
+      const defaultName = `shortvideo-logs-${this.getLocalDateStr()}.log`;
       const { canceled, filePath } = await dialog.showSaveDialog(targetWindow || null, {
         title: loc.dialogs.exportLogsTitle,
         defaultPath: defaultName,
@@ -335,18 +368,23 @@ class SystemLoggerService {
   }
 
   /**
-   * 注册 IPC 接口
+   * 注册 IPC 接口（全部强制校验受信任发送方）
    */
   private registerIpcHandlers(): void {
-    ipcMain.handle('syslog:get-history', () => {
+    const ALLOWED_CATEGORIES = new Set(['all', 'wechat', 'xiaohongshu', 'system']);
+
+    ipcMain.handle('syslog:get-history', (event) => {
+      if (!isTrustedIpcSender(event)) return [];
       return this.getHistory();
     });
 
-    ipcMain.handle('syslog:get-info', () => {
+    ipcMain.handle('syslog:get-info', (event) => {
+      if (!isTrustedIpcSender(event)) return { filePath: '', directory: '', count: 0 };
       return this.getLogInfo();
     });
 
-    ipcMain.handle('syslog:get-counts', () => {
+    ipcMain.handle('syslog:get-counts', (event) => {
+      if (!isTrustedIpcSender(event)) return { all: 0, wechat: 0, xiaohongshu: 0, system: 0 };
       let wechatCount = 0;
       let xhsCount = 0;
       let sysCount = 0;
@@ -379,25 +417,30 @@ class SystemLoggerService {
       };
     });
 
-    ipcMain.handle('syslog:clear', () => {
+    ipcMain.handle('syslog:clear', (event) => {
+      if (!isTrustedIpcSender(event)) return false;
       this.clear();
       return true;
     });
 
-    ipcMain.handle('syslog:open-folder', () => {
-      return this.openLogFolder();
+    ipcMain.handle('syslog:open-folder', async (event) => {
+      if (!isTrustedIpcSender(event)) return false;
+      return await this.openLogFolder();
     });
 
     ipcMain.handle('syslog:export', async (event) => {
+      if (!isTrustedIpcSender(event)) return false;
       const win = BrowserWindow.fromWebContents(event.sender) || undefined;
       return await this.exportLogs(win);
     });
 
-    ipcMain.handle('syslog:switch-category', (_event, category: string) => {
+    ipcMain.handle('syslog:switch-category', (event, category: string) => {
+      if (!isTrustedIpcSender(event)) return false;
+      const cleanCat = typeof category === 'string' && ALLOWED_CATEGORIES.has(category) ? category : 'all';
       for (const wc of Array.from(this.subscribers)) {
         if (!wc.isDestroyed()) {
           try {
-            wc.send('syslog:set-category', category);
+            wc.send('syslog:set-category', cleanCat);
           } catch {}
         } else {
           this.subscribers.delete(wc);
@@ -406,11 +449,23 @@ class SystemLoggerService {
       return true;
     });
 
-    ipcMain.on('syslog:category-counts-update', (_event, data: any) => {
+    ipcMain.on('syslog:category-counts-update', (event, data: any) => {
+      if (!isTrustedIpcSender(event) || !data || typeof data !== 'object') return;
+      const srcCounts = data.counts && typeof data.counts === 'object' ? data.counts : data;
+      const cleanCat = typeof data.category === 'string' && ALLOWED_CATEGORIES.has(data.category) ? data.category : 'all';
+      const safePayload = {
+        category: cleanCat,
+        counts: {
+          all: Math.max(0, Number(srcCounts.all) || 0),
+          wechat: Math.max(0, Number(srcCounts.wechat) || 0),
+          xiaohongshu: Math.max(0, Number(srcCounts.xiaohongshu) || 0),
+          system: Math.max(0, Number(srcCounts.system) || 0),
+        },
+      };
       for (const wc of Array.from(this.subscribers)) {
         if (!wc.isDestroyed()) {
           try {
-            wc.send('syslog:counts-update', data);
+            wc.send('syslog:counts-update', safePayload);
           } catch {}
         } else {
           this.subscribers.delete(wc);

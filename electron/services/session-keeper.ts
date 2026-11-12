@@ -1,5 +1,6 @@
 import { WebContents } from 'electron';
 import { windowManager } from './window-manager';
+import { getLocale } from '../utils/i18n';
 
 export interface KeepAliveOptions {
   reloadIntervalMs?: number;
@@ -25,6 +26,7 @@ export class PlatformSessionKeeper {
   private static instance: PlatformSessionKeeper;
   private sessions: Map<string, PlatformSessionState> = new Map();
   private timer: NodeJS.Timeout | null = null;
+  private destroyed = false;
 
   private constructor() {
     this.startLoop();
@@ -97,7 +99,10 @@ export class PlatformSessionKeeper {
       return false;
     }
 
-    const platformName = platformId === 'wechat' ? '微信视频号' : (platformId === 'xiaohongshu' ? '小红书' : platformId);
+    const loc = getLocale(windowManager.getCurrentLanguage());
+    const platformName = platformId === 'wechat'
+      ? loc.platforms.wechat
+      : (platformId === 'xiaohongshu' ? loc.platforms.xiaohongshu : platformId);
     console.log(`[SessionKeeper] 收到指令：正在对 ${platformName} 执行整体页面重新加载...`);
 
     try {
@@ -106,7 +111,7 @@ export class PlatformSessionKeeper {
 
       windowManager.broadcast('platform:status-update', {
         platform: platformId,
-        status: `[页面刷新] ${platformName} 页面已成功触发重新加载`,
+        status: `[${loc.menu.view.reload}] ${platformName}`,
         type: 'info',
       });
       return true;
@@ -117,14 +122,19 @@ export class PlatformSessionKeeper {
   }
 
   /**
-   * 启动保活轮询器（每 60 秒轮询，确保会话长久有效）
+   * 启动带随机抖动的保活轮询器（55~88 秒随机间隔，避免规律周期特征）
    */
   private startLoop(): void {
-    if (this.timer) return;
+    if (this.timer || this.destroyed) return;
 
-    this.timer = setInterval(() => {
+    const nextDelayMs = 55000 + Math.floor(Math.random() * 33000);
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      if (this.destroyed) return;
       this.keepSessionActive();
-    }, 60 * 1000);
+      this.startLoop();
+    }, nextDelayMs);
+    this.timer.unref?.();
   }
 
   /**
@@ -144,44 +154,34 @@ export class PlatformSessionKeeper {
   }
 
   /**
-   * 针对单一平台注入定制的心跳与活跃探针
+   * 针对单一平台注入轻量化会话探针（避免伪造不可信 mousemove/focus 事件与突发并发请求）
    */
   private probeSession(platformId: string, webContents: WebContents): void {
-    if (!webContents || webContents.isDestroyed()) return;
+    if (!webContents || webContents.isDestroyed() || webContents.isLoading()) return;
 
     if (platformId === 'wechat') {
-      // 微信视频号专属心跳探针：
-      // 1. 模拟鼠标与焦点轻量活跃事件；
-      // 2. 静默向后端 API 触发未读数统计与数据同步请求，刷新服务端 Session 过期时间；
-      // 3. 检测是否出现“登录已过期”弹窗。
       const wechatProbeCode = `
         (async function() {
           try {
             if (!location.hostname.includes('channels.weixin.qq.com')) return { ok: false, reason: 'not_on_channels' };
 
-            // 1. 模拟微小真实交互事件
-            try {
-              window.dispatchEvent(new Event('focus'));
-              window.dispatchEvent(new Event('mousemove'));
-            } catch {}
-
-            // 2. 从 Cookie 提取 token 参数
             let token = '';
             try {
               const m = document.cookie.match(/(?:^|;\\s*)token=([^;]+)/);
               if (m) token = decodeURIComponent(m[1]);
             } catch {}
 
-            // 3. 静默调用微信视频号助手的业务心跳接口，持续续期服务端 Session
             const heartbeats = [
               '/cgi-bin/mmfinderassistant-bin/helper/helper_get_finder_unread_count',
-              '/cgi-bin/mmfinderassistant-bin/auth/auth_data',
-              '/cgi-bin/mmfinderassistant-bin/helper/helper_get_notice_list'
+              '/cgi-bin/mmfinderassistant-bin/auth/auth_data'
             ];
 
-            for (const endpoint of heartbeats) {
+            for (let i = 0; i < heartbeats.length; i++) {
+              if (i > 0) {
+                await new Promise(r => setTimeout(r, 400 + Math.floor(Math.random() * 700)));
+              }
               try {
-                await fetch(endpoint, {
+                await fetch(heartbeats[i], {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
@@ -194,14 +194,14 @@ export class PlatformSessionKeeper {
                     page: 1,
                     pageSize: 1
                   }),
-                  credentials: 'include'
-                }).catch(() => {});
+                  credentials: 'include',
+                  signal: typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(8000) : undefined
+                }).then((r) => r?.body?.cancel?.().catch(() => {})).catch(() => {});
               } catch {}
             }
 
-            // 4. 检测页面是否含有登录过期标记
             const hasExpiredModal = Boolean(
-              Array.from(document.querySelectorAll('*')).some(el => {
+              Array.from(document.querySelectorAll('div, span, p')).some(el => {
                 const t = (el.textContent || '').trim();
                 return t.includes('登录已过期') && el.children.length === 0;
               })
@@ -221,31 +221,29 @@ export class PlatformSessionKeeper {
       }).catch(() => {});
 
     } else if (platformId === 'xiaohongshu') {
-      // 小红书专属心跳探针
       const xhsProbeCode = `
         (async function() {
           try {
             if (!location.hostname.includes('creator.xiaohongshu.com')) return { ok: false, reason: 'not_on_xhs' };
-
-            try {
-              window.dispatchEvent(new Event('focus'));
-              window.dispatchEvent(new Event('mousemove'));
-            } catch {}
 
             const heartbeats = [
               '/api/galaxy/creator/home/personal_info',
               '/api/galaxy/creator/unread_count'
             ];
 
-            for (const endpoint of heartbeats) {
+            for (let i = 0; i < heartbeats.length; i++) {
+              if (i > 0) {
+                await new Promise(r => setTimeout(r, 450 + Math.floor(Math.random() * 650)));
+              }
               try {
-                await fetch(endpoint, {
+                await fetch(heartbeats[i], {
                   method: 'GET',
                   headers: {
                     'Accept': 'application/json, text/plain, */*'
                   },
-                  credentials: 'include'
-                }).catch(() => {});
+                  credentials: 'include',
+                  signal: typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(8000) : undefined
+                }).then((r) => r?.body?.cancel?.().catch(() => {})).catch(() => {});
               } catch {}
             }
 
@@ -264,8 +262,9 @@ export class PlatformSessionKeeper {
    * 停止所有守护任务
    */
   public destroy(): void {
+    this.destroyed = true;
     if (this.timer) {
-      clearInterval(this.timer);
+      clearTimeout(this.timer);
       this.timer = null;
     }
     this.sessions.clear();

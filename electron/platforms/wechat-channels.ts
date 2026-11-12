@@ -210,13 +210,16 @@ export class WechatChannelsPlatform extends BasePlatform {
         await tracer.track(tPlatform('dismissedDialog', undefined, { btn: targetBtn.text }), null, 'success');
         await sleep(1200, signal);
       }
-    } catch { }
+    } catch (err: any) {
+      if (err instanceof PublishAbortedError || tracer.isAborted()) throw err;
+    }
   }
 
   /**
    * 登录成功后，在视频号助手主页或列表页拟人化寻找并点击【发表视频】按钮进入新建页面
    */
   async navigateToNewPostPage(client: CdpPageClient, tracer: ActionTracer, adapter?: PlatformTabAdapter): Promise<boolean> {
+    const signal = tracer.getSignal();
     await tracer.track(tPlatform('checkingPublishPage'));
 
     // 检查是否已经在发表页面
@@ -276,7 +279,7 @@ export class WechatChannelsPlatform extends BasePlatform {
       if (btnInfo && btnInfo.found && btnInfo.x && btnInfo.y) {
         await tracer.track(tPlatform('clickedPublishEntry', undefined, { btn: btnInfo.text }));
         await client.mouseClick(btnInfo.x, btnInfo.y);
-        await sleep(2500);
+        await sleep(2500, signal);
 
         const afterUrl = await client.evaluate(() => location.href).catch(() => '');
         if (afterUrl.includes('/post/create')) {
@@ -285,14 +288,14 @@ export class WechatChannelsPlatform extends BasePlatform {
         }
       }
 
-      await sleep(1000);
+      await sleep(1000, signal);
     }
 
     // 若通过点击未能触发，备用通过 loadURL 强行导航
     if (adapter) {
       await tracer.track(tPlatform('fallbackDirectNav'));
       await adapter.loadURL(this.publishUrl);
-      await sleep(2500);
+      await sleep(2500, signal);
       return true;
     }
 
@@ -433,6 +436,7 @@ export class WechatChannelsPlatform extends BasePlatform {
     };
     client.on('Page.fileChooserOpened', fileChooserHandler);
 
+    const signal = tracer.getSignal();
     try {
       for (let attempt = 0; attempt < 5; attempt++) {
         // 先行检查：确保当前处于发表页面
@@ -440,7 +444,7 @@ export class WechatChannelsPlatform extends BasePlatform {
         if (!curUrl.includes('/post/create')) {
           await tracer.track(tPlatform('uploadRetry'), null, 'warn');
           await this.navigateToNewPostPage(client, tracer);
-          await sleep(2000);
+          await sleep(2000, signal);
         }
 
         // A. 尝试直接穿透递归 Shadow DOM 寻找 input[type="file"] 注入
@@ -515,7 +519,7 @@ export class WechatChannelsPlatform extends BasePlatform {
           await client.mouseClick(btnCoord.x, btnCoord.y);
         }
 
-        await sleep(1000);
+        await sleep(1000, signal);
 
         // C. 检查是否触发了无感拦截的文件选择对话框
         if (interceptedBackendNodeId) {
@@ -705,17 +709,18 @@ export class WechatChannelsPlatform extends BasePlatform {
       return false;
     }
 
+    const signal = tracer.getSignal();
     if (clickDelResult.x && clickDelResult.y) {
       await client.mouseClick(clickDelResult.x, clickDelResult.y);
     }
 
     if (clickDelResult.type === 'reupload') {
       await tracer.track(tPlatform('reuploadTriggered'));
-      await sleep(1000);
+      await sleep(1000, signal);
       return true;
     }
 
-    await sleep(800);
+    await sleep(800, signal);
 
     // 检查并点击二次确认对话框中的“确定”或“删除”
     const confirmCoord = await client.evaluate(() => {
@@ -761,7 +766,7 @@ export class WechatChannelsPlatform extends BasePlatform {
       await client.mouseClick(confirmCoord.x, confirmCoord.y);
     }
 
-    await sleep(2000);
+    await sleep(2000, signal);
     await tracer.track(tPlatform('deletedVideoSuccess'), null, 'success');
     return true;
   }
@@ -775,6 +780,7 @@ export class WechatChannelsPlatform extends BasePlatform {
    * 5. 定时发表：小时数值加 1，分钟数随机增加 10~30 分钟
    */
   async configureAdvancedOptions(client: CdpPageClient, tracer: ActionTracer, payload?: PublishPayload): Promise<void> {
+    const signal = tracer.getSignal();
     await tracer.track(tPlatform('configuringAdvanced'));
 
     // ── 穿透 DOM 助手：穿透 shadowRoot 与 iframe，获取全量真实渲染节点 ──
@@ -823,7 +829,7 @@ export class WechatChannelsPlatform extends BasePlatform {
         await tracer.track(`✅ 高级发布选项组件已检测到并挂载就绪 (耗时 ${waitSec + 1} 秒)！`, null, 'success');
         break;
       }
-      await sleep(600);
+      await sleep(600, signal);
     }
 
     // ── 内部物理点击助手：直接调用 Client 的物理输入事件 ──
@@ -903,7 +909,7 @@ export class WechatChannelsPlatform extends BasePlatform {
           // 始终模拟点击一次 trigger 确保下拉浮层被真实唤出
           await tracer.track(`[位置] 当前位置为: 【${locInfo.currentLocation}】，正在点击展开位置选项菜单 (坐标: ${locInfo.x}, ${locInfo.y})...`);
           await cdpClick(locInfo.x, locInfo.y);
-          await sleep(600);
+          await sleep(600, signal);
 
           // 第二阶段：多根穿透全文档定位【不显示位置】选项
           let noneOptInfo: any = null;
@@ -967,13 +973,13 @@ export class WechatChannelsPlatform extends BasePlatform {
             });
 
             if (noneOptInfo && noneOptInfo.x && noneOptInfo.y) break;
-            await sleep(400);
+            await sleep(400, signal);
           }
 
           if (noneOptInfo && noneOptInfo.x && noneOptInfo.y) {
             await tracer.track(`[位置] 正在物理点击【不显示位置】选项 (坐标: ${noneOptInfo.x}, ${noneOptInfo.y})...`);
             await cdpClick(noneOptInfo.x, noneOptInfo.y);
-            await sleep(800);
+            await sleep(800, signal);
 
             // 验证是否已成功切换
             const isNowNone = await client.evaluate(() => {
@@ -1008,6 +1014,7 @@ export class WechatChannelsPlatform extends BasePlatform {
         }
       }
     } catch (e: any) {
+      if (e instanceof PublishAbortedError || tracer.isAborted()) throw e;
       await tracer.track(`[位置] 配置略过: ${e.message}`, null, 'warn');
     }
 
@@ -1090,7 +1097,7 @@ export class WechatChannelsPlatform extends BasePlatform {
           await tracer.track(`[添加到合集] 点击展开合集下拉框 (坐标: ${collInfo.triggerX}, ${collInfo.triggerY})...`);
           await cdpClick(collInfo.triggerX, collInfo.triggerY);
           // 点击后给与充足时间让 Vue 展开菜单并触发 API 请求
-          await sleep(1000);
+          await sleep(1000, signal);
 
           // 第二步：多根穿透等待 API 数据返回并定位第一项（平稳等待最长 20 秒，杜绝重复触发关闭）
           await tracer.track('⏳ [添加到合集] 正在等待接口加载并返回合集列表数据...');
@@ -1159,14 +1166,14 @@ export class WechatChannelsPlatform extends BasePlatform {
               await tracer.track(`[添加到合集] 正在等待接口返回合集数据 (${Math.round((waitStep + 1) * 0.5)}s/20s)...`);
             }
 
-            await sleep(500);
+            await sleep(500, signal);
           }
 
           // 第三步：物理点击选取第 1 个选项
           if (firstOptionInfo && firstOptionInfo.ready && firstOptionInfo.x && firstOptionInfo.y) {
             await tracer.track(`[添加到合集] 接口数据已就绪 (共 ${firstOptionInfo.total} 个合集)，正在选取第 1 项: 【${firstOptionInfo.name}】(坐标: ${firstOptionInfo.x}, ${firstOptionInfo.y})...`);
             await cdpClick(firstOptionInfo.x, firstOptionInfo.y);
-            await sleep(800);
+            await sleep(800, signal);
 
             // 验证是否已成功选中（对齐真实DOM: .collection-text）
             const checkSelected = await client.evaluate(() => {
@@ -1202,6 +1209,7 @@ export class WechatChannelsPlatform extends BasePlatform {
         }
       }
     } catch (e: any) {
+      if (e instanceof PublishAbortedError || tracer.isAborted()) throw e;
       await tracer.track(`[添加到合集] 处理略过: ${e.message}`, null, 'warn');
     }
 
@@ -1355,10 +1363,10 @@ export class WechatChannelsPlatform extends BasePlatform {
             await tracer.track(`[定时发表] 正在物理点击【定时】${clickResult.hasIcon ? 'radio图标' : 'label'} (第${rTry + 1}次, 坐标: ${jitterX}, ${jitterY})...`);
             // 纯 CDP 物理鼠标点击 <i> 图标或 label，触发可信原生事件
             await client.mouseClick(jitterX, jitterY, { delayMs: getRandomDelay(80, 140) });
-            await sleep(getRandomDelay(780, 1150)); // 等待 Vue 响应式完成 DOM 重渲染
+            await sleep(getRandomDelay(780, 1150), signal); // 等待 Vue 响应式完成 DOM 重渲染
           } else {
             await tracer.track(`[定时发表] ⚠️ ${(clickResult as any).reason || '未找到定时单选'}，等待后重试 (${rTry + 1}/6)...`, null, 'warn');
-            await sleep(getRandomDelay(580, 880));
+            await sleep(getRandomDelay(580, 880), signal);
           }
         }
 
@@ -1419,10 +1427,10 @@ export class WechatChannelsPlatform extends BasePlatform {
           if (panelState.found && panelState.x && panelState.y) {
             await tracer.track(`[定时发表] 正在物理点击日期输入框打开日历 (第 ${attempt} 次, 坐标: ${panelState.x}, ${panelState.y})...`);
             await client.mouseClick(panelState.x, panelState.y);
-            await sleep(700);
+            await sleep(700, signal);
           } else {
             await tracer.track(`[定时发表] 日历组件未渲染，等待 Vue 响应 (${attempt}/5)...`);
-            await sleep(800);
+            await sleep(800, signal);
           }
         }
 
@@ -1475,7 +1483,7 @@ export class WechatChannelsPlatform extends BasePlatform {
 
           if (monthCheck.needFlip && monthCheck.x && monthCheck.y) {
             await client.mouseClick(monthCheck.x, monthCheck.y);
-            await sleep(400);
+            await sleep(400, signal);
           } else {
             break;
           }
@@ -1532,7 +1540,7 @@ export class WechatChannelsPlatform extends BasePlatform {
         if (dayCoord.found && dayCoord.x && dayCoord.y) {
           await tracer.track(`[定时发表] 正在物理点击日期 ${targetDay} 号 (坐标: ${dayCoord.x}, ${dayCoord.y})...`);
           await client.mouseClick(dayCoord.x, dayCoord.y);
-          await sleep(600);
+          await sleep(600, signal);
         } else {
           await tracer.track(`[定时发表] ${(dayCoord as any).reason || '未找到目标日期'}`, null, 'warn');
         }
@@ -1590,9 +1598,9 @@ export class WechatChannelsPlatform extends BasePlatform {
           if (timeState.found && timeState.x && timeState.y) {
             await tracer.track(`[定时发表] 正在物理点击时间输入框打开时分选择 (第 ${attempt} 次, 坐标: ${timeState.x}, ${timeState.y})...`);
             await client.mouseClick(timeState.x, timeState.y);
-            await sleep(600);
+            await sleep(600, signal);
           } else {
-            await sleep(500);
+            await sleep(500, signal);
           }
         }
 
@@ -1679,38 +1687,49 @@ export class WechatChannelsPlatform extends BasePlatform {
           if (hourMinuteCoords.hour && hourMinuteCoords.hour.x && hourMinuteCoords.hour.y) {
             await tracer.track(`[定时发表] 正在物理点击小时 ${hourMinuteCoords.hour.val} (坐标: ${hourMinuteCoords.hour.x}, ${hourMinuteCoords.hour.y})...`);
             await client.mouseClick(hourMinuteCoords.hour.x, hourMinuteCoords.hour.y);
-            await sleep(400);
+            await sleep(400, signal);
           }
           if (hourMinuteCoords.minute && hourMinuteCoords.minute.x && hourMinuteCoords.minute.y) {
             await tracer.track(`[定时发表] 正在物理点击分钟 ${hourMinuteCoords.minute.val} (坐标: ${hourMinuteCoords.minute.x}, ${hourMinuteCoords.minute.y})...`);
             await client.mouseClick(hourMinuteCoords.minute.x, hourMinuteCoords.minute.y);
-            await sleep(400);
+            await sleep(400, signal);
           }
         } else {
           await tracer.track(`[定时发表] ${(hourMinuteCoords as any).reason || '时分选择失败'}`, null, 'warn');
         }
 
-        // 步骤 6：关闭下拉浮层并核验结果（点击外部区域或 label 触发失焦关闭，穿透 iframe）
-        await client.evaluate(() => {
+        // 步骤 6：关闭下拉浮层并核验结果（通过真实物理点击外部 label 区域触发失焦关闭，穿透 iframe）
+        const labelCoord = await client.evaluate(() => {
           const getRoots = () => {
             const roots = [{ doc: document, offsetX: 0, offsetY: 0 }];
             for (const f of Array.from(document.querySelectorAll('iframe'))) {
               try {
-                if (f.contentDocument) roots.push({ doc: f.contentDocument, offsetX: 0, offsetY: 0 });
+                if (f.contentDocument) {
+                  const r = f.getBoundingClientRect();
+                  roots.push({ doc: f.contentDocument, offsetX: r.left, offsetY: r.top });
+                }
               } catch { }
             }
             return roots;
           };
 
-          for (const { doc } of getRoots()) {
+          for (const { doc, offsetX, offsetY } of getRoots()) {
             const labelEl = doc.querySelector('.post-time-wrap .label') as HTMLElement | null;
             if (labelEl) {
-              labelEl.click();
-              break;
+              const r = labelEl.getBoundingClientRect();
+              if (r.width > 0 && r.height > 0) {
+                return { x: Math.round(r.left + offsetX + r.width / 2), y: Math.round(r.top + offsetY + r.height / 2) };
+              }
             }
           }
+          return null;
         });
-        await sleep(500);
+        if (labelCoord) {
+          await client.mouseClick(labelCoord.x, labelCoord.y, { delayMs: getRandomDelay(60, 120) });
+        } else {
+          await client.pressKey('Escape').catch(() => {});
+        }
+        await sleep(500, signal);
 
         // 步骤 7：核验输入框中的最终设定值 (穿透 iframe)
         const finalCheck = await client.evaluate(() => {
@@ -1758,13 +1777,14 @@ export class WechatChannelsPlatform extends BasePlatform {
         await tracer.track('⚡ [定时发表] 未指定计划发布时间，保持【立即发表】模式', null, 'info');
       }
     } catch (e: any) {
+      if (e instanceof PublishAbortedError || tracer.isAborted()) throw e;
       await tracer.track(`[定时发表] 处理略过: ${e.message}`, null, 'warn');
     }
 
     // 4. 声明原创：勾选 -> 原创权益弹窗协议核对 -> 勾选《声明须知》和《使用条款》 -> 等待【声明原创】按钮激活并点击 -> 验证生效
     try {
       await tracer.track('正在检查并处理【声明原创】...');
-      await sleep(600);
+      await sleep(600, signal);
 
       let origConfirmed = false;
       let origTriggerInfo: any = { found: false };
@@ -1866,7 +1886,7 @@ export class WechatChannelsPlatform extends BasePlatform {
         });
 
         if (origTriggerInfo.found) break;
-        await sleep(1000);
+        await sleep(1000, signal);
       }
 
       if (origTriggerInfo.alreadyChecked) {
@@ -1880,7 +1900,7 @@ export class WechatChannelsPlatform extends BasePlatform {
         let dialogDetected = false;
         let detectReason = '';
         for (let i = 0; i < 20; i++) {
-          await sleep(350);
+          await sleep(350, signal);
 
           const detectRes = await client.evaluate(() => {
             const getRoots = () => {
@@ -1932,7 +1952,7 @@ export class WechatChannelsPlatform extends BasePlatform {
         }
 
         if (dialogDetected) {
-          await sleep(500);
+          await sleep(500, signal);
           await tracer.track(`✅ 已检测到【原创权益】弹窗完全展开 (${detectReason})！`, null, 'success');
 
           // 第一阶段：检查并处理条款协议勾选（精准点中复选框小方块，严格避开蓝色超链接）
@@ -1990,7 +2010,7 @@ export class WechatChannelsPlatform extends BasePlatform {
             } else if (protoStatus.x && protoStatus.y) {
               await tracer.track(`[原创条款] 正在物理点击勾选《原创声明须知》协议方块 (坐标: ${protoStatus.x}, ${protoStatus.y})...`);
               await cdpClick(protoStatus.x, protoStatus.y);
-              await sleep(600);
+              await sleep(600, signal);
             }
           }
 
@@ -2047,7 +2067,7 @@ export class WechatChannelsPlatform extends BasePlatform {
             if (btnInfo.found && !btnInfo.disabled && btnInfo.x && btnInfo.y) {
               await tracer.track(`[声明原创] 正在物理点击确认【声明原创】按钮 (坐标: ${btnInfo.x}, ${btnInfo.y})...`);
               await cdpClick(btnInfo.x, btnInfo.y);
-              await sleep(1000);
+              await sleep(1000, signal);
 
               // 验证弹窗是否关闭
               const isClosed = await client.evaluate(() => {
@@ -2068,9 +2088,9 @@ export class WechatChannelsPlatform extends BasePlatform {
               }
             } else if (btnInfo.found && btnInfo.disabled) {
               await tracer.track('[声明原创] ⚠️ 确认按钮当前为禁用状态，等待协议生效解锁...', null, 'warn');
-              await sleep(500);
+              await sleep(500, signal);
             } else {
-              await sleep(400);
+              await sleep(400, signal);
             }
           }
 
@@ -2079,15 +2099,26 @@ export class WechatChannelsPlatform extends BasePlatform {
             origConfirmed = true;
           } else {
             await tracer.track('[声明原创] ⚠️ 确认按钮处于禁用状态或未完成确认，正在关闭弹窗并略过原创声明', null, 'warn');
-            // 如果弹窗依然存在，尝试点击关闭或取消按钮，避免遮挡页面后续表单项
-            await client.evaluate(() => {
+            // 如果弹窗依然存在，获取关闭/取消按钮的真实物理坐标并通过 CDP 点击，或按 Escape 键
+            const closeBtnCoord = await client.evaluate(() => {
               const dialog = document.querySelector('.declare-original-dialog, .weui-desktop-dialog');
               if (dialog) {
-                const cancelBtn: any = dialog.querySelector('.weui-desktop-btn_default, .weui-desktop-icon-btn_close, button.close, [aria-label="Close"]');
-                if (cancelBtn) cancelBtn.click();
+                const cancelBtn = dialog.querySelector('.weui-desktop-btn_default, .weui-desktop-icon-btn_close, button.close, [aria-label="Close"]') as HTMLElement | null;
+                if (cancelBtn) {
+                  const r = cancelBtn.getBoundingClientRect();
+                  if (r.width > 0 && r.height > 0) {
+                    return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+                  }
+                }
               }
+              return null;
             });
-            await sleep(400);
+            if (closeBtnCoord) {
+              await cdpClick(closeBtnCoord.x, closeBtnCoord.y);
+            } else {
+              await client.pressKey('Escape').catch(() => {});
+            }
+            await sleep(400, signal);
           }
         } else {
           const checkStatus = await client.evaluate(() => {
@@ -2115,12 +2146,13 @@ export class WechatChannelsPlatform extends BasePlatform {
         await tracer.track('[声明原创] ⚠️ 未能成功开启或确认原创声明（可能按钮为禁用状态或已免审），跳过继续后续发布流程', null, 'warn');
       }
     } catch (e: any) {
+      if (e instanceof PublishAbortedError || tracer.isAborted()) throw e;
       await tracer.track(`[声明原创] 处理略过: ${e.message}`, null, 'warn');
     }
 
     // 5. 视频标注：精确定位 .post-with-mark-tag，展开下拉菜单并选择【含AI生成内容】
     await tracer.track('正在检查并配置【视频标注】(设置为"含AI生成内容")...');
-    await sleep(400);
+    await sleep(400, signal);
 
     let markTagDone = false;
     for (let mTry = 0; mTry < 6; mTry++) {
@@ -2201,7 +2233,7 @@ export class WechatChannelsPlatform extends BasePlatform {
         if (!markTagInfo.isOptionsOpen && markTagInfo.triggerX && markTagInfo.triggerY) {
           await tracer.track(`[视频标注] 点击展开选项列表 (坐标: ${markTagInfo.triggerX}, ${markTagInfo.triggerY})...`);
           await cdpClick(markTagInfo.triggerX, markTagInfo.triggerY);
-          await sleep(600);
+          await sleep(600, signal);
         }
 
         // 第二阶段：在展开的 .mark-tag-options 或全局中精确定位【含AI生成内容】并点击
@@ -2251,29 +2283,37 @@ export class WechatChannelsPlatform extends BasePlatform {
         if (optionClickInfo.found && optionClickInfo.x && optionClickInfo.y) {
           await tracer.track(`[视频标注] 物理点击目标选项: 【${optionClickInfo.targetText}】...`);
           await cdpClick(optionClickInfo.x, optionClickInfo.y);
-          await sleep(600);
+          await sleep(600, signal);
         } else {
-          // 如果通过 CDP 坐标未点到，尝试用 DOM 事件分发直接选中
-          await client.evaluate(() => {
+          // 降级：滚动后重新探测目标真实坐标并物理点击，若仍不可见则用键盘导航，绝不伪造 DOM MouseEvent
+          const fallbackOptCoord = await client.evaluate(() => {
             const isAiMark = (txt: string) => {
               if (!txt) return false;
               const t = txt.trim().toLowerCase();
               if (t.includes('无需') || t.includes('no mark') || t.includes('not required') || t.includes('虚构') || t.includes('entertainment')) return false;
               return t.includes('含ai') || t.includes('ai生成') || t.includes('contains ai') || t.includes('ai-generated') || t.includes('ai generated') || t.includes('generated content');
             };
-            const opts = Array.from(document.querySelectorAll('.mark-tag-option, .mark-tag-options div'));
+            const opts = Array.from(document.querySelectorAll('.mark-tag-option, .mark-tag-options div')) as HTMLElement[];
             for (const o of opts) {
               const txt = (o.textContent || '').trim();
               if (isAiMark(txt)) {
-                (o as HTMLElement).click();
-                o.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
-                o.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
-                o.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-                break;
+                o.scrollIntoView({ behavior: 'auto', block: 'center' });
+                const r = o.getBoundingClientRect();
+                if (r.width > 0 && r.height > 0) {
+                  return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+                }
               }
             }
+            return null;
           });
-          await sleep(500);
+          if (fallbackOptCoord) {
+            await cdpClick(fallbackOptCoord.x, fallbackOptCoord.y);
+          } else {
+            await client.pressKey('ArrowDown').catch(() => {});
+            await sleep(150, signal);
+            await client.pressKey('Enter').catch(() => {});
+          }
+          await sleep(500, signal);
         }
 
         // 第三阶段：校验最终选中状态
@@ -2304,7 +2344,7 @@ export class WechatChannelsPlatform extends BasePlatform {
         await tracer.track(`[视频标注] ℹ️ 尝试第 ${mTry + 1} 次定位组件...`);
       }
 
-      await sleep(600);
+      await sleep(600, signal);
     }
 
     // 核心规则：如果未能确认视频标注选中状态，坚决终止任务！
@@ -2325,6 +2365,13 @@ export class WechatChannelsPlatform extends BasePlatform {
     lang?: string
   ): Promise<PlatformPublishResult> {
     const activeLang = this.getCurrentLang(lang);
+    if (this.isPublishing()) {
+      return {
+        success: false,
+        platform: 'wechat',
+        message: this.t('publishAlreadyRunning', activeLang, { platform: this.getDisplayName(activeLang) }),
+      };
+    }
     this.currentAbortController = new AbortController();
     const signal = this.currentAbortController.signal;
     let client: CdpPageClient | null = null;
@@ -2423,17 +2470,22 @@ export class WechatChannelsPlatform extends BasePlatform {
       if (!checkPostUrl.includes('/post/create')) {
         await tracer.track('⏳ 正在通过发表页 URL 强行导航确保进入发表页...');
         await adapter.loadURL(this.publishUrl);
-        await sleep(2000);
+        await sleep(2000, signal);
       }
 
       // 刷新 CDP 客户端连接，确保 Target 处于最新发表页面
-      await sleep(1500);
+      await sleep(1500, signal);
       while (adapter.webContents.isLoading()) {
-        await sleep(500);
+        checkAborted();
+        await sleep(500, signal);
       }
       try {
-        client = await adapter.getCdpClient();
-        tracer.setClient(client);
+        const refreshedClient = await adapter.getCdpClient();
+        if (refreshedClient && refreshedClient !== client) {
+          try { client?.close(); } catch { }
+          client = refreshedClient;
+          tracer.setClient(client);
+        }
       } catch { }
 
       // 关键卡点：必须严格等待页面彻底渲染就绪，绝不抢跑！
@@ -2586,7 +2638,7 @@ export class WechatChannelsPlatform extends BasePlatform {
 
           if (titleStatus.coord) {
             await client.mouseClick(titleStatus.coord.x, titleStatus.coord.y);
-            await sleep(100);
+            await sleep(100, signal);
           }
           await client.pressEnd();
           await client.backspace(excess);
@@ -2808,7 +2860,7 @@ export class WechatChannelsPlatform extends BasePlatform {
               // 1. 如果能找到删除按钮，物理点击删除并处理确认弹窗
               if (uploadState.deleteCoord) {
                 await client.mouseClick(uploadState.deleteCoord.x, uploadState.deleteCoord.y, { delayMs: getRandomDelay(80, 140) });
-                await sleep(getRandomDelay(650, 980));
+                await sleep(getRandomDelay(650, 980), signal);
                 // 检查确认弹窗并用 CDP 物理点击确定按钮
                 const okCoord = await client.evaluate(() => {
                   const btns = Array.from(document.querySelectorAll('.weui-desktop-btn_primary, button')) as HTMLElement[];
@@ -2821,13 +2873,13 @@ export class WechatChannelsPlatform extends BasePlatform {
                 if (okCoord) {
                   await client.mouseClick(okCoord.x, okCoord.y, { delayMs: getRandomDelay(80, 140) });
                 }
-                await sleep(getRandomDelay(1200, 1750));
+                await sleep(getRandomDelay(1200, 1750), signal);
               }
 
               // 2. 重新通过原生 CDP 注入视频文件
               await tracer.track('正在重新注入本地短视频素材并等待上传...');
               await this.uploadVideoViaCdp(client, localVideoPath, tracer);
-              await sleep(getRandomDelay(2600, 3500));
+              await sleep(getRandomDelay(2600, 3500), signal);
               i = 0; // 重置检查计数器，重新进入完整上传轮询
               uploadActiveStart = Date.now();
               continue;
@@ -2935,7 +2987,9 @@ export class WechatChannelsPlatform extends BasePlatform {
           if (i > 0 && i % 4 === 0) {
             await tracer.track(`⏳ 正在等待微信完成视频解析或转码 (${Math.round(i * 1.5)}s)...`, null, 'info', { persistent: true });
           }
-        } catch { }
+        } catch (err: any) {
+          if (err instanceof PublishAbortedError || tracer.isAborted()) throw err;
+        }
 
         await sleep(1500, signal);
       }
@@ -3009,7 +3063,9 @@ export class WechatChannelsPlatform extends BasePlatform {
           await client.sendCommand('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 600, y: 500, deltaX: 0, deltaY: 600 });
           // 底部平稳停顿 1.5 秒
           await sleep(1500, signal);
-        } catch { }
+        } catch (err: any) {
+          if (err instanceof PublishAbortedError || tracer.isAborted()) throw err;
+        }
 
         // ── 点击发表前最终上传状态二次核验 ──────────────────────────────────────────
         // 规则：在实际点击【发表】按钮之前，再做一次实时轮询确认：
@@ -3084,7 +3140,7 @@ export class WechatChannelsPlatform extends BasePlatform {
                 // 1. 物理点击删除按钮
                 if (uploadState.deleteCoord) {
                   await client.mouseClick(uploadState.deleteCoord.x, uploadState.deleteCoord.y, { delayMs: getRandomDelay(80, 140) });
-                  await sleep(getRandomDelay(650, 980));
+                  await sleep(getRandomDelay(650, 980), signal);
                   // 2. 处理删除确认弹窗（纯 CDP 物理点击）
                   const okCoord = await client.evaluate(() => {
                     const btns = Array.from(document.querySelectorAll('.weui-desktop-btn_primary, button')) as HTMLElement[];
@@ -3097,12 +3153,12 @@ export class WechatChannelsPlatform extends BasePlatform {
                   if (okCoord) {
                     await client.mouseClick(okCoord.x, okCoord.y, { delayMs: getRandomDelay(80, 140) });
                   }
-                  await sleep(getRandomDelay(1200, 1750));
+                  await sleep(getRandomDelay(1200, 1750), signal);
                 }
                 // 3. 重新注入视频并等待上传启动
                 await tracer.track('正在重新注入本地短视频素材，等待重新上传启动...');
                 await this.uploadVideoViaCdp(client, localVideoPath, tracer);
-                await sleep(getRandomDelay(4500, 5600)); // 多等约 5 秒让上传真正启动后再轮询
+                await sleep(getRandomDelay(4500, 5600), signal); // 多等约 5 秒让上传真正启动后再轮询
                 fwait = -1; // 修正：continue 后 fwait++ 使其从 0 重新开始完整轮询
                 continue;
               } else {
@@ -3122,7 +3178,9 @@ export class WechatChannelsPlatform extends BasePlatform {
             // 上传已完成且无失败标志：可以安全点击发表
             finalUploadOk = true;
             break;
-          } catch { }
+          } catch (err: any) {
+            if (err instanceof PublishAbortedError || tracer.isAborted()) throw err;
+          }
           await sleep(2000, signal);
         }
 

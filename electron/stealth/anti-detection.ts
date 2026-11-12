@@ -204,24 +204,32 @@ export function generateStealthScript(targetPlatform: string = process.platform,
               enabledPlugin: { value: plugin, enumerable: true },
             });
 
-            plugin[mIndex] = mimeType;
-            plugin[m.type] = mimeType;
+            Object.defineProperty(plugin, mIndex, { value: mimeType, enumerable: true, configurable: true });
+            Object.defineProperty(plugin, m.type, { value: mimeType, enumerable: false, configurable: true });
 
             if (!Object.prototype.hasOwnProperty.call(mimeTypeArray, m.type)) {
-              mimeTypeArray[mimeCount] = mimeType;
-              mimeTypeArray[m.type] = mimeType;
+              Object.defineProperty(mimeTypeArray, mimeCount, { value: mimeType, enumerable: true, configurable: true });
+              Object.defineProperty(mimeTypeArray, m.type, { value: mimeType, enumerable: false, configurable: true });
               mimeCount++;
             }
           });
 
-          pluginArray[pIndex] = plugin;
-          pluginArray[p.name] = plugin;
+          Object.defineProperty(pluginArray, pIndex, { value: plugin, enumerable: true, configurable: true });
+          Object.defineProperty(pluginArray, p.name, { value: plugin, enumerable: false, configurable: true });
         });
 
-        // 补齐真实标准浏览器的 Symbol.iterator 迭代器支持 (支持 for...of, [...plugins], Array.from)
+        // 补齐真实标准浏览器的不可枚举 Symbol.iterator 迭代器支持 (支持 for...of, [...plugins], Array.from)
         try {
-          pluginArray[Symbol.iterator] = Array.prototype[Symbol.iterator];
-          mimeTypeArray[Symbol.iterator] = Array.prototype[Symbol.iterator];
+          Object.defineProperty(pluginArray, Symbol.iterator, {
+            value: Array.prototype[Symbol.iterator],
+            enumerable: false,
+            configurable: true,
+          });
+          Object.defineProperty(mimeTypeArray, Symbol.iterator, {
+            value: Array.prototype[Symbol.iterator],
+            enumerable: false,
+            configurable: true,
+          });
         } catch (e) {}
 
         Object.defineProperties(pluginArray, {
@@ -524,7 +532,8 @@ export function generateStealthScript(targetPlatform: string = process.platform,
           if (isDebuggerCode(handler)) {
             return -1;
           }
-          return origSetInterval.apply(this, arguments);
+          const ctx = (this === undefined || this === null) ? window : this;
+          return origSetInterval.apply(ctx, arguments);
         }, 'setInterval');
       }
 
@@ -534,7 +543,8 @@ export function generateStealthScript(targetPlatform: string = process.platform,
           if (isDebuggerCode(handler)) {
             return -1;
           }
-          return origSetTimeout.apply(this, arguments);
+          const ctx = (this === undefined || this === null) ? window : this;
+          return origSetTimeout.apply(ctx, arguments);
         }, 'setTimeout');
       }
     } catch (e) {}
@@ -544,22 +554,34 @@ export function generateStealthScript(targetPlatform: string = process.platform,
     // -------------------------------------------------------------
     try {
       Object.defineProperty(Document.prototype, 'hidden', {
-        get: makeNative(function() { return false; }, 'get hidden'),
+        get: makeNative(function() {
+          if (!(this instanceof Document)) throw new TypeError("Illegal invocation");
+          return false;
+        }, 'get hidden'),
         configurable: true,
         enumerable: true
       });
       Object.defineProperty(Document.prototype, 'visibilityState', {
-        get: makeNative(function() { return 'visible'; }, 'get visibilityState'),
+        get: makeNative(function() {
+          if (!(this instanceof Document)) throw new TypeError("Illegal invocation");
+          return 'visible';
+        }, 'get visibilityState'),
         configurable: true,
         enumerable: true
       });
       Object.defineProperty(Document.prototype, 'webkitVisibilityState', {
-        get: makeNative(function() { return 'visible'; }, 'get webkitVisibilityState'),
+        get: makeNative(function() {
+          if (!(this instanceof Document)) throw new TypeError("Illegal invocation");
+          return 'visible';
+        }, 'get webkitVisibilityState'),
         configurable: true,
         enumerable: true
       });
       Object.defineProperty(Document.prototype, 'webkitHidden', {
-        get: makeNative(function() { return false; }, 'get webkitHidden'),
+        get: makeNative(function() {
+          if (!(this instanceof Document)) throw new TypeError("Illegal invocation");
+          return false;
+        }, 'get webkitHidden'),
         configurable: true,
         enumerable: true
       });

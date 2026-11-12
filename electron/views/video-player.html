@@ -370,7 +370,7 @@
   <div class="toast-msg" id="toast-msg">已复制到剪贴板</div>
 
   <script>
-    const { ipcRenderer, shell } = require('electron');
+    const { ipcRenderer } = require('electron');
 
     // 多语言字典（覆盖项目 14 种核心语言与兼容语种）
     const I18N = {
@@ -688,10 +688,13 @@
       btnFolder.style.display = 'inline-flex';
     }
 
+    let toastTimer = null;
     function showToast(text) {
       if (text) toastMsg.textContent = text;
       toastMsg.classList.add('show');
-      setTimeout(() => {
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toastTimer = null;
         toastMsg.classList.remove('show');
       }, 1600);
     }
@@ -709,11 +712,12 @@
       const target = localFilePath || rawSrc;
       if (!target) return;
       try {
-        await ipcRenderer.invoke('app:open-system-player', target);
-      } catch (e) {
-        if (shell && shell.openPath && localFilePath) {
-          shell.openPath(localFilePath);
+        const res = await ipcRenderer.invoke('app:open-system-player', target);
+        if (res && res.success === false && res.message) {
+          showToast(res.message);
         }
+      } catch (e) {
+        console.warn('[VideoPlayer] Failed to invoke app:open-system-player:', e);
       }
     }
 
@@ -724,11 +728,12 @@
     btnFolder.addEventListener('click', async () => {
       if (!localFilePath) return;
       try {
-        await ipcRenderer.invoke('app:show-in-folder', localFilePath);
-      } catch (e) {
-        if (shell && shell.showItemInFolder) {
-          shell.showItemInFolder(localFilePath);
+        const res = await ipcRenderer.invoke('app:show-in-folder', localFilePath);
+        if (res && res.success === false && res.message) {
+          showToast(res.message);
         }
+      } catch (e) {
+        console.warn('[VideoPlayer] Failed to invoke app:show-in-folder:', e);
       }
     });
 
@@ -842,7 +847,8 @@
       if (e.code === 'Space' || e.key.toLowerCase() === 'k') {
         e.preventDefault();
         if (mediaEl.paused) {
-          mediaEl.play();
+          const p = mediaEl.play();
+          if (p && typeof p.catch === 'function') p.catch(() => {});
         } else {
           mediaEl.pause();
         }

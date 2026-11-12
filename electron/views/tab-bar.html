@@ -2404,14 +2404,16 @@
             renderStatusCapsule(platformStore[targetPlatform].statusData);
 
             // 核心：若进入自动发布流程或收到明确横幅指令，立即从顶部滑出高对比度醒目横幅
-            const isStartNotice = /自动发布流程|预计花费|预计.*分钟/.test(msg) || Boolean(data.banner);
+            const isStartNotice = Boolean(data.inProgress) || Boolean(data.banner) || /自动发布流程|预计花费|预计.*分钟|auto-publishing|estimated/i.test(msg);
             if (isStartNotice) {
+              const cfgBanner = I18N_CONFIG[currentLanguage] || I18N_CONFIG.zh;
+              const fallbackTitle = (cfgBanner.tabPublish || platformStore[targetPlatform].platformName || 'Auto Publishing');
               const bannerText = data.banner?.detail
-                ? `🚀 ${data.banner.title || '已进入自动发布流程'}：${data.banner.detail}`
+                ? `🚀 ${data.banner.title || fallbackTitle}: ${data.banner.detail}`
                 : msg;
               showPublishBanner(bannerText, 10000);
-            } else if (/✅|已成功发布|发布完成/.test(msg)) {
-              showPublishBanner(`🎉 ${platformStore[targetPlatform].platformName}：${msg}`, 3500);
+            } else if (data.type === 'success' || /✅|published successfully|发布成功|已成功发布|发布完成/i.test(msg)) {
+              showPublishBanner(`🎉 ${platformStore[targetPlatform].platformName}: ${msg}`, 3500);
             }
           }
         }
@@ -2474,9 +2476,7 @@
           const isXhsBusy = platformStore.xiaohongshu?.state === 'running';
           let tip = (config.updateConfirm || '新版本 (v{version}) 已下载完毕，是否立即重启客户端完成升级？').replace('{version}', ver);
           if (isWechatBusy || isXhsBusy) {
-            tip = (currentLanguage === 'zh'
-              ? '⚠️ 警告：当前自动化发布任务正在进行中，重启将中断任务！建议等待发布完毕后再升级。\n\n是否仍要立即重启？'
-              : '⚠️ Warning: Publishing task is running, restarting will interrupt the task!\n\nAre you sure you want to restart now?');
+            tip = config.updateBusyWarning || tip;
           }
           if (confirm(tip)) {
             window.tabBarAPI?.quitAndInstall?.();
