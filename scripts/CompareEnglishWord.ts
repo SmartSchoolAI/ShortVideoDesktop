@@ -301,10 +301,10 @@ const HAS_R2_CONFIG = Boolean(
 );
 
 // CLI rendering script multi-language (14 languages) mechanism
-const SCRIPT_VALID_LANGS = ['zh', 'en', 'ja', 'ko', 'vi', 'th', 'id', 'es', 'fr', 'pt', 'de', 'it', 'ru', 'tr'] as const;
-type ScriptSupportedLang = typeof SCRIPT_VALID_LANGS[number];
+export const SCRIPT_VALID_LANGS = ['zh', 'en', 'ja', 'ko', 'vi', 'th', 'id', 'es', 'fr', 'pt', 'de', 'it', 'ru', 'tr'] as const;
+export type ScriptSupportedLang = typeof SCRIPT_VALID_LANGS[number];
 
-function normalizeScriptLang(lang?: string | null): ScriptSupportedLang {
+export function normalizeScriptLang(lang?: string | null): ScriptSupportedLang {
   if (!lang) return 'zh';
   const clean = String(lang).toLowerCase().trim();
   if ((SCRIPT_VALID_LANGS as readonly string[]).includes(clean)) {
@@ -317,13 +317,55 @@ function normalizeScriptLang(lang?: string | null): ScriptSupportedLang {
   return 'zh';
 }
 
+export function getActiveScriptLang(): ScriptSupportedLang {
+  return normalizeScriptLang(process.env.SHORTVIDEO_LANG || process.env.LANG || 'zh');
+}
+
 const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<ScriptSupportedLang, string>> }> = [
+  {
+    regex: /⏳\s*渲染进度:\s*([\d.]+)%\s*\((\d+)\/(\d+)\s*帧\)\s*\|\s*剩余预计:\s*([^\r\n]+)/g,
+    translations: {
+      "zh": "⏳ 渲染进度: $1% ($2/$3 帧) | 剩余预计: $4",
+      "en": "⏳ Render progress: $1% ($2/$3 frames) | ETA: $4",
+      "ja": "⏳ レンダリング進捗: $1% ($2/$3 フレーム) | 残り時間: $4",
+      "ko": "⏳ 렌더링 진행률: $1% ($2/$3 프레임) | 남은 예상 시간: $4",
+      "vi": "⏳ Tiến độ kết xuất: $1% ($2/$3 khung hình) | Còn lại: $4",
+      "th": "⏳ ความคืบหน้าการเรนเดอร์: $1% ($2/$3 เฟรม) | เวลาที่เหลือ: $4",
+      "id": "⏳ Kemajuan render: $1% ($2/$3 bingkai) | Sisa waktu: $4",
+      "es": "⏳ Progreso de renderizado: $1% ($2/$3 cuadros) | Tiempo restante: $4",
+      "fr": "⏳ Progression du rendu : $1% ($2/$3 images) | Temps restant : $4",
+      "pt": "⏳ Progresso da renderização: $1% ($2/$3 quadros) | Tempo restante: $4",
+      "de": "⏳ Render-Fortschritt: $1% ($2/$3 Frames) | Verbleibend: $4",
+      "it": "⏳ Avanzamento rendering: $1% ($2/$3 fotogrammi) | Rimanente: $4",
+      "ru": "⏳ Прогресс рендеринга: $1% ($2/$3 кадров) | Осталось: $4",
+      "tr": "⏳ İşleme ilerlemesi: %$1 ($2/$3 kare) | Kalan süre: $4",
+    }
+  },
+  {
+    regex: /⏳\s*渲染进度:\s*([\d.]+)%\s*\((\d+)\/(\d+)\s*帧\)/g,
+    translations: {
+      "zh": "⏳ 渲染进度: $1% ($2/$3 帧)",
+      "en": "⏳ Render progress: $1% ($2/$3 frames)",
+      "ja": "⏳ レンダリング進捗: $1% ($2/$3 フレーム)",
+      "ko": "⏳ 렌더링 진행률: $1% ($2/$3 프레임)",
+      "vi": "⏳ Tiến độ kết xuất: $1% ($2/$3 khung hình)",
+      "th": "⏳ ความคืบหน้าการเรนเดอร์: $1% ($2/$3 เฟรม)",
+      "id": "⏳ Kemajuan render: $1% ($2/$3 bingkai)",
+      "es": "⏳ Progreso de renderizado: $1% ($2/$3 cuadros)",
+      "fr": "⏳ Progression du rendu : $1% ($2/$3 images)",
+      "pt": "⏳ Progresso da renderização: $1% ($2/$3 quadros)",
+      "de": "⏳ Render-Fortschritt: $1% ($2/$3 Frames)",
+      "it": "⏳ Avanzamento rendering: $1% ($2/$3 fotogrammi)",
+      "ru": "⏳ Прогресс рендеринга: $1% ($2/$3 кадров)",
+      "tr": "⏳ İşleme ilerlemesi: %$1 ($2/$3 kare)",
+    }
+  },
   {
     regex: /网络操作/g,
     translations: {
-      "zh": "Network operation",
+      "zh": "网络操作",
       "en": "Network operation",
-      "ja": "Network operation",
+      "ja": "ネットワーク操作",
       "ko": "네트워크 작업",
       "vi": "Thao tác mạng",
       "th": "การดำเนินการเครือข่าย",
@@ -340,9 +382,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
   {
     regex: /中文字幕/g,
     translations: {
-      "zh": "Chinese Subtitles",
+      "zh": "中文字幕",
       "en": "Chinese Subtitles",
-      "ja": "Chinese Subtitles",
+      "ja": "中国語字幕",
       "ko": "중국어 자막",
       "vi": "Phụ đề tiếng Trung",
       "th": "ซับไตเติลภาษาจีน",
@@ -359,9 +401,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
   {
     regex: /纯英文/g,
     translations: {
-      "zh": "English Only",
+      "zh": "纯英文",
       "en": "English Only",
-      "ja": "English Only",
+      "ja": "英語のみ",
       "ko": "영어 전용",
       "vi": "Chỉ tiếng Anh",
       "th": "ภาษาอังกฤษเท่านั้น",
@@ -378,9 +420,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
   {
     regex: /日文字幕/g,
     translations: {
-      "zh": "Japanese Subtitles",
+      "zh": "日文字幕",
       "en": "Japanese Subtitles",
-      "ja": "Japanese Subtitles",
+      "ja": "日本語字幕",
       "ko": "일본어 자막",
       "vi": "Phụ đề tiếng Nhật",
       "th": "ซับไตเติลภาษาญี่ปุ่น",
@@ -397,9 +439,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
   {
     regex: /韩文字幕/g,
     translations: {
-      "zh": "Korean Subtitles",
+      "zh": "韩文字幕",
       "en": "Korean Subtitles",
-      "ja": "Korean Subtitles",
+      "ja": "韓国語字幕",
       "ko": "한국어 자막",
       "vi": "Phụ đề tiếng Hàn",
       "th": "ซับไตเติลเกาหลี",
@@ -416,9 +458,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
   {
     regex: /越南文字幕/g,
     translations: {
-      "zh": "Vietnamese Subtitles",
+      "zh": "越南文字幕",
       "en": "Vietnamese Subtitles",
-      "ja": "Vietnamese Subtitles",
+      "ja": "ベトナム語字幕",
       "ko": "베트남어 자막",
       "vi": "Phụ đề tiếng Việt",
       "th": "ซับไตเติลเวียดนาม",
@@ -435,9 +477,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
   {
     regex: /泰文字幕/g,
     translations: {
-      "zh": "Thai Subtitles",
+      "zh": "泰文字幕",
       "en": "Thai Subtitles",
-      "ja": "Thai Subtitles",
+      "ja": "タイ語字幕",
       "ko": "태국어 자막",
       "vi": "Phụ đề tiếng Thái",
       "th": "ซับไตเติลไทย",
@@ -454,9 +496,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
   {
     regex: /印尼文字幕/g,
     translations: {
-      "zh": "Indonesian Subtitles",
+      "zh": "印尼文字幕",
       "en": "Indonesian Subtitles",
-      "ja": "Indonesian Subtitles",
+      "ja": "インドネシア語字幕",
       "ko": "인도네시아어 자막",
       "vi": "Phụ đề tiếng Indonesia",
       "th": "ซับไตเติลอินโดนีเซีย",
@@ -473,9 +515,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
   {
     regex: /西班牙文字幕/g,
     translations: {
-      "zh": "Spanish Subtitles",
+      "zh": "西班牙文字幕",
       "en": "Spanish Subtitles",
-      "ja": "Spanish Subtitles",
+      "ja": "スペイン語字幕",
       "ko": "스페인어 자막",
       "vi": "Phụ đề tiếng Tây Ban Nha",
       "th": "ซับไตเติลสเปน",
@@ -492,9 +534,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
   {
     regex: /法文字幕/g,
     translations: {
-      "zh": "French Subtitles",
+      "zh": "法文字幕",
       "en": "French Subtitles",
-      "ja": "French Subtitles",
+      "ja": "フランス語字幕",
       "ko": "프랑스어 자막",
       "vi": "Phụ đề tiếng Pháp",
       "th": "ซับไตเติลฝรั่งเศส",
@@ -511,9 +553,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
   {
     regex: /葡萄牙文字幕/g,
     translations: {
-      "zh": "Portuguese Subtitles",
+      "zh": "葡萄牙文字幕",
       "en": "Portuguese Subtitles",
-      "ja": "Portuguese Subtitles",
+      "ja": "ポルトガル語字幕",
       "ko": "포르투갈어 자막",
       "vi": "Phụ đề tiếng Bồ Đào Nha",
       "th": "ซับไตเติลโปรตุเกส",
@@ -530,9 +572,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
   {
     regex: /德文字幕/g,
     translations: {
-      "zh": "German Subtitles",
+      "zh": "德文字幕",
       "en": "German Subtitles",
-      "ja": "German Subtitles",
+      "ja": "ドイツ語字幕",
       "ko": "독일어 자막",
       "vi": "Phụ đề tiếng Đức",
       "th": "ซับไตเติลเยอรมัน",
@@ -549,9 +591,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
   {
     regex: /意大利文字幕/g,
     translations: {
-      "zh": "Italian Subtitles",
+      "zh": "意大利文字幕",
       "en": "Italian Subtitles",
-      "ja": "Italian Subtitles",
+      "ja": "イタリア語字幕",
       "ko": "이탈리아어 자막",
       "vi": "Phụ đề tiếng Ý",
       "th": "ซับไตเติลอิตาลี",
@@ -568,9 +610,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
   {
     regex: /俄文字幕/g,
     translations: {
-      "zh": "Russian Subtitles",
+      "zh": "俄文字幕",
       "en": "Russian Subtitles",
-      "ja": "Russian Subtitles",
+      "ja": "ロシア語字幕",
       "ko": "러시아어 자막",
       "vi": "Phụ đề tiếng Nga",
       "th": "ซับไตเติลรัสเซีย",
@@ -587,9 +629,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
   {
     regex: /土耳其文字幕/g,
     translations: {
-      "zh": "Turkish Subtitles",
+      "zh": "土耳其文字幕",
       "en": "Turkish Subtitles",
-      "ja": "Turkish Subtitles",
+      "ja": "トルコ語字幕",
       "ko": "터키어 자막",
       "vi": "Phụ đề tiếng Thổ Nhĩ Kỳ",
       "th": "ซับไตเติลตุรกี",
@@ -606,9 +648,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
   {
     regex: /根据任务语言设定检测到 (\d+) 种渲染版本，即将开始渲染[:：]/g,
     translations: {
-      "zh": "Detected $1 render versions based on task language settings, starting render:",
+      "zh": "根据任务语言设定检测到 $1 种渲染版本，即将开始渲染:",
       "en": "Detected $1 render versions based on task language settings, starting render:",
-      "ja": "Detected $1 render versions based on task language settings, starting render:",
+      "ja": "タスク言語設定に基づき $1 種類のレンダリングバージョンを検出しました。開始します:",
       "ko": "작업 언어 설정에 따라 $1개 렌더링 버전이 감지되었습니다. 렌더링을 시작합니다:",
       "vi": "Đã phát hiện $1 phiên bản render dựa trên cài đặt ngôn ngữ, chuẩn bị bắt đầu render:",
       "th": "ตรวจพบ $1 เวอร์ชันเรนเดอร์ตามการตั้งค่าภาษา กำลังเริ่มเรนเดอร์:",
@@ -644,9 +686,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
   {
     regex: /【(.*?)】渲染完成! 耗时[:：]\s*(.*?)s \| 文件大小[:：]\s*(.*?) MB/g,
     translations: {
-      "zh": "[$1] render completed! Time: $2s | File size: $3 MB",
+      "zh": "【$1】渲染完成! 耗时: $2s | 文件大小: $3 MB",
       "en": "[$1] render completed! Time: $2s | File size: $3 MB",
-      "ja": "[$1] render completed! Time: $2s | File size: $3 MB",
+      "ja": "【$1】レンダリング完了! 所要時間: $2s | ファイルサイズ: $3 MB",
       "ko": "【$1】 렌더링 완료! 소요 시간: $2s | 파일 크기: $3 MB",
       "vi": "[$1] render thành công! Thời gian: $2s | Dung lượng: $3 MB",
       "th": "[$1] เรนเดอร์เสร็จสมบูรณ์! ใช้เวลา: $2 วินาที | ขนาดไฟล์: $3 MB",
@@ -663,9 +705,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
   {
     regex: /正在对音频轨做微小变调 \((.*?) 音分\)，人耳无感知但指纹辛辣差异化\.\.\./g,
     translations: {
-      "zh": "Applying subtle pitch shift ($1 cents) to audio track to differentiate fingerprint...",
+      "zh": "正在对音频轨做微小变调 ($1 音分)，人耳无感知但指纹辛辣差异化...",
       "en": "Applying subtle pitch shift ($1 cents) to audio track to differentiate fingerprint...",
-      "ja": "Applying subtle pitch shift ($1 cents) to audio track to differentiate fingerprint...",
+      "ja": "音声トラックに微細なピッチシフト ($1 セント) を適用中...",
       "ko": "오디오 트랙에 미세 피치 시프트 ($1 센트) 적용 중...",
       "vi": "Đang áp dụng điều chỉnh cao độ ($1 cents) cho dải âm thanh...",
       "th": "กำลังปรับระดับเสียงในแทร็กเสียง ($1 เซนต์)...",
@@ -682,9 +724,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
   {
     regex: /【(.*?)】代理上传成功! 耗时[:：]\s*(.*?)s \| 地址[:：]\s*(.*)/g,
     translations: {
-      "zh": "[$1] proxy upload successful! Time: $2s | URL: $3",
+      "zh": "【$1】代理上传成功! 耗时: $2s | 地址: $3",
       "en": "[$1] proxy upload successful! Time: $2s | URL: $3",
-      "ja": "[$1] proxy upload successful! Time: $2s | URL: $3",
+      "ja": "【$1】プロキシアップロード成功! 所要時間: $2s | URL: $3",
       "ko": "【$1】 프록시 업로드 성공! 소요 시간: $2s | URL: $3",
       "vi": "[$1] tải lên qua proxy thành công! Thời gian: $2s | URL: $3",
       "th": "[$1] อัปโหลดผ่านพร็อกซีสำเร็จ! ใช้เวลา: $2 วินาที | URL: $3",
@@ -701,9 +743,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
   {
     regex: /【(.*?)】本地直传成功[:：]\s*(.*)/g,
     translations: {
-      "zh": "[$1] local direct upload successful: $2",
+      "zh": "【$1】本地直传成功: $2",
       "en": "[$1] local direct upload successful: $2",
-      "ja": "[$1] local direct upload successful: $2",
+      "ja": "【$1】ローカル直接アップロード成功: $2",
       "ko": "【$1】 로컬 직송 성공: $2",
       "vi": "[$1] tải trực tiếp cục bộ thành công: $2",
       "th": "[$1] อัปโหลดตรงในเครื่องสำเร็จ: $2",
@@ -720,9 +762,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
   {
     regex: /任务 \[(.*?)\] (\d+) 个多语言视频全部处理并发布完成!/g,
     translations: {
-      "zh": "Task [$1] all $2 multilingual videos processed and published!",
+      "zh": "任务 [$1] $2 个多语言视频全部处理并发布完成!",
       "en": "Task [$1] all $2 multilingual videos processed and published!",
-      "ja": "Task [$1] all $2 multilingual videos processed and published!",
+      "ja": "タスク [$1] 全 $2 本の多言語動画の処理と公開が完了しました!",
       "ko": "작업 [$1] 총 $2개 다국어 동영상 처리 및 게시 완료!",
       "vi": "Nhiệm vụ [$1] tất cả $2 video đa ngôn ngữ đã xử lý và xuất bản xong!",
       "th": "งาน [$1] ทั้งหมด $2 วิดีโอหลายภาษาประมวลผลและเผยแพร่เสร็จสมบูรณ์!",
@@ -739,9 +781,9 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
   {
     regex: /正在向服务端同步状态为「渲染完成 \(video_finished\)」\.\.\./g,
     translations: {
-      "zh": "Syncing status [video_finished] to server...",
+      "zh": "正在向服务端同步状态为「渲染完成 (video_finished)」...",
       "en": "Syncing status [video_finished] to server...",
-      "ja": "Syncing status [video_finished] to server...",
+      "ja": "サーバーにステータス「レンダリング完了 (video_finished)」を同期中...",
       "ko": "서버로 상태 [video_finished] 동기화 중...",
       "vi": "Đang đồng bộ trạng thái [video_finished] với máy chủ...",
       "th": "กำลังซิงค์สถานะ [video_finished] ไปยังเซิร์ฟเวอร์...",
@@ -753,25 +795,6 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
       "it": "Sincronizzazione dello stato [video_finished] con il server...",
       "ru": "Синхронизация статуса [video_finished] с сервером...",
       "tr": "[video_finished] durumu sunucuya senkronize ediliyor...",
-    }
-  },
-  {
-    regex: /🧹\ 检测到强制重新构建，清理历史缓存目录:\ \$\{BUNDLE_CACHE_DIR\}/g,
-    translations: {
-      "zh": "🧹 检测到强制重新构建，清理历史缓存目录: ${BUNDLE_CACHE_DIR}",
-      "en": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
-      "ja": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
-      "ko": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
-      "vi": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
-      "th": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
-      "id": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
-      "es": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
-      "fr": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
-      "pt": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
-      "de": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
-      "it": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
-      "ru": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
-      "tr": "🧹 检测到强制重新构建，清理历史缓存目录: BUNDLE_CACHE_DIR",
     }
   },
   {
@@ -813,7 +836,7 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
     }
   },
   {
-    regex: /Remotion\s*打包失败[，,]\s*退出码[:：]\s*(.*?)/g,
+    regex: /Remotion\s*打包失败[，,]\s*退出码[:：]\s*(.*)/g,
     translations: {
       "zh": "Remotion 打包失败，退出码: $1",
       "en": "Remotion bundle failed, exit code: $1",
@@ -832,7 +855,7 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
     }
   },
   {
-    regex: /Remotion\s*渲染进程异常退出[，,]\s*状态码[:：]\s*(.*?)/g,
+    regex: /Remotion\s*渲染进程异常退出[，,]\s*状态码[:：]\s*(.*)/g,
     translations: {
       "zh": "Remotion 渲染进程异常退出，状态码: $1",
       "en": "Remotion render process exited unexpectedly, status code: $1",
@@ -851,7 +874,7 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
     }
   },
   {
-    regex: /SSE\s*监听主线程异常[:：]\s*(.*?)/g,
+    regex: /SSE\s*监听主线程异常[:：]\s*(.*)/g,
     translations: {
       "zh": "SSE 监听主线程异常: $1",
       "en": "SSE listener main thread error: $1",
@@ -931,18 +954,18 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
     translations: {
       "zh": "单次运行模式完成，退出。",
       "en": "Single run mode finished, exiting.",
-      "ja": "Single run mode finished, exiting.",
-      "ko": "Single run mode finished, exiting.",
-      "vi": "Single run mode finished, exiting.",
-      "th": "Single run mode finished, exiting.",
-      "id": "Single run mode finished, exiting.",
-      "es": "Single run mode finished, exiting.",
-      "fr": "Single run mode finished, exiting.",
-      "pt": "Single run mode finished, exiting.",
-      "de": "Single run mode finished, exiting.",
-      "it": "Single run mode finished, exiting.",
-      "ru": "Single run mode finished, exiting.",
-      "tr": "Single run mode finished, exiting.",
+      "ja": "単一実行モードが完了しました。終了します。",
+      "ko": "단일 실행 모드가 완료되었습니다. 종료합니다.",
+      "vi": "Chế độ chạy một lần hoàn tất, đang thoát.",
+      "th": "โหมดการทำงานครั้งเดียวเสร็จสมบูรณ์ กำลังออก",
+      "id": "Mode sekali jalan selesai, keluar.",
+      "es": "Modo de ejecución única completado, saliendo.",
+      "fr": "Mode d'exécution unique terminé, fermeture.",
+      "pt": "Modo de execução única concluído, saindo.",
+      "de": "Einzellaufmodus abgeschlossen, wird beendet.",
+      "it": "Modalità di esecuzione singola completata, uscita.",
+      "ru": "Режим однократного запуска завершен, выход.",
+      "tr": "Tek seferlik çalışma modu tamamlandı, çıkılıyor.",
     }
   },
   {
@@ -1003,7 +1026,7 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
     }
   },
   {
-    regex: /🔔\s*\[SSE\s*实时下发\]\s*收到新视频渲染任务[:：]?\s*\[(.*?)\]\s*(.*?)\s*vs\s*(.*?)/g,
+    regex: /🔔\s*\[SSE\s*实时下发\]\s*收到新视频渲染任务[:：]?\s*\[(.*?)\]\s*(.*?)\s*vs\s*(.*)/g,
     translations: {
       "zh": "🔔 [SSE 实时下发] 收到新视频渲染任务: [$1] $2 vs $3",
       "en": "🔔 [SSE Realtime] Received new video render task: [$1] $2 vs $3",
@@ -1136,6 +1159,44 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
     }
   },
   {
+    regex: /⚡\s*\[流水线接续抢单\]\s*成功锁定待渲染任务:\s*(.*?)\s*\[(.*?)\]\s*(.*)/g,
+    translations: {
+      "zh": "⚡ [流水线接续抢单] 成功锁定待渲染任务: $1 [$2] $3",
+      "en": "⚡ [Pipeline Continuous Claiming] Claimed pending render task: $1 [$2] $3",
+      "ja": "⚡ [パイプライン継続取得] レンダリング待ちタスクを確保: $1 [$2] $3",
+      "ko": "⚡ [파이프라인 연속 작업 확보] 렌더링 대기 작업 잠금 완료: $1 [$2] $3",
+      "vi": "⚡ [Nhận tác vụ liên tục] Đã khóa tác vụ kết xuất chờ: $1 [$2] $3",
+      "th": "⚡ [รับงานต่อเนื่อง] ล็อกงานเรนเดอร์ที่รอดำเนินการแล้ว: $1 [$2] $3",
+      "id": "⚡ [Klaim Berkelanjutan Pipeline] Berhasil mengunci tugas render: $1 [$2] $3",
+      "es": "⚡ [Reclamación Continua] Tarea de renderizado bloqueada: $1 [$2] $3",
+      "fr": "⚡ [Réclamation Continue] Tâche de rendu verrouillée : $1 [$2] $3",
+      "pt": "⚡ [Reivindicação Contínua] Tarefa de renderização bloqueada: $1 [$2] $3",
+      "de": "⚡ [Kontinuierliche Übernahme] Render-Aufgabe reserviert: $1 [$2] $3",
+      "it": "⚡ [Acquisizione Continua] Attività di rendering bloccata: $1 [$2] $3",
+      "ru": "⚡ [Непрерывный захват] Задача на рендеринг заблокирована: $1 [$2] $3",
+      "tr": "⚡ [Ardışık Düzen Görev Alma] Bekleyen işleme görevi kilitlendi: $1 [$2] $3",
+    }
+  },
+  {
+    regex: /⚡\s*\[轮询抢单\]\s*成功锁定待渲染任务:\s*(.*?)\s*\[(.*?)\]\s*(.*)/g,
+    translations: {
+      "zh": "⚡ [轮询抢单] 成功锁定待渲染任务: $1 [$2] $3",
+      "en": "⚡ [Polling Claim] Claimed pending render task: $1 [$2] $3",
+      "ja": "⚡ [ポーリング取得] レンダリング待ちタスクを確保: $1 [$2] $3",
+      "ko": "⚡ [폴링 작업 확보] 렌더링 대기 작업 잠금 완료: $1 [$2] $3",
+      "vi": "⚡ [Nhận tác vụ thăm dò] Đã khóa tác vụ kết xuất chờ: $1 [$2] $3",
+      "th": "⚡ [รับงานแบบโพล] ล็อกงานเรนเดอร์ที่รอดำเนินการแล้ว: $1 [$2] $3",
+      "id": "⚡ [Klaim Polling] Berhasil mengunci tugas render: $1 [$2] $3",
+      "es": "⚡ [Reclamación por Sondeo] Tarea de renderizado bloqueada: $1 [$2] $3",
+      "fr": "⚡ [Réclamation par Scrutation] Tâche de rendu verrouillée : $1 [$2] $3",
+      "pt": "⚡ [Reivindicação por Sondagem] Tarefa de renderização bloqueada: $1 [$2] $3",
+      "de": "⚡ [Polling-Übernahme] Render-Aufgabe reserviert: $1 [$2] $3",
+      "it": "⚡ [Acquisizione Polling] Attività di rendering bloccata: $1 [$2] $3",
+      "ru": "⚡ [Захват опросом] Задача на рендеринг заблокирована: $1 [$2] $3",
+      "tr": "⚡ [Yoklama Görev Alma] Bekleyen işleme görevi kilitlendi: $1 [$2] $3",
+    }
+  },
+  {
     regex: /流水线接续抢单/g,
     translations: {
       "zh": "流水线接续抢单",
@@ -1250,6 +1311,44 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
     }
   },
   {
+    regex: /⚠️\s*检测到渲染内存不足 \(Out of memory \/ malloc failed\)，正在自动降级并发度为 1x 并重新尝试渲染\.\.\./g,
+    translations: {
+      "zh": "⚠️ 检测到渲染内存不足 (Out of memory / malloc failed)，正在自动降级并发度为 1x 并重新尝试渲染...",
+      "en": "⚠️ Detected out-of-memory condition, automatically reducing concurrency to 1x and retrying...",
+      "ja": "⚠️ メモリ不足を検出しました。並列度を 1x に自動縮小して再試行中...",
+      "ko": "⚠️ 렌더링 메모리 부족 감지, 동시성을 1x로 자동 축소하고 재시도 중...",
+      "vi": "⚠️ Phát hiện thiếu bộ nhớ kết xuất, tự động giảm luồng xuống 1x và thử lại...",
+      "th": "⚠️ ตรวจพบหน่วยความจำไม่เพียงพอ กำลังลดการทำงานพร้อมกันเป็น 1x และลองใหม่...",
+      "id": "⚠️ Terdeteksi kekurangan memori render, otomatis menurunkan konkurensi ke 1x dan mencoba lagi...",
+      "es": "⚠️ Memoria insuficiente detectada, reduciendo concurrencia a 1x y reintentando...",
+      "fr": "⚠️ Mémoire insuffisante détectée, réduction de la concurrence à 1x et nouvel essai...",
+      "pt": "⚠️ Memória insuficiente detectada, reduzindo concorrência para 1x e tentando novamente...",
+      "de": "⚠️ Speichermangel beim Rendering erkannt, reduziere Parallelität auf 1x und versuche erneut...",
+      "it": "⚠️ Memoria insufficiente rilevata, riduzione concorrenza a 1x e nuovo tentativo...",
+      "ru": "⚠️ Обнаружена нехватка памяти при рендеринге, снижение параллелизма до 1x и повтор...",
+      "tr": "⚠️ İşleme bellek yetersizliği algılandı, eşzamanlılık 1x'e düşürülüp yeniden deneniyor...",
+    }
+  },
+  {
+    regex: /检测到渲染内存不足 \(Out of memory \/ malloc failed\)/g,
+    translations: {
+      "zh": "检测到渲染内存不足 (Out of memory / malloc failed)",
+      "en": "Detected out-of-memory condition (Out of memory / malloc failed)",
+      "ja": "レンダリング時のメモリ不足を検出 (Out of memory / malloc failed)",
+      "ko": "렌더링 메모리 부족 감지 (Out of memory / malloc failed)",
+      "vi": "Phát hiện lỗi thiếu bộ nhớ kết xuất (Out of memory / malloc failed)",
+      "th": "ตรวจพบหน่วยความจำไม่เพียงพอสำหรับการเรนเดอร์ (Out of memory / malloc failed)",
+      "id": "Terdeteksi memori render tidak mencukupi (Out of memory / malloc failed)",
+      "es": "Se detectó memoria insuficiente durante el renderizado (Out of memory / malloc failed)",
+      "fr": "Mémoire insuffisante détectée lors du rendu (Out of memory / malloc failed)",
+      "pt": "Memória insuficiente detectada durante a renderização (Out of memory / malloc failed)",
+      "de": "Speichermangel beim Rendering erkannt (Out of memory / malloc failed)",
+      "it": "Memoria insufficiente rilevata durante il rendering (Out of memory / malloc failed)",
+      "ru": "Обнаружена нехватка памяти при рендеринге (Out of memory / malloc failed)",
+      "tr": "İşleme sırasında yetersiz bellek algılandı (Out of memory / malloc failed)",
+    }
+  },
+  {
     regex: /检测到 Chromium 内存不足 \(Out of memory\)，正在自动降级并发度为 1x 并重新尝试渲染\.\.\./g,
     translations: {
       "zh": "检测到 Chromium 内存不足 (Out of memory)，正在自动降级并发度为 1x 并重新尝试渲染...",
@@ -1273,7 +1372,7 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
     translations: {
       "zh": "降级并发重试渲染仍然失败: $1",
       "en": "Retry render after reducing concurrency still failed: $1",
-      "ja": "並列度を下げて再试行しましたがレンダリングに失敗しました: $1",
+      "ja": "並列度を下げて再試行しましたがレンダリングに失敗しました: $1",
       "ko": "동시성 축소 후 재시도 렌더링이 여전히 실패했습니다: $1",
       "vi": "Thử lại kết xuất sau khi giảm đồng thời vẫn thất bại: $1",
       "th": "ลองเรนเดอร์ใหม่หลังลดการทำงานพร้อมกันยังคงล้มเหลว: $1",
@@ -1288,22 +1387,98 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
     }
   },
   {
-    regex: /降级并发度 1x 重新渲染成功!/g,
+    regex: /(?:✅\s*)?降级并发度 1x 重新渲染成功!/g,
     translations: {
-      "zh": "降级并发度 1x 重新渲染成功!",
-      "en": "Successfully re-rendered after reducing concurrency to 1x!",
-      "ja": "並列度を 1x に縮小して再レンダリングに成功しました!",
-      "ko": "동시성을 1x로 축소한 후 재렌더링에 성공했습니다!",
-      "vi": "Kết xuất lại thành công sau khi giảm đồng thời xuống 1x!",
-      "th": "เรนเดอร์ใหม่สำเร็จหลังจากลดการทำงานพร้อมกันเป็น 1x!",
-      "id": "Berhasil merender ulang setelah menurunkan konkurensi ke 1x!",
-      "es": "¡Renderizado nuevamente con éxito tras reducir la concurrencia a 1x!",
-      "fr": "Rendu réussi après réduction de la concurrence à 1x !",
-      "pt": "Renderização bem-sucedida após reduzir a concorrência para 1x!",
-      "de": "Erfolgreich erneut gerendert nach Reduzierung der Parallelität auf 1x!",
-      "it": "Rendering completato con successo dopo aver ridotto la concorrenza a 1x!",
-      "ru": "Повторный рендеринг успешно завершен после снижения параллелизма до 1x!",
-      "tr": "Eşzamanlılık 1x'e düşürüldükten sonra yeniden işleme başarılı!",
+      "zh": "✅ 降级并发度 1x 重新渲染成功!",
+      "en": "✅ Successfully re-rendered after reducing concurrency to 1x!",
+      "ja": "✅ 並列度を 1x に縮小して再レンダリングに成功しました!",
+      "ko": "✅ 동시성을 1x로 축소한 후 재렌더링에 성공했습니다!",
+      "vi": "✅ Kết xuất lại thành công sau khi giảm đồng thời xuống 1x!",
+      "th": "✅ เรนเดอร์ใหม่สำเร็จหลังจากลดการทำงานพร้อมกันเป็น 1x!",
+      "id": "✅ Berhasil merender ulang setelah menurunkan konkurensi ke 1x!",
+      "es": "✅ ¡Renderizado nuevamente con éxito tras reducir la concurrencia a 1x!",
+      "fr": "✅ Rendu réussi après réduction de la concurrence à 1x !",
+      "pt": "✅ Renderização bem-sucedida após reduzir a concorrência para 1x!",
+      "de": "✅ Erfolgreich erneut gerendert nach Reduzierung der Parallelität auf 1x!",
+      "it": "✅ Rendering completato con successo dopo aver ridotto la concorrenza a 1x!",
+      "ru": "✅ Повторный рендеринг успешно завершен после снижения параллелизма до 1x!",
+      "tr": "✅ Eşzamanlılık 1x'e düşürüldükten sonra yeniden işleme başarılı!",
+    }
+  },
+  {
+    regex: /⚠️ 同类型错误 \[(.*?)\] 连续出现 \((\d+)\/(\d+)\) 次/g,
+    translations: {
+      "zh": "⚠️ 同类型错误 [$1] 连续出现 ($2/$3) 次",
+      "en": "⚠️ Consecutive error of the same type [$1] occurred ($2/$3) times",
+      "ja": "⚠️ 同じ種類のエラー [$1] が連続で ($2/$3) 回発生しました",
+      "ko": "⚠️ 동일한 유형의 오류 [$1]가 연속 ($2/$3)회 발생했습니다",
+      "vi": "⚠️ Lỗi cùng loại [$1] xuất hiện liên tiếp ($2/$3) lần",
+      "th": "⚠️ ข้อผิดพลาดประเภทเดียวกัน [$1] เกิดขึ้นติดต่อกัน ($2/$3) ครั้ง",
+      "id": "⚠️ Kesalahan jenis yang sama [$1] terjadi berturut-turut ($2/$3) kali",
+      "es": "⚠️ El error del mismo tipo [$1] ocurrió consecutivamente ($2/$3) veces",
+      "fr": "⚠️ L'erreur du même type [$1] s'est produite consécutivement ($2/$3) fois",
+      "pt": "⚠️ Erro do mesmo tipo [$1] ocorreu consecutivamente ($2/$3) vezes",
+      "de": "⚠️ Fehler desselben Typs [$1] ist ($2/$3) Mal hintereinander aufgetreten",
+      "it": "⚠️ Si è verificato consecutivamente l'errore dello stesso tipo [$1] ($2/$3) volte",
+      "ru": "⚠️ Ошибка одного типа [$1] произошла подряд ($2/$3) раз(а)",
+      "tr": "⚠️ Aynı tür hata [$1] art arda ($2/$3) kez meydana geldi",
+    }
+  },
+  {
+    regex: /🛑 \[熔断机制触发\] 同类型错误 \[(.*?)\] 已连续出现 3 次，为防止系统无限死循环重试，立即停止执行后续渲染操作！/g,
+    translations: {
+      "zh": "🛑 [熔断机制触发] 同类型错误 [$1] 已连续出现 3 次，为防止系统无限死循环重试，立即停止执行后续渲染操作！",
+      "en": "🛑 [Circuit Breaker Tripped] Same error type [$1] occurred 3 times consecutively. Halting rendering operations immediately to prevent infinite retry loops!",
+      "ja": "🛑 [サーキットブレーカー発動] 同じ種類のエラー [$1] が3回連続で発生したため、無限ループを防ぐためレンダリング操作を直ちに停止します！",
+      "ko": "🛑 [회로 차단기 작동] 동일한 유형의 오류 [$1]가 3회 연속 발생하여 무한 루프 재시도를 방지하기 위해 렌더링 작업을 즉시 중단합니다!",
+      "vi": "🛑 [Cơ chế ngắt mạch kích hoạt] Lỗi cùng loại [$1] đã xảy ra 3 lần liên tiếp, dừng ngay thao tác kết xuất để tránh vòng lặp thử lại vô hạn!",
+      "th": "🛑 [เบรกเกอร์ทำงาน] เกิดข้อผิดพลาดประเภทเดียวกัน [$1] ติดต่อกัน 3 ครั้งแล้ว หยุดการเรนเดอร์ทันทีเพื่อป้องกันการลองใหม่แบบวนซ้ำไม่รู้จบ!",
+      "id": "🛑 [Pemutus Sirkuit Dipicu] Kesalahan jenis yang sama [$1] telah terjadi 3 kali berturut-turut, segera menghentikan operasi perenderan untuk mencegah pengulangan tak terbatas!",
+      "es": "🛑 [Disyuntor Activado] El mismo tipo de error [$1] ocurrió 3 veces consecutivas. ¡Deteniendo las operaciones de renderizado inmediatamente para evitar bucles infinitos de reintento!",
+      "fr": "🛑 [Disjoncteur Déclenché] Le même type d'erreur [$1] s'est produit 3 fois consécutivement. Arrêt immédiat des opérations de rendu pour éviter les boucles infinies !",
+      "pt": "🛑 [Disjuntor Acionado] O mesmo tipo de error [$1] ocorreu 3 vezes consecutivas. Interrompendo as operações de renderização imediatamente para evitar loops infinitos!",
+      "de": "🛑 [Schutzschalter ausgelöst] Derselbe Fehlertyp [$1] ist 3 Mal hintereinander aufgetreten. Der Rendering-Vorgang wird sofort gestoppt, um Endlosschleifen zu vermeiden!",
+      "it": "🛑 [Interruttore automatico scattato] Lo stesso tipo di errore [$1] si è verificato per 3 volte consecutive. Interruzione immediata del rendering per evitare cicli infiniti!",
+      "ru": "🛑 [Сработал автоматический выключатель] Ошибка одного типа [$1] произошла подряд 3 раза. Немедленная остановка операций рендеринга для предотвращения бесконечного цикла!",
+      "tr": "🛑 [Devre Kesici Tetiklendi] Aynı hata türü [$1] art arda 3 kez meydana geldi. Sonsuz yeniden deneme döngüsünü önlemek için işleme işlemleri derhal durduruluyor!",
+    }
+  },
+  {
+    regex: /🛑 渲染器已触发同类错误 3 次熔断机制并停止，请排查原因修复后重新启动。/g,
+    translations: {
+      "zh": "🛑 渲染器已触发同类错误 3 次熔断机制并停止，请排查原因修复后重新启动。",
+      "en": "🛑 The renderer has stopped due to tripping the 3-consecutive-same-error circuit breaker. Please investigate, fix the issue, and restart.",
+      "ja": "🛑 レンダラーは同じエラーが3回連続したためサーキットブレーカーにより停止しました。原因を確認・修正してから再起動してください。",
+      "ko": "🛑 동일 오류 3회 발생 회로 차단기가 작동하여 렌더러가 중지되었습니다. 원인을 조사 및 해결한 후 다시 시작하십시오.",
+      "vi": "🛑 Trình kết xuất đã dừng do kích hoạt ngắt mạch lỗi 3 lần liên tiếp. Vui lòng kiểm tra, khắc phục sự cố và khởi động lại.",
+      "th": "🛑 ตัวเรนเดอร์หยุดทำงานเนื่องจากเบรกเกอร์ตรวจพบข้อผิดพลาดเดิมติดต่อกัน 3 ครั้ง กรุณาตรวจสอบ แก้ไขปัญหา และเริ่มต้นใหม่",
+      "id": "🛑 Perender telah berhenti karena memicu pemutus sirkuit 3 kali kesalahan berturut-turut. Silakan periksa, perbaiki masalah, dan mulai ulang.",
+      "es": "🛑 El renderizador se ha detenido debido a la activación del disyuntor por 3 errores idénticos consecutivos. Investigue, solucione el problema y reinicie.",
+      "fr": "🛑 Le moteur de rendu s'est arrêté après le déclenchement du disjoncteur (3 erreurs identiques consécutives). Veuillez corriger le problème puis redémarrer.",
+      "pt": "🛑 O renderizador parou devido ao acionamento do disjuntor por 3 erros consecutivos iguais. Investigue, corrija o problema e reinicie.",
+      "de": "🛑 Der Renderer wurde gestoppt, da der Schutzschalter nach 3 identischen Fehlern ausgelöst wurde. Bitte beheben Sie den Fehler und starten Sie neu.",
+      "it": "🛑 Il motore di rendering si è arrestato dopo l'intervento dell'interruttore automatico per 3 errori consecutivi. Risolvere il problema e riavviare.",
+      "ru": "🛑 Рендерер остановлен из-за срабатывания выключателя при 3 одинаковых ошибках подряд. Устраните проблему и перезапустите.",
+      "tr": "🛑 Oluşturucu, 3 ardışık aynı hata devre kesicisinin tetiklenmesi nedeniyle durduruldu. Lütfen sorunu giderin ve yeniden başlatın.",
+    }
+  },
+  {
+    regex: /⚠️ 检测到网络连接\/代理上传异常已发生 (\d+) 次，正在进入 10 秒网络恢复冷却等待，稍后继续任务轮询\.\.\./g,
+    translations: {
+      "zh": "⚠️ 检测到网络连接/代理上传异常已发生 $1 次，正在进入 10 秒网络恢复冷却等待，稍后继续任务轮询...",
+      "en": "⚠️ Detected network connection/proxy upload exception ($1 times). Entering 10s cooldown for network recovery before resuming task polling...",
+      "ja": "⚠️ ネットワーク接続/プロキシアップロードの例外が $1 回発生しました。タスクポーリングを再開する前に、10秒間のネットワーク回復クールダウンに入ります...",
+      "ko": "⚠️ 네트워크 연결/프록시 업로드 예외가 $1회 감지되었습니다. 작업 폴링을 재개하기 전에 10초 동안 네트워크 복구 대기 상태로 들어갑니다...",
+      "vi": "⚠️ Đã phát hiện ngoại lệ kết nối mạng/tải lên proxy $1 lần. Đang chờ 10 giây để mạng phục hồi trước khi tiếp tục thăm dò tác vụ...",
+      "th": "⚠️ ตรวจพบข้อยกเว้นการเชื่อมต่อเครือข่าย/การอัปโหลดพร็อกซี $1 ครั้ง กำลังเข้าสู่การรอการกู้คืนเครือข่าย 10 วินาทีก่อนดำเนินการตรวจสอบงานต่อไป...",
+      "id": "⚠️ Terdeteksi pengecualian koneksi jaringan/unggahan proksi sebanyak $1 kali. Memasuki pendinginan 10 detik untuk pemulihan jaringan sebelum melanjutkan pemungutan tugas...",
+      "es": "⚠️ Se detectó una excepción de conexión de red/subida por proxy ($1 veces). Entrando en un tiempo de espera de 10s para la recuperación de red antes de reanudar...",
+      "fr": "⚠️ Exception de connexion réseau/téléversement proxy détectée ($1 fois). Période de récupération réseau de 10s avant de reprendre...",
+      "pt": "⚠️ Exceção de conexão de rede/upload de proxy detectada ($1 vezes). Entrando em resfriamento de 10s para recuperação de rede antes de retomar...",
+      "de": "⚠️ Netzwerkverbindungs-/Proxy-Upload-Ausnahme ($1 Mal) erkannt. 10s Abkühlzeit zur Netzwerkwiederherstellung wird gestartet...",
+      "it": "⚠️ Rilevata eccezione di connessione di rete/caricamento proxy ($1 volte). Entrata in pausa di 10s per il recupero della rete prima di riprendere...",
+      "ru": "⚠️ Обнаружен сбой подключения к сети/прокси-загрузки ($1 раз). Переход в 10-секундное ожидание восстановления сети перед возобновлением...",
+      "tr": "⚠️ Ağ bağlantısı/proxy yükleme istisnası ($1 kez) algılandı. Görev yoklamasına devam etmeden önce 10 saniyelik ağ kurtarma beklemesine giriliyor...",
     }
   },
   {
@@ -1324,20 +1499,818 @@ const SCRIPT_I18N_RULES: Array<{ regex: RegExp; translations: Partial<Record<Scr
       "ru": "⏳ Прогресс загрузки: $1% ($2/$3 MB, $4 MB/s)",
       "tr": "⏳ Yükleme ilerlemesi: %$1 ($2/$3 MB, $4 MB/s)",
     }
+  },
+  {
+    regex: /❌ 任务 \[(.*?)\] 执行异常:\s*(.*?)，已自动恢复为待渲染状态/g,
+    translations: {
+      "zh": "❌ 任务 [$1] 执行异常: $2，已自动恢复为待渲染状态",
+      "en": "❌ Task [$1] execution error: $2. Restored status to waiting_render",
+      "ja": "❌ タスク [$1] 実行エラー: $2。waiting_render 状態に戻しました",
+      "ko": "❌ 작업 [$1] 실행 오류: $2. 대기 상태(waiting_render)로 복원되었습니다",
+      "vi": "❌ Tác vụ [$1] lỗi thực thi: $2. Đã khôi phục về trạng thái chờ kết xuất",
+      "th": "❌ งาน [$1] เกิดข้อผิดพลาด: $2 กู้คืนสถานะเป็น waiting_render แล้ว",
+      "id": "❌ Tugas [$1] kesalahan eksekusi: $2. Status dikembalikan ke waiting_render",
+      "es": "❌ Error de ejecución en tarea [$1]: $2. Estado restaurado a waiting_render",
+      "fr": "❌ Erreur d'exécution tâche [$1] : $2. Statut restauré à waiting_render",
+      "pt": "❌ Erro de execução da tarefa [$1]: $2. Status restaurado para waiting_render",
+      "de": "❌ Ausführungsfehler Aufgabe [$1]: $2. Status auf waiting_render zurückgesetzt",
+      "it": "❌ Errore esecuzione attività [$1]: $2. Stato ripristinato a waiting_render",
+      "ru": "❌ Ошибка выполнения задачи [$1]: $2. Статус возвращен в waiting_render",
+      "tr": "❌ Görev [$1] yürütme hatası: $2. Durum waiting_render olarak geri yüklendi",
+    }
+  },
+  {
+    regex: /❌ 任务 \[(.*?)\] 执行异常:\s*(.*?)（尝试恢复待渲染状态失败，请核查服务端状态）/g,
+    translations: {
+      "zh": "❌ 任务 [$1] 执行异常: $2（尝试恢复待渲染状态失败，请核查服务端状态）",
+      "en": "❌ Task [$1] execution error: $2 (Failed to restore waiting_render status; please check server state)",
+      "ja": "❌ タスク [$1] 実行エラー: $2（waiting_render への復元に失敗しました。サーバー状態を確認してください）",
+      "ko": "❌ 작업 [$1] 실행 오류: $2 (대기 상태 복원 실패, 서버 상태를 확인하세요)",
+      "vi": "❌ Tác vụ [$1] lỗi thực thi: $2 (Không thể khôi phục trạng thái waiting_render, vui lòng kiểm tra máy chủ)",
+      "th": "❌ งาน [$1] เกิดข้อผิดพลาด: $2 (ไม่สามารถกู้คืนสถานะ waiting_render โปรดตรวจสอบเซิร์ฟเวอร์)",
+      "id": "❌ Tugas [$1] kesalahan eksekusi: $2 (Gagal memulihkan status waiting_render, harap periksa server)",
+      "es": "❌ Error en tarea [$1]: $2 (Error al restaurar waiting_render; verifique el estado en el servidor)",
+      "fr": "❌ Erreur tâche [$1] : $2 (Échec de restauration waiting_render ; vérifiez le serveur)",
+      "pt": "❌ Erro na tarefa [$1]: $2 (Falha ao restaurar waiting_render; verifique o servidor)",
+      "de": "❌ Fehler Aufgabe [$1]: $2 (Wiederherstellung von waiting_render fehlgeschlagen; Serverstatus prüfen)",
+      "it": "❌ Errore attività [$1]: $2 (Ripristino waiting_render non riuscito; verificare lo stato sul server)",
+      "ru": "❌ Ошибка задачи [$1]: $2 (Не удалось восстановить waiting_render; проверьте сервер)",
+      "tr": "❌ Görev [$1] hatası: $2 (waiting_render durumu geri yüklenemedi; sunucuyu kontrol edin)",
+    }
+  },
+  {
+    regex: /更新任务状态\((.*?)\)失败:\s*(.*)/g,
+    translations: {
+      "zh": "更新任务状态($1)失败: $2",
+      "en": "Failed to update task status ($1): $2",
+      "ja": "タスクステータス ($1) の更新に失敗しました: $2",
+      "ko": "작업 상태 ($1) 업데이트 실패: $2",
+      "vi": "Cập nhật trạng thái tác vụ ($1) thất bại: $2",
+      "th": "อัปเดตสถานะงาน ($1) ล้มเหลว: $2",
+      "id": "Gagal memperbarui status tugas ($1): $2",
+      "es": "Error al actualizar estado de tarea ($1): $2",
+      "fr": "Échec de mise à jour du statut ($1) : $2",
+      "pt": "Falha ao atualizar status da tarefa ($1): $2",
+      "de": "Aktualisierung des Aufgabenstatus ($1) fehlgeschlagen: $2",
+      "it": "Aggiornamento stato attività ($1) non riuscito: $2",
+      "ru": "Ошибка обновления статуса задачи ($1): $2",
+      "tr": "Görev durumu ($1) güncellenemedi: $2",
+    }
+  },
+  {
+    regex: /更新状态为 (.*)/g,
+    translations: {
+      "zh": "更新状态为 $1",
+      "en": "update status to $1",
+      "ja": "ステータスを $1 に更新",
+      "ko": "상태를 $1(으)로 업데이트",
+      "vi": "cập nhật trạng thái thành $1",
+      "th": "อัปเดตสถานะเป็น $1",
+      "id": "perbarui status ke $1",
+      "es": "actualizar estado a $1",
+      "fr": "mettre à jour le statut vers $1",
+      "pt": "atualizar status para $1",
+      "de": "Status auf $1 aktualisieren",
+      "it": "aggiorna stato a $1",
+      "ru": "обновление статуса до $1",
+      "tr": "durumu $1 olarak güncelle",
+    }
+  },
+  {
+    regex: /服务端代理上传视频 \((.*?)\)/g,
+    translations: {
+      "zh": "服务端代理上传视频 ($1)",
+      "en": "server proxy upload video ($1)",
+      "ja": "サーバープロキシ動画アップロード ($1)",
+      "ko": "서버 프록시 비디오 업로드 ($1)",
+      "vi": "tải video qua proxy máy chủ ($1)",
+      "th": "อัปโหลดวิดีโอผ่านพร็อกซีเซิร์ฟเวอร์ ($1)",
+      "id": "unggah video proksi server ($1)",
+      "es": "subida proxy de video ($1)",
+      "fr": "téléversement vidéo via proxy ($1)",
+      "pt": "upload proxy de vídeo ($1)",
+      "de": "Server-Proxy-Video-Upload ($1)",
+      "it": "caricamento proxy video ($1)",
+      "ru": "загрузка видео через прокси сервера ($1)",
+      "tr": "sunucu proxy video yükleme ($1)",
+    }
+  },
+  {
+    regex: /☁️\s*正在上传中文视频\.\.\./g,
+    translations: {
+      "zh": "☁️ 正在上传中文视频...",
+      "en": "☁️ Uploading Chinese video...",
+      "ja": "☁️ 中国語動画をアップロード中...",
+      "ko": "☁️ 중국어 동영상 업로드 중...",
+      "vi": "☁️ Đang tải lên video tiếng Trung...",
+      "th": "☁️ กำลังอัปโหลดวิดีโอภาษาจีน...",
+      "id": "☁️ Mengunggah video Mandarin...",
+      "es": "☁️ Subiendo video en chino...",
+      "fr": "☁️ Téléversement de la vidéo en chinois...",
+      "pt": "☁️ Enviando vídeo em chinês...",
+      "de": "☁️ Lade chinesisches Video hoch...",
+      "it": "☁️ Caricamento video in cinese...",
+      "ru": "☁️ Загрузка китайского видео...",
+      "tr": "☁️ Çince video yükleniyor...",
+    }
+  },
+  {
+    regex: /☁️\s*正在上传英文视频\.\.\./g,
+    translations: {
+      "zh": "☁️ 正在上传英文视频...",
+      "en": "☁️ Uploading English video...",
+      "ja": "☁️ 英語動画をアップロード中...",
+      "ko": "☁️ 영어 동영상 업로드 중...",
+      "vi": "☁️ Đang tải lên video tiếng Anh...",
+      "th": "☁️ กำลังอัปโหลดวิดีโอภาษาอังกฤษ...",
+      "id": "☁️ Mengunggah video Bahasa Inggris...",
+      "es": "☁️ Subiendo video en inglés...",
+      "fr": "☁️ Téléversement de la vidéo en anglais...",
+      "pt": "☁️ Enviando vídeo em inglês...",
+      "de": "☁️ Lade englisches Video hoch...",
+      "it": "☁️ Caricamento video in inglese...",
+      "ru": "☁️ Загрузка английского видео...",
+      "tr": "☁️ İngilizce video yükleniyor...",
+    }
+  },
+  {
+    regex: /✅\s*中文视频上传成功:\s*(.*)/g,
+    translations: {
+      "zh": "✅ 中文视频上传成功: $1",
+      "en": "✅ Chinese video uploaded successfully: $1",
+      "ja": "✅ 中国語動画アップロード成功: $1",
+      "ko": "✅ 중국어 동영상 업로드 성공: $1",
+      "vi": "✅ Tải lên video tiếng Trung thành công: $1",
+      "th": "✅ อัปโหลดวิดีโอภาษาจีนสำเร็จ: $1",
+      "id": "✅ Video Mandarin berhasil diunggah: $1",
+      "es": "✅ Video en chino subido con éxito: $1",
+      "fr": "✅ Vidéo chinoise téléversée avec succès : $1",
+      "pt": "✅ Vídeo em chinês enviado com sucesso: $1",
+      "de": "✅ Chinesisches Video erfolgreich hochgeladen: $1",
+      "it": "✅ Video in cinese caricato con successo: $1",
+      "ru": "✅ Китайское видео успешно загружено: $1",
+      "tr": "✅ Çince video başarıyla yüklendi: $1",
+    }
+  },
+  {
+    regex: /✅\s*英文视频上传成功:\s*(.*)/g,
+    translations: {
+      "zh": "✅ 英文视频上传成功: $1",
+      "en": "✅ English video uploaded successfully: $1",
+      "ja": "✅ 英語動画アップロード成功: $1",
+      "ko": "✅ 영어 동영상 업로드 성공: $1",
+      "vi": "✅ Tải lên video tiếng Anh thành công: $1",
+      "th": "✅ อัปโหลดวิดีโอภาษาอังกฤษสำเร็จ: $1",
+      "id": "✅ Video Bahasa Inggris berhasil diunggah: $1",
+      "es": "✅ Video en inglés subido con éxito: $1",
+      "fr": "✅ Vidéo anglaise téléversée avec succès : $1",
+      "pt": "✅ Vídeo em inglês enviado com sucesso: $1",
+      "de": "✅ Englisches Video erfolgreich hochgeladen: $1",
+      "it": "✅ Video in inglese caricato con successo: $1",
+      "ru": "✅ Английское видео успешно загружено: $1",
+      "tr": "✅ İngilizce video başarıyla yüklendi: $1",
+    }
+  },
+  {
+    regex: /\[1\/2\]\s*正在渲染中文视频 \((.*?)\)\.\.\./g,
+    translations: {
+      "zh": "[1/2] 正在渲染中文视频 ($1)...",
+      "en": "[1/2] Rendering Chinese video ($1)...",
+      "ja": "[1/2] 中国語動画をレンダリング中 ($1)...",
+      "ko": "[1/2] 중국어 동영상 렌더링 중 ($1)...",
+      "vi": "[1/2] Đang kết xuất video tiếng Trung ($1)...",
+      "th": "[1/2] กำลังเรนเดอร์วิดีโอภาษาจีน ($1)...",
+      "id": "[1/2] Merender video Mandarin ($1)...",
+      "es": "[1/2] Renderizando video en chino ($1)...",
+      "fr": "[1/2] Rendu de la vidéo chinoise ($1)...",
+      "pt": "[1/2] Renderizando vídeo em chinês ($1)...",
+      "de": "[1/2] Chinesisches Video wird gerendert ($1)...",
+      "it": "[1/2] Rendering video in cinese ($1)...",
+      "ru": "[1/2] Рендеринг китайского видео ($1)...",
+      "tr": "[1/2] Çince video işleniyor ($1)...",
+    }
+  },
+  {
+    regex: /\[2\/2\]\s*正在渲染英文视频 \((.*?)\)\.\.\./g,
+    translations: {
+      "zh": "[2/2] 正在渲染英文视频 ($1)...",
+      "en": "[2/2] Rendering English video ($1)...",
+      "ja": "[2/2] 英語動画をレンダリング中 ($1)...",
+      "ko": "[2/2] 영어 동영상 렌더링 중 ($1)...",
+      "vi": "[2/2] Đang kết xuất video tiếng Anh ($1)...",
+      "th": "[2/2] กำลังเรนเดอร์วิดีโอภาษาอังกฤษ ($1)...",
+      "id": "[2/2] Merender video Bahasa Inggris ($1)...",
+      "es": "[2/2] Renderizando video en inglés ($1)...",
+      "fr": "[2/2] Rendu de la vidéo anglaise ($1)...",
+      "pt": "[2/2] Renderizando vídeo em inglês ($1)...",
+      "de": "[2/2] Englisches Video wird gerendert ($1)...",
+      "it": "[2/2] Rendering video in inglese ($1)...",
+      "ru": "[2/2] Рендеринг английского видео ($1)...",
+      "tr": "[2/2] İngilizce video işleniyor ($1)...",
+    }
+  },
+  {
+    regex: /✅\s*中文视频渲染完成:\s*(.*)/g,
+    translations: {
+      "zh": "✅ 中文视频渲染完成: $1",
+      "en": "✅ Chinese video rendered: $1",
+      "ja": "✅ 中国語動画レンダリング完了: $1",
+      "ko": "✅ 중국어 동영상 렌더링 완료: $1",
+      "vi": "✅ Hoàn tất kết xuất video tiếng Trung: $1",
+      "th": "✅ เรนเดอร์วิดีโอภาษาจีนเสร็จสมบูรณ์: $1",
+      "id": "✅ Video Mandarin selesai dirender: $1",
+      "es": "✅ Video en chino renderizado: $1",
+      "fr": "✅ Vidéo chinoise rendue : $1",
+      "pt": "✅ Vídeo em chinês renderizado: $1",
+      "de": "✅ Chinesisches Video gerendert: $1",
+      "it": "✅ Video in cinese renderizzato: $1",
+      "ru": "✅ Китайское видео отрендерено: $1",
+      "tr": "✅ Çince video işlendi: $1",
+    }
+  },
+  {
+    regex: /✅\s*英文视频渲染完成:\s*(.*)/g,
+    translations: {
+      "zh": "✅ 英文视频渲染完成: $1",
+      "en": "✅ English video rendered: $1",
+      "ja": "✅ 英語動画レンダリング完了: $1",
+      "ko": "✅ 영어 동영상 렌더링 완료: $1",
+      "vi": "✅ Hoàn tất kết xuất video tiếng Anh: $1",
+      "th": "✅ เรนเดอร์วิดีโอภาษาอังกฤษเสร็จสมบูรณ์: $1",
+      "id": "✅ Video Bahasa Inggris selesai dirender: $1",
+      "es": "✅ Video en inglés renderizado: $1",
+      "fr": "✅ Vidéo anglaise rendue : $1",
+      "pt": "✅ Vídeo em inglês renderizado: $1",
+      "de": "✅ Englisches Video gerendert: $1",
+      "it": "✅ Video in inglese renderizzato: $1",
+      "ru": "✅ Английское видео отрендерено: $1",
+      "tr": "✅ İngilizce video işlendi: $1",
+    }
+  },
+  {
+    regex: /🎬\s*\[(微积分 FRQ|微积分 MCQ)\]\s*开始渲染任务:\s*\[(.*?)\]\s*(.*)/g,
+    translations: {
+      "zh": "🎬 [$1] 开始渲染任务: [$2] $3",
+      "en": "🎬 [$1] Starting render task: [$2] $3",
+      "ja": "🎬 [$1] レンダリングタスクを開始: [$2] $3",
+      "ko": "🎬 [$1] 렌더링 작업 시작: [$2] $3",
+      "vi": "🎬 [$1] Bắt đầu tác vụ kết xuất: [$2] $3",
+      "th": "🎬 [$1] เริ่มงานเรนเดอร์: [$2] $3",
+      "id": "🎬 [$1] Memulai tugas render: [$2] $3",
+      "es": "🎬 [$1] Iniciando tarea de renderizado: [$2] $3",
+      "fr": "🎬 [$1] Démarrage de la tâche de rendu : [$2] $3",
+      "pt": "🎬 [$1] Iniciando tarefa de renderização: [$2] $3",
+      "de": "🎬 [$1] Starte Render-Aufgabe: [$2] $3",
+      "it": "🎬 [$1] Avvio attività di rendering: [$2] $3",
+      "ru": "🎬 [$1] Запуск задачи рендеринга: [$2] $3",
+      "tr": "🎬 [$1] İşleme görevi başlatılıyor: [$2] $3",
+    }
+  },
+  {
+    regex: /📂\s*本地输出目录:\s*(.*)/g,
+    translations: {
+      "zh": "📂 本地输出目录: $1",
+      "en": "📂 Local output directory: $1",
+      "ja": "📂 ローカル出力ディレクトリ: $1",
+      "ko": "📂 로컬 출력 디렉터리: $1",
+      "vi": "📂 Thư mục xuất cục bộ: $1",
+      "th": "📂 ไดเรกทอรีเอาต์พุตในเครื่อง: $1",
+      "id": "📂 Direktori output lokal: $1",
+      "es": "📂 Directorio de salida local: $1",
+      "fr": "📂 Répertoire de sortie local : $1",
+      "pt": "📂 Diretório de saída local: $1",
+      "de": "📂 Lokales Ausgabeverzeichnis: $1",
+      "it": "📂 Directory di output locale: $1",
+      "ru": "📂 Локальный каталог вывода: $1",
+      "tr": "📂 Yerel çıktı dizini: $1",
+    }
+  },
+  {
+    regex: /📥\s*已从云端同步最新微积分 FRQ 剧本与时间戳数据 \(summary\.json\)/g,
+    translations: {
+      "zh": "📥 已从云端同步最新微积分 FRQ 剧本与时间戳数据 (summary.json)",
+      "en": "📥 Synced latest AP Calculus FRQ script and timestamps from cloud (summary.json)",
+      "ja": "📥 クラウドから最新の AP 微積分 FRQ スクリプトとタイムスタンプを同期しました (summary.json)",
+      "ko": "📥 클라우드에서 최신 AP 미적분 FRQ 스크립트 및 타임스탬프 동기화 완료 (summary.json)",
+      "vi": "📥 Đã đồng bộ kịch bản & dấu thời gian AP Calculus FRQ mới nhất từ đám mây (summary.json)",
+      "th": "📥 ซิงค์สคริปต์และไทม์แสตมป์ AP Calculus FRQ ล่าสุดจากคลาวด์แล้ว (summary.json)",
+      "id": "📥 Menyinkronkan skrip & stempel waktu AP Calculus FRQ terbaru dari cloud (summary.json)",
+      "es": "📥 Guion y marcas de tiempo de AP Calculus FRQ sincronizados desde la nube (summary.json)",
+      "fr": "📥 Script et horodatages AP Calculus FRQ synchronisés depuis le cloud (summary.json)",
+      "pt": "📥 Roteiro e carimbos de tempo do AP Calculus FRQ sincronizados da nuvem (summary.json)",
+      "de": "📥 Aktuelles AP Calculus FRQ-Skript und Zeitstempel aus der Cloud synchronisiert (summary.json)",
+      "it": "📥 Script e timestamp AP Calculus FRQ sincronizzati dal cloud (summary.json)",
+      "ru": "📥 Сценарий и таймкоды AP Calculus FRQ синхронизированы из облака (summary.json)",
+      "tr": "📥 En güncel AP Calculus FRQ senaryosu ve zaman damgaları buluttan senkronize edildi (summary.json)",
+    }
+  },
+  {
+    regex: /📥\s*已从云端同步最新微积分 FRQ 原始数据 \(original\.json\)/g,
+    translations: {
+      "zh": "📥 已从云端同步最新微积分 FRQ 原始数据 (original.json)",
+      "en": "📥 Synced latest AP Calculus FRQ raw data from cloud (original.json)",
+      "ja": "📥 クラウドから最新の AP 微積分 FRQ 元データを同期しました (original.json)",
+      "ko": "📥 클라우드에서 최신 AP 미적분 FRQ 원본 데이터 동기화 완료 (original.json)",
+      "vi": "📥 Đã đồng bộ dữ liệu gốc AP Calculus FRQ mới nhất từ đám mây (original.json)",
+      "th": "📥 ซิงค์ข้อมูลดิบ AP Calculus FRQ ล่าสุดจากคลาวด์แล้ว (original.json)",
+      "id": "📥 Menyinkronkan data mentah AP Calculus FRQ terbaru dari cloud (original.json)",
+      "es": "📥 Datos sin procesar de AP Calculus FRQ sincronizados desde la nube (original.json)",
+      "fr": "📥 Données brutes AP Calculus FRQ synchronisées depuis le cloud (original.json)",
+      "pt": "📥 Dados brutos do AP Calculus FRQ sincronizados da nuvem (original.json)",
+      "de": "📥 Aktuelle AP Calculus FRQ-Rohdaten aus der Cloud synchronisiert (original.json)",
+      "it": "📥 Dati grezzi AP Calculus FRQ sincronizzati dal cloud (original.json)",
+      "ru": "📥 Исходные данные AP Calculus FRQ синхронизированы из облака (original.json)",
+      "tr": "📥 En güncel AP Calculus FRQ ham verileri buluttan senkronize edildi (original.json)",
+    }
+  },
+  {
+    regex: /📥\s*已从云端同步最新微积分剧本与时间戳数据 \(summary\.json\)/g,
+    translations: {
+      "zh": "📥 已从云端同步最新微积分剧本与时间戳数据 (summary.json)",
+      "en": "📥 Synced latest AP Calculus MCQ script and timestamps from cloud (summary.json)",
+      "ja": "📥 クラウドから最新の AP 微積分 MCQ スクリプトとタイムスタンプを同期しました (summary.json)",
+      "ko": "📥 클라우드에서 최신 AP 미적분 MCQ 스크립트 및 타임스탬프 동기화 완료 (summary.json)",
+      "vi": "📥 Đã đồng bộ kịch bản & dấu thời gian AP Calculus MCQ mới nhất từ đám mây (summary.json)",
+      "th": "📥 ซิงค์สคริปต์และไทม์แสตมป์ AP Calculus MCQ ล่าสุดจากคลาวด์แล้ว (summary.json)",
+      "id": "📥 Menyinkronkan skrip & stempel waktu AP Calculus MCQ terbaru dari cloud (summary.json)",
+      "es": "📥 Guion y marcas de tiempo de AP Calculus MCQ sincronizados desde la nube (summary.json)",
+      "fr": "📥 Script et horodatages AP Calculus MCQ synchronisés depuis le cloud (summary.json)",
+      "pt": "📥 Roteiro e carimbos de tempo do AP Calculus MCQ sincronizados da nuvem (summary.json)",
+      "de": "📥 Aktuelles AP Calculus MCQ-Skript und Zeitstempel aus der Cloud synchronisiert (summary.json)",
+      "it": "📥 Script e timestamp AP Calculus MCQ sincronizzati dal cloud (summary.json)",
+      "ru": "📥 Сценарий и таймкоды AP Calculus MCQ синхронизированы из облака (summary.json)",
+      "tr": "📥 En güncel AP Calculus MCQ senaryosu ve zaman damgaları buluttan senkronize edildi (summary.json)",
+    }
+  },
+  {
+    regex: /⏩\s*跳过云端上传 \(--skip-upload\)/g,
+    translations: {
+      "zh": "⏩ 跳过云端上传 (--skip-upload)",
+      "en": "⏩ Skipping cloud upload (--skip-upload)",
+      "ja": "⏩ クラウドアップロードをスキップ (--skip-upload)",
+      "ko": "⏩ 클라우드 업로드 건너뛰기 (--skip-upload)",
+      "vi": "⏩ Bỏ qua tải lên đám mây (--skip-upload)",
+      "th": "⏩ ข้ามการอัปโหลดขึ้นคลาวด์ (--skip-upload)",
+      "id": "⏩ Melewati unggahan cloud (--skip-upload)",
+      "es": "⏩ Omitiendo subida a la nube (--skip-upload)",
+      "fr": "⏩ Téléversement cloud ignoré (--skip-upload)",
+      "pt": "⏩ Ignorando upload na nuvem (--skip-upload)",
+      "de": "⏩ Cloud-Upload übersprungen (--skip-upload)",
+      "it": "⏩ Caricamento cloud saltato (--skip-upload)",
+      "ru": "⏩ Пропуск загрузки в облако (--skip-upload)",
+      "tr": "⏩ Bulut yüklemesi atlanıyor (--skip-upload)",
+    }
+  },
+  {
+    regex: /📝\s*正在更新微积分(?: FRQ)? 视频任务状态为已完成 \(video_finished\)\.\.\./g,
+    translations: {
+      "zh": "📝 正在更新微积分视频任务状态为已完成 (video_finished)...",
+      "en": "📝 Updating AP Calculus video task status to completed (video_finished)...",
+      "ja": "📝 AP 微積分動画タスクのステータスを完了 (video_finished) に更新中...",
+      "ko": "📝 AP 미적분 비디오 작업 상태를 완료 (video_finished)로 업데이트 중...",
+      "vi": "📝 Đang cập nhật trạng thái tác vụ video AP Calculus thành hoàn thành (video_finished)...",
+      "th": "📝 กำลังอัปเดตสถานะงานวิดีโอ AP Calculus เป็นเสร็จสมบูรณ์ (video_finished)...",
+      "id": "📝 Memperbarui status tugas video AP Calculus ke selesai (video_finished)...",
+      "es": "📝 Actualizando estado de tarea de AP Calculus a completado (video_finished)...",
+      "fr": "📝 Mise à jour du statut de la tâche AP Calculus vers terminé (video_finished)...",
+      "pt": "📝 Atualizando status da tarefa AP Calculus para concluído (video_finished)...",
+      "de": "📝 Aktualisiere AP Calculus Aufgabenstatus auf abgeschlossen (video_finished)...",
+      "it": "📝 Aggiornamento stato attività AP Calculus a completato (video_finished)...",
+      "ru": "📝 Обновление статуса задачи AP Calculus на завершено (video_finished)...",
+      "tr": "📝 AP Calculus video görevi durumu tamamlandı (video_finished) olarak güncelleniyor...",
+    }
+  },
+  {
+    regex: /🎉\s*\[(.*?)\]\s*任务 \[(.*?)\] 全部渲染与上传完成!/g,
+    translations: {
+      "zh": "🎉 [$1] 任务 [$2] 全部渲染与上传完成!",
+      "en": "🎉 [$1] Task [$2] all renders and uploads completed!",
+      "ja": "🎉 [$1] タスク [$2] すべてのレンダリングとアップロードが完了しました!",
+      "ko": "🎉 [$1] 작업 [$2] 모든 렌더링 및 업로드 완료!",
+      "vi": "🎉 [$1] Tác vụ [$2] đã hoàn tất toàn bộ kết xuất & tải lên!",
+      "th": "🎉 [$1] งาน [$2] เรนเดอร์และอัปโหลดทั้งหมดเสร็จสมบูรณ์!",
+      "id": "🎉 [$1] Tugas [$2] semua render dan unggahan selesai!",
+      "es": "🎉 [$1] ¡Tarea [$2] renderizada y subida por completo!",
+      "fr": "🎉 [$1] Tâche [$2] entièrement rendue et téléversée !",
+      "pt": "🎉 [$1] Tarefa [$2] concluída com sucesso!",
+      "de": "🎉 [$1] Aufgabe [$2] vollständig gerendert und hochgeladen!",
+      "it": "🎉 [$1] Attività [$2] rendering e caricamento completati!",
+      "ru": "🎉 [$1] Задача [$2] полностью отрендерена и загружена!",
+      "tr": "🎉 [$1] Görev [$2] tüm işleme ve yüklemeler tamamlandı!",
+    }
+  },
+  {
+    regex: /⚠️\s*\[(.*?)\]\s*任务 \[(.*?)\] 视频已生成，但更新服务端状态失败/g,
+    translations: {
+      "zh": "⚠️ [$1] 任务 [$2] 视频已生成，但更新服务端状态失败",
+      "en": "⚠️ [$1] Task [$2] video generated, but failed to update server status",
+      "ja": "⚠️ [$1] タスク [$2] 動画は生成されましたが、サーバー状態の更新に失敗しました",
+      "ko": "⚠️ [$1] 작업 [$2] 비디오가 생성되었으나 서버 상태 업데이트에 실패했습니다",
+      "vi": "⚠️ [$1] Tác vụ [$2] đã tạo video nhưng cập nhật trạng thái máy chủ thất bại",
+      "th": "⚠️ [$1] งาน [$2] สร้างวิดีโอแล้วแต่อัปเดตสถานะเซิร์ฟเวอร์ล้มเหลว",
+      "id": "⚠️ [$1] Tugas [$2] video dibuat, namun gagal memperbarui status server",
+      "es": "⚠️ [$1] Video de tarea [$2] generado, pero falló la actualización de estado en el servidor",
+      "fr": "⚠️ [$1] Vidéo de tâche [$2] générée, mais échec de mise à jour du statut serveur",
+      "pt": "⚠️ [$1] Vídeo da tarefa [$2] gerado, mas falha ao atualizar status no servidor",
+      "de": "⚠️ [$1] Video für Aufgabe [$2] erstellt, aber Serverstatus-Update fehlgeschlagen",
+      "it": "⚠️ [$1] Video attività [$2] generato, ma aggiornamento stato server non riuscito",
+      "ru": "⚠️ [$1] Видео для задачи [$2] создано, но обновить статус на сервере не удалось",
+      "tr": "⚠️ [$1] Görev [$2] videosu oluşturuldu ancak sunucu durumu güncellenemedi",
+    }
+  },
+  {
+    regex: /⏳ 渲染调度服务端连接正常，当前队列中没有待渲染视频任务，静默等待中\.\.\./g,
+    translations: {
+      "zh": "⏳ 渲染调度服务端连接正常，当前队列中没有待渲染视频任务，静默等待中...",
+      "en": "⏳ Scheduler server connected; no pending render tasks in queue, waiting quietly...",
+      "ja": "⏳ スケジューラー接続正常。待機中の動画タスクはありません。静かに待機中...",
+      "ko": "⏳ 스케줄러 서버 연결 정상, 대기 중인 작업 없음. 대기 중...",
+      "vi": "⏳ Đã kết nối máy chủ điều phối; không có tác vụ chờ, đang âm thầm chờ...",
+      "th": "⏳ เชื่อมต่อเซิร์ฟเวอร์จัดคิวปกติ ไม่มีงานที่รอดำเนินการ กำลังรอ...",
+      "id": "⏳ Server penjadwal terhubung normal; belum ada tugas render dalam antrean, menunggu...",
+      "es": "⏳ Servidor de programación conectado; no hay tareas pendientes en la cola, esperando...",
+      "fr": "⏳ Serveur planificateur connecté ; aucune tâche en attente, en attente...",
+      "pt": "⏳ Servidor agendador conectado; sem tarefas pendentes na fila, aguardando...",
+      "de": "⏳ Planer-Server verbunden; keine ausstehenden Aufgaben in der Warteschlange, warte...",
+      "it": "⏳ Server scheduler connesso; nessuna attività in coda, in attesa...",
+      "ru": "⏳ Сервер планировщика подключен; очередь пуста, ожидание...",
+      "tr": "⏳ Zamanlayıcı sunucu bağlantısı normal; kuyrukta bekleyen görev yok, bekleniyor...",
+    }
+  },
+  {
+    regex: /⚡\s*检测到已有\s*\[(.*?)\]\s*Remotion\s*渲染核心缓存\s*\((.*?)\):\s*(.*?)，直接复用免打包/g,
+    translations: {
+      "zh": "⚡ 检测到已有 [$1] Remotion 渲染核心缓存 ($2): $3，直接复用免打包",
+      "en": "⚡ Found existing [$1] Remotion bundle cache ($2): $3, reusing directly",
+      "ja": "⚡ 既存の [$1] Remotion レンダーキャッシュ ($2) を検出: $3（再バンドル不要で再利用）",
+      "ko": "⚡ 기존 [$1] Remotion 렌더 캐시 ($2) 감지됨: $3 (번들링 생략 후 재사용)",
+      "vi": "⚡ Đã tìm thấy bộ nhớ đệm Remotion [$1] ($2): $3, dùng lại trực tiếp",
+      "th": "⚡ พบแคชแกนเรนเดอร์ [$1] Remotion ($2): $3 นำมาใช้ซ้ำทันที",
+      "id": "⚡ Cache inti render [$1] Remotion ditemukan ($2): $3, digunakan langsung",
+      "es": "⚡ Caché Remotion [$1] detectada ($2): $3, reutilizando directamente",
+      "fr": "⚡ Cache Remotion [$1] détecté ($2) : $3, réutilisation directe",
+      "pt": "⚡ Cache Remotion [$1] encontrado ($2): $3, reutilizando diretamente",
+      "de": "⚡ Vorhandener [$1] Remotion-Cache ($2) gefunden: $3, direkte Wiederverwendung",
+      "it": "⚡ Rilevata cache Remotion [$1] ($2): $3, riutilizzo diretto",
+      "ru": "⚡ Обнаружен кэш Remotion [$1] ($2): $3, прямое переиспользование",
+      "tr": "⚡ Mevcut [$1] Remotion önbelleği ($2) bulundu: $3, doğrudan kullanılıyor",
+    }
+  },
+  {
+    regex: /🧹\s*检测到\s*\[(.*?)\]\s*Remotion\s*缓存版本过期或不完整，自动清理并刷新:\s*(.*)/g,
+    translations: {
+      "zh": "🧹 检测到 [$1] Remotion 缓存版本过期或不完整，自动清理并刷新: $2",
+      "en": "🧹 Detected stale or incomplete [$1] Remotion cache, cleaning and refreshing: $2",
+      "ja": "🧹 [$1] Remotion キャッシュの期限切れ/不完全を検出、クリーンアップして更新中: $2",
+      "ko": "🧹 [$1] Remotion 캐시가 만료되었거나 불완전하여 정리 및 새로고침 중: $2",
+      "vi": "🧹 Phát hiện cache Remotion [$1] cũ hoặc thiếu, đang dọn dẹp và làm mới: $2",
+      "th": "🧹 พบแคช [$1] Remotion ล้าสมัยหรือเสียหาย กำลังล้างและรีเฟรช: $2",
+      "id": "🧹 Cache Remotion [$1] kedaluwarsa/tidak lengkap, membersihkan dan menyegarkan: $2",
+      "es": "🧹 Caché Remotion [$1] obsoleta o incompleta, limpiando y actualizando: $2",
+      "fr": "🧹 Cache Remotion [$1] obsolète ou incomplet, nettoyage et rafraîchissement : $2",
+      "pt": "🧹 Cache Remotion [$1] desatualizado ou incompleto, limpando e atualizando: $2",
+      "de": "🧹 Veralteter/unvollständiger [$1] Remotion-Cache erkannt, bereinige: $2",
+      "it": "🧹 Rilevata cache Remotion [$1] obsoleta/incompleta, pulizia e aggiornamento: $2",
+      "ru": "🧹 Кэш Remotion [$1] устарел или поврежден, очистка и обновление: $2",
+      "tr": "🧹 Eski veya eksik [$1] Remotion önbelleği algılandı, temizlenip yenileniyor: $2",
+    }
+  },
+  {
+    regex: /📡\s*正在建立\s*\[(.*?)\]\s*SSE\s*实时任务下发长连接:\s*(.*)/g,
+    translations: {
+      "zh": "📡 正在建立 [$1] SSE 实时任务下发长连接: $2",
+      "en": "📡 Establishing [$1] SSE real-time task connection: $2",
+      "ja": "📡 [$1] SSE リアルタイムタスク接続を確立中: $2",
+      "ko": "📡 [$1] SSE 실시간 작업 연결 수립 중: $2",
+      "vi": "📡 Đang thiết lập kết nối SSE thời gian thực [$1]: $2",
+      "th": "📡 กำลังเชื่อมต่อ SSE แบบเรียลไทม์ [$1]: $2",
+      "id": "📡 Membangun koneksi SSE real-time [$1]: $2",
+      "es": "📡 Estableciendo conexión SSE en tiempo real [$1]: $2",
+      "fr": "📡 Établissement de la connexion SSE temps réel [$1] : $2",
+      "pt": "📡 Estabelecendo conexão SSE em tempo real [$1]: $2",
+      "de": "📡 Stelle [$1] SSE-Echtzeitverbindung her: $2",
+      "it": "📡 Creazione connessione SSE in tempo reale [$1]: $2",
+      "ru": "📡 Установка SSE-соединения реального времени [$1]: $2",
+      "tr": "📡 [$1] SSE gerçek zamanlı görev bağlantısı kuruluyor: $2",
+    }
+  },
+  {
+    regex: /⚡\s*\[(.*?)\]\s*SSE\s*任务长连接已打通！已进入「即时事件下发」监听状态。/g,
+    translations: {
+      "zh": "⚡ [$1] SSE 任务长连接已打通！已进入「即时事件下发」监听状态。",
+      "en": "⚡ [$1] SSE connection established! Listening for instant events.",
+      "ja": "⚡ [$1] SSE 接続が確立されました！即時イベント待機状態です。",
+      "ko": "⚡ [$1] SSE 연결 완료! 실시간 이벤트 대기 상태로 진입했습니다.",
+      "vi": "⚡ [$1] Kết nối SSE đã thông suốt! Đang lắng nghe sự kiện tức thì.",
+      "th": "⚡ [$1] เชื่อมต่อ SSE สำเร็จ! กำลังรอรับเหตุการณ์แบบทันที",
+      "id": "⚡ [$1] Koneksi SSE berhasil! Mendengarkan acara instan.",
+      "es": "⚡ [$1] ¡Conexión SSE establecida! Escuchando eventos instantáneos.",
+      "fr": "⚡ [$1] Connexion SSE établie ! À l'écoute des événements instantanés.",
+      "pt": "⚡ [$1] Conexão SSE estabelecida! Aguardando eventos instantâneos.",
+      "de": "⚡ [$1] SSE-Verbindung hergestellt! Lausche auf Sofort-Ereignisse.",
+      "it": "⚡ [$1] Connessione SSE stabilita! In ascolto di eventi istantanei.",
+      "ru": "⚡ [$1] SSE-соединение установлено! Ожидание мгновенных событий.",
+      "tr": "⚡ [$1] SSE bağlantısı kuruldu! Anlık olaylar dinleniyor.",
+    }
+  },
+  {
+    regex: /🔔\s*\[(.*?)\s*SSE\s*抢单成功\]\s*成功锁定待渲染任务:\s*\[(.*?)\]\s*(.*)/g,
+    translations: {
+      "zh": "🔔 [$1 SSE 抢单成功] 成功锁定待渲染任务: [$2] $3",
+      "en": "🔔 [$1 SSE Claimed] Locked pending render task: [$2] $3",
+      "ja": "🔔 [$1 SSE 取得成功] レンダリング待ちタスクを確保: [$2] $3",
+      "ko": "🔔 [$1 SSE 작업 확보] 렌더링 대기 작업 잠금 완료: [$2] $3",
+      "vi": "🔔 [$1 SSE Nhận thành công] Đã khóa tác vụ chờ kết xuất: [$2] $3",
+      "th": "🔔 [$1 SSE รับงานสำเร็จ] ล็อกงานเรนเดอร์ที่รอแล้ว: [$2] $3",
+      "id": "🔔 [$1 SSE Diklaim] Mengunci tugas render tertunda: [$2] $3",
+      "es": "🔔 [$1 SSE Reclamado] Tarea de renderizado bloqueada: [$2] $3",
+      "fr": "🔔 [$1 SSE Réclamé] Tâche de rendu verrouillée : [$2] $3",
+      "pt": "🔔 [$1 SSE Reivindicado] Tarefa de renderização bloqueada: [$2] $3",
+      "de": "🔔 [$1 SSE Übernommen] Render-Aufgabe reserviert: [$2] $3",
+      "it": "🔔 [$1 SSE Acquisito] Attività di rendering bloccata: [$2] $3",
+      "ru": "🔔 [$1 SSE Захвачено] Задача на рендеринг заблокирована: [$2] $3",
+      "tr": "🔔 [$1 SSE Alındı] Bekleyen işleme görevi kilitlendi: [$2] $3",
+    }
+  },
+  {
+    regex: /🔔\s*\[(.*?)\s*SSE\s*消息触发\]\s*任务已被其他\s*Worker\s*提前锁定或非当前用户任务，跳过/g,
+    translations: {
+      "zh": "🔔 [$1 SSE 消息触发] 任务已被其他 Worker 提前锁定或非当前用户任务，跳过",
+      "en": "🔔 [$1 SSE Triggered] Task already claimed by another worker or belongs to another user, skipping",
+      "ja": "🔔 [$1 SSE トリガー] タスクは他のワーカーに取得済みまたは別ユーザーのためスキップ",
+      "ko": "🔔 [$1 SSE 트리거] 다른 워커가 먼저 선점했거나 다른 사용자의 작업이므로 건너뜁니다",
+      "vi": "🔔 [$1 SSE Kích hoạt] Tác vụ đã bị Worker khác nhận hoặc không thuộc người dùng hiện tại, bỏ qua",
+      "th": "🔔 [$1 SSE ทริกเกอร์] งานถูกล็อกโดย Worker อื่นแล้วหรือเป็นของใช้อื่น ข้าม",
+      "id": "🔔 [$1 SSE Pemicu] Tugas sudah diambil worker lain atau milik pengguna lain, lewati",
+      "es": "🔔 [$1 SSE Activado] Tarea ya tomada por otro worker o de otro usuario, omitiendo",
+      "fr": "🔔 [$1 SSE Déclenché] Tâche déjà prise par un autre worker ou un autre utilisateur, ignorée",
+      "pt": "🔔 [$1 SSE Acionado] Tarefa já obtida por outro worker ou de outro usuário, ignorando",
+      "de": "🔔 [$1 SSE Ausgelöst] Aufgabe bereits vergeben oder gehört anderem Benutzer, übersprungen",
+      "it": "🔔 [$1 SSE Attivato] Attività già acquisita da un altro worker o di un altro utente, salto",
+      "ru": "🔔 [$1 SSE Триггер] Задача уже занята другим воркером или принадлежит другому пользователю, пропуск",
+      "tr": "🔔 [$1 SSE Tetiklendi] Görev başka bir worker tarafından alınmış veya başka kullanıcıya ait, atlanıyor",
+    }
+  },
+  {
+    regex: /📡\s*服务端确认\s*\[(.*?)\]\s*长连接就绪\s*\(SSE Ready\)/g,
+    translations: {
+      "zh": "📡 服务端确认 [$1] 长连接就绪 (SSE Ready)",
+      "en": "📡 Server confirmed [$1] connection ready (SSE Ready)",
+      "ja": "📡 サーバーが [$1] 接続準備完了を確認 (SSE Ready)",
+      "ko": "📡 서버 [$1] 연결 준비 완료 확인 (SSE Ready)",
+      "vi": "📡 Máy chủ xác nhận [$1] đã sẵn sàng (SSE Ready)",
+      "th": "📡 เซิร์ฟเวอร์ยืนยันการเชื่อมต่อ [$1] พร้อมแล้ว (SSE Ready)",
+      "id": "📡 Server mengonfirmasi [$1] koneksi siap (SSE Ready)",
+      "es": "📡 Servidor confirmó conexión [$1] lista (SSE Ready)",
+      "fr": "📡 Serveur a confirmé [$1] prêt (SSE Ready)",
+      "pt": "📡 Servidor confirmou conexão [$1] pronta (SSE Ready)",
+      "de": "📡 Server bestätigte [$1] Bereitschaft (SSE Ready)",
+      "it": "📡 Server confermato [$1] pronto (SSE Ready)",
+      "ru": "📡 Сервер подтвердил готовность [$1] (SSE Ready)",
+      "tr": "📡 Sunucu [$1] bağlantısının hazır olduğunu onayladı (SSE Ready)",
+    }
+  },
+  {
+    regex: /\[(.*?)\]\s*SSE\s*长连接中断:\s*(.*?)，5秒后自动重连\.\.\./g,
+    translations: {
+      "zh": "[$1] SSE 长连接中断: $2，5秒后自动重连...",
+      "en": "[$1] SSE connection interrupted: $2, reconnecting in 5s...",
+      "ja": "[$1] SSE 接続が中断: $2、5秒後に自動再接続...",
+      "ko": "[$1] SSE 연결 끊김: $2, 5초 후 재연결...",
+      "vi": "[$1] Kết nối SSE bị ngắt: $2, tự kết nối lại sau 5 giây...",
+      "th": "[$1] การเชื่อมต่อ SSE ขัดข้อง: $2 กำลังเชื่อมต่อใหม่ใน 5 วินาที...",
+      "id": "[$1] Koneksi SSE terputus: $2, menyambung ulang dalam 5 dtk...",
+      "es": "[$1] Conexión SSE interrumpida: $2, reconectando en 5s...",
+      "fr": "[$1] Connexion SSE interrompue : $2, reconnexion dans 5s...",
+      "pt": "[$1] Conexão SSE interrompida: $2, reconectando em 5s...",
+      "de": "[$1] SSE-Verbindung unterbrochen: $2, Neuverbindung in 5s...",
+      "it": "[$1] Connessione SSE interrotta: $2, riconnessione in 5s...",
+      "ru": "[$1] Соединение SSE прервано: $2, переподключение через 5 сек...",
+      "tr": "[$1] SSE bağlantısı kesildi: $2, 5 sn içinde yeniden bağlanılıyor...",
+    }
+  },
+  {
+    regex: /🎬\s*短视频远程渲染工作进程\s*\(ShortVideo Render Worker\)/g,
+    translations: {
+      "zh": "🎬 短视频远程渲染工作进程 (ShortVideo Render Worker)",
+      "en": "🎬 ShortVideo Remote Render Worker (ShortVideo Render Worker)",
+      "ja": "🎬 ShortVideo リモートレンダーワーカー (ShortVideo Render Worker)",
+      "ko": "🎬 ShortVideo 원격 렌더 워커 (ShortVideo Render Worker)",
+      "vi": "🎬 Tiến trình kết xuất từ xa ShortVideo (ShortVideo Render Worker)",
+      "th": "🎬 เวิร์กเกอร์เรนเดอร์ระยะไกล ShortVideo (ShortVideo Render Worker)",
+      "id": "🎬 Worker Render Jarak Jauh ShortVideo (ShortVideo Render Worker)",
+      "es": "🎬 Trabajador de Renderizado Remoto ShortVideo (ShortVideo Render Worker)",
+      "fr": "🎬 Worker de Rendu Distant ShortVideo (ShortVideo Render Worker)",
+      "pt": "🎬 Worker de Renderização Remota ShortVideo (ShortVideo Render Worker)",
+      "de": "🎬 ShortVideo Remote Render Worker (ShortVideo Render Worker)",
+      "it": "🎬 Worker Rendering Remoto ShortVideo (ShortVideo Render Worker)",
+      "ru": "🎬 Удаленный рабочий процесс рендеринга ShortVideo (ShortVideo Render Worker)",
+      "tr": "🎬 ShortVideo Uzaktan İşleme Çalışanı (ShortVideo Render Worker)",
+    }
+  },
+  {
+    regex: /💻\s*本机硬件配置:\s*(.*?)\s*\((\d+)\s*核心\)\s*\|\s*内存:\s*([\d.]+ GB)/g,
+    translations: {
+      "zh": "💻 本机硬件配置: $1 ($2 核心) | 内存: $3",
+      "en": "💻 Host Hardware: $1 ($2 Cores) | Memory: $3",
+      "ja": "💻 ホストハードウェア: $1 ($2 コア) | メモリ: $3",
+      "ko": "💻 호스트 하드웨어: $1 ($2 코어) | 메모리: $3",
+      "vi": "💻 Phần cứng máy chủ: $1 ($2 Nhân) | Bộ nhớ: $3",
+      "th": "💻 ฮาร์ดแวร์เครื่อง: $1 ($2 คอร์) | หน่วยความจำ: $3",
+      "id": "💻 Perangkat Keras Host: $1 ($2 Inti) | Memori: $3",
+      "es": "💻 Hardware del sistema: $1 ($2 núcleos) | Memoria: $3",
+      "fr": "💻 Matériel hôte : $1 ($2 cœurs) | Mémoire : $3",
+      "pt": "💻 Hardware do host: $1 ($2 núcleos) | Memória: $3",
+      "de": "💻 Host-Hardware: $1 ($2 Kerne) | Speicher: $3",
+      "it": "💻 Hardware host: $1 ($2 core) | Memoria: $3",
+      "ru": "💻 Оборудование: $1 ($2 ядер) | Память: $3",
+      "tr": "💻 Ana Bilgisayar Donanımı: $1 ($2 Çekirdek) | Bellek: $3",
+    }
+  },
+  {
+    regex: /⚡\s*渲染并发配置:\s*(.*)/g,
+    translations: {
+      "zh": "⚡ 渲染并发配置: $1",
+      "en": "⚡ Render Concurrency: $1",
+      "ja": "⚡ レンダー並列度: $1",
+      "ko": "⚡ 렌더링 동시성: $1",
+      "vi": "⚡ Số luồng kết xuất: $1",
+      "th": "⚡ การทำงานพร้อมกันเรนเดอร์: $1",
+      "id": "⚡ Konkurensi Render: $1",
+      "es": "⚡ Concurrencia de renderizado: $1",
+      "fr": "⚡ Concurrence de rendu : $1",
+      "pt": "⚡ Concorrência de renderização: $1",
+      "de": "⚡ Render-Parallelität: $1",
+      "it": "⚡ Concorrenza rendering: $1",
+      "ru": "⚡ Параллелизм рендеринга: $1",
+      "tr": "⚡ İşleme Eşzamanlılığı: $1",
+    }
+  },
+  {
+    regex: /🌍\s*指定渲染语言:\s*(.*)/g,
+    translations: {
+      "zh": "🌍 指定渲染语言: $1",
+      "en": "🌍 Target Language: $1",
+      "ja": "🌍 指定言語: $1",
+      "ko": "🌍 지정 렌더링 언어: $1",
+      "vi": "🌍 Ngôn ngữ kết xuất: $1",
+      "th": "🌍 ภาษาการเรนเดอร์: $1",
+      "id": "🌍 Bahasa Render: $1",
+      "es": "🌍 Idioma de renderizado: $1",
+      "fr": "🌍 Langue de rendu : $1",
+      "pt": "🌍 Idioma de renderização: $1",
+      "de": "🌍 Zielsprache: $1",
+      "it": "🌍 Lingua di rendering: $1",
+      "ru": "🌍 Целевой язык: $1",
+      "tr": "🌍 Hedef İşleme Dili: $1",
+    }
+  },
+  {
+    regex: /🌐\s*目标服务端:\s*(.*)/g,
+    translations: {
+      "zh": "🌐 目标服务端: $1",
+      "en": "🌐 Target Server: $1",
+      "ja": "🌐 ターゲットサーバー: $1",
+      "ko": "🌐 대상 서버: $1",
+      "vi": "🌐 Máy chủ mục tiêu: $1",
+      "th": "🌐 เซิร์ฟเวอร์เป้าหมาย: $1",
+      "id": "🌐 Server Target: $1",
+      "es": "🌐 Servidor de destino: $1",
+      "fr": "🌐 Serveur cible : $1",
+      "pt": "🌐 Servidor de destino: $1",
+      "de": "🌐 Zielserver: $1",
+      "it": "🌐 Server di destinazione: $1",
+      "ru": "🌐 Целевой сервер: $1",
+      "tr": "🌐 Hedef Sunucu: $1",
+    }
+  },
+  {
+    regex: /❌\s*\[登录拦截\]\s*当前未检测到用户登录凭据\s*\(Token\s*为空\)，已终止执行渲染！/g,
+    translations: {
+      "zh": "❌ [登录拦截] 当前未检测到用户登录凭据 (Token 为空)，已终止执行渲染！",
+      "en": "❌ [Auth Required] No user login credentials detected (Token empty), render aborted!",
+      "ja": "❌ [認証エラー] ログイン資格情報が検出されませんでした (Tokenが空)、レンダリングを中止しました！",
+      "ko": "❌ [로그인 필요] 로그인 자격 증명이 감지되지 않았습니다 (Token 비어있음), 렌더링 중단됨!",
+      "vi": "❌ [Yêu cầu đăng nhập] Không phát hiện thông tin đăng nhập (Token trống), đã hủy kết xuất!",
+      "th": "❌ [จำเป็นต้องเข้าสู่ระบบ] ตรวจไม่พบข้อมูลการเข้าสู่ระบบ (Token ว่างเปล่า) ยกเลิกการเรนเดอร์!",
+      "id": "❌ [Login Diperlukan] Kredensial login tidak terdeteksi (Token kosong), render dibatalkan!",
+      "es": "❌ [Autenticación requerida] No se detectaron credenciales (Token vacío), ¡renderizado abortado!",
+      "fr": "❌ [Connexion requise] Aucun identifiant détecté (Token vide), rendu interrompu !",
+      "pt": "❌ [Login necessário] Nenhuma credencial detectada (Token vazio), renderização cancelada!",
+      "de": "❌ [Anmeldung erforderlich] Keine Anmeldedaten erkannt (Token leer), Rendering abgebrochen!",
+      "it": "❌ [Accesso richiesto] Nessuna credenziale rilevata (Token vuoto), rendering interrotto!",
+      "ru": "❌ [Требуется вход] Учетные данные не найдены (Token пуст), рендеринг отменен!",
+      "tr": "❌ [Giriş Gerekli] Oturum bilgisi bulunamadı (Token boş), işleme durduruldu!",
+    }
+  },
+  {
+    regex: /💡\s*提示:\s*请先在 ShortVideo 桌面客户端的主站窗口中登录账号后再开始渲染。/g,
+    translations: {
+      "zh": "💡 提示: 请先在 ShortVideo 桌面客户端的主站窗口中登录账号后再开始渲染。",
+      "en": "💡 Tip: Please log in to your account on the main ShortVideo tab first before starting render.",
+      "ja": "💡 ヒント: 最初に ShortVideo メインタブでログインしてから開始してください。",
+      "ko": "💡 팁: 먼저 ShortVideo 메인 탭에서 로그인한 후 렌더링을 시작하세요.",
+      "vi": "💡 Mẹo: Vui lòng đăng nhập tài khoản ở tab chính ShortVideo trước khi kết xuất.",
+      "th": "💡 คำแนะนำ: โปรดเข้าสู่ระบบในแท็บหลักของ ShortVideo ก่อนเริ่มเรนเดอร์",
+      "id": "💡 Tips: Silakan login di tab utama ShortVideo terlebih dahulu sebelum render.",
+      "es": "💡 Consejo: Inicie sesión en la pestaña principal de ShortVideo antes de comenzar a renderizar.",
+      "fr": "💡 Astuce : Connectez-vous d'abord dans l'onglet principal ShortVideo avant de lancer le rendu.",
+      "pt": "💡 Dica: Faça login na aba principal do ShortVideo primeiro antes de iniciar a renderização.",
+      "de": "💡 Hinweis: Bitte melden Sie sich zuerst im ShortVideo-Haupt-Tab an, bevor Sie rendern.",
+      "it": "💡 Suggerimento: Accedi prima nella scheda principale di ShortVideo prima di avviare il rendering.",
+      "ru": "💡 Совет: Пожалуйста, войдите в аккаунт на главной вкладке ShortVideo перед запуском.",
+      "tr": "💡 İpucu: İşlemeye başlamadan önce lütfen ana ShortVideo sekmesinde oturum açın.",
+    }
+  },
+  {
+    regex: /轮询异常:\s*(.*)/g,
+    translations: {
+      "zh": "轮询异常: $1",
+      "en": "Polling exception: $1",
+      "ja": "ポーリング例外: $1",
+      "ko": "폴링 예외: $1",
+      "vi": "Ngoại lệ thăm dò: $1",
+      "th": "ข้อยกเว้นการสำรวจ: $1",
+      "id": "Pengecualian polling: $1",
+      "es": "Excepción de sondeo: $1",
+      "fr": "Exception de scrutation : $1",
+      "pt": "Exceção de sondagem: $1",
+      "de": "Polling-Ausnahme: $1",
+      "it": "Eccezione polling: $1",
+      "ru": "Исключение при опросе: $1",
+      "tr": "Yoklama istisnası: $1",
+    }
+  },
+  {
+    regex: /微积分 FRQ/g,
+    translations: {
+      "zh": "微积分 FRQ",
+      "en": "AP Calculus FRQ",
+      "ja": "微積分 FRQ",
+      "ko": "미적분 FRQ",
+      "vi": "Giải tích FRQ",
+      "th": "แคลคูลัส FRQ",
+      "id": "Kalkulus FRQ",
+      "es": "Cálculo AP FRQ",
+      "fr": "Calcul AP FRQ",
+      "pt": "Cálculo AP FRQ",
+      "de": "Analysis FRQ",
+      "it": "Calcolo AP FRQ",
+      "ru": "Матан AP FRQ",
+      "tr": "Kalkülüs FRQ",
+    }
+  },
+  {
+    regex: /微积分 MCQ/g,
+    translations: {
+      "zh": "微积分 MCQ",
+      "en": "AP Calculus MCQ",
+      "ja": "微積分 MCQ",
+      "ko": "미적분 MCQ",
+      "vi": "Giải tích MCQ",
+      "th": "แคลคูลัส MCQ",
+      "id": "Kalkulus MCQ",
+      "es": "Cálculo AP MCQ",
+      "fr": "Calcul AP MCQ",
+      "pt": "Cálculo AP MCQ",
+      "de": "Analysis MCQ",
+      "it": "Calcolo AP MCQ",
+      "ru": "Матан AP MCQ",
+      "tr": "Kalkülüs MCQ",
+    }
+  },
+  {
+    regex: /对比学单词/g,
+    translations: {
+      "zh": "对比学单词",
+      "en": "Compare English Word",
+      "ja": "英単語比較",
+      "ko": "영단어 비교",
+      "vi": "So sánh từ tiếng Anh",
+      "th": "เปรียบเทียบคำศัพท์อังกฤษ",
+      "id": "Bandingkan Kata Inggris",
+      "es": "Comparar Palabras",
+      "fr": "Comparaison de mots",
+      "pt": "Comparar Palavras",
+      "de": "Wortvergleich",
+      "it": "Confronto Parole",
+      "ru": "Сравнение слов",
+      "tr": "İngilizce Kelime Karşılaştır",
+    }
   }
 ];
 
-function localizeScriptLog(rawText: string, lang?: string | null): string {
+export function localizeScriptLog(rawText: string, lang?: string | null): string {
   if (!rawText || typeof rawText !== 'string') return '';
-  const activeLang = normalizeScriptLang(lang || process.env.SHORTVIDEO_LANG || process.env.LANG || 'zh');
+  const activeLang = normalizeScriptLang(lang || getActiveScriptLang());
   if (activeLang === 'zh') return rawText;
 
   let text = rawText;
   for (const rule of SCRIPT_I18N_RULES) {
     const targetTpl = rule.translations[activeLang] || rule.translations.en;
-    if (targetTpl && rule.regex.test(text)) {
-      text = text.replace(rule.regex, targetTpl);
-    }
+    if (!targetTpl) continue;
+    rule.regex.lastIndex = 0;
+    text = text.replace(rule.regex, targetTpl);
   }
   return text;
 }
@@ -1352,7 +2325,7 @@ function log(msg: string, color: 'green' | 'blue' | 'yellow' | 'red' | 'gray' = 
     gray: '\x1b[90m',
   };
   const reset = '\x1b[0m';
-  const activeLang = normalizeScriptLang(lang || process.env.SHORTVIDEO_LANG || process.env.LANG || 'zh');
+  const activeLang = normalizeScriptLang(lang || getActiveScriptLang());
   const localizedMsg = localizeScriptLog(msg, activeLang);
   const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
   console.log(`${colors.gray}[${time}]${reset} ${colors[color]}${localizedMsg}${reset}`);
@@ -1363,8 +2336,9 @@ async function retryOperation<T>(
   operation: () => Promise<T>,
   maxRetries = 3,
   delayMs = 2000,
-  operationName = localizeScriptLog('网络操作')
+  operationName?: string
 ): Promise<T> {
+  const opName = operationName || localizeScriptLog('网络操作');
   let lastError: any;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -1377,7 +2351,7 @@ async function retryOperation<T>(
       const detail = err?.cause?.message ? `${err.message} (${err.cause.message})` : (err.message || String(err));
       if (attempt < maxRetries) {
         const waitTime = delayMs * Math.min(attempt, 3);
-        log(localizeScriptLog(`[重试 ${attempt}/${maxRetries}] ${operationName} 发生异常: ${detail}，${(waitTime / 1000).toFixed(1)}秒后重试...`), 'yellow');
+        log(localizeScriptLog(`[重试 ${attempt}/${maxRetries}] ${opName} 发生异常: ${detail}，${(waitTime / 1000).toFixed(1)}秒后重试...`), 'yellow');
         await new Promise((resolve) => setTimeout(resolve, waitTime));
       }
     }
@@ -1395,20 +2369,40 @@ function detectIsElectronClient(): boolean {
 }
 
 const IS_ELECTRON_CLIENT = detectIsElectronClient();
+let activeClientScope: 'current_user' | 'all_users' = IS_ELECTRON_CLIENT ? 'current_user' : 'all_users';
+
+export function buildWorkerRequestHeaders(
+  baseHeaders: Record<string, string> = {},
+  token: string = CURRENT_AUTH_TOKEN,
+  scope: 'current_user' | 'all_users' = activeClientScope
+): Record<string, string> {
+  const activeLang = getActiveScriptLang();
+  const headers: Record<string, string> = {
+    ...baseHeaders,
+    'x-ui-lang': activeLang,
+    'Accept-Language': activeLang,
+    'x-scope': scope,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const renderSecret = (process.env.RENDER_SECRET || process.env.SHORTVIDEO_RENDER_SECRET || '').trim();
+  if (renderSecret) {
+    headers['x-render-secret'] = renderSecret;
+  }
+  return headers;
+}
 
 async function fetchWaitingTasks(
   baseUrl: string,
   token: string = CURRENT_AUTH_TOKEN,
-  scope: 'current_user' | 'all_users' = (IS_ELECTRON_CLIENT ? 'current_user' : 'all_users')
+  scope: 'current_user' | 'all_users' = activeClientScope
 ): Promise<any[]> {
   const targetUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/compare-english-word/tasks`;
   try {
-    const headers: Record<string, string> = {
+    const headers = buildWorkerRequestHeaders({
       'Content-Type': 'application/json',
-    };
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
+    }, token, scope);
 
     const res = await fetch(targetUrl, {
       method: 'POST',
@@ -1439,41 +2433,103 @@ async function fetchWaitingTasks(
 
 export type VideoModule = 'compare-english-word' | 'ap-calculus-mcq' | 'ap-calculus-frq';
 
-export function detectTaskModule(task: any): VideoModule {
+export function inferModuleFromHints(
+  moduleHint?: string,
+  folderPath?: string,
+  taskId?: string | number
+): VideoModule {
+  const hint = String(moduleHint || '').trim().toLowerCase();
+  if (hint === 'ap-calculus-frq' || hint === 'apcalculusfrq') return 'ap-calculus-frq';
+  if (hint === 'ap-calculus-mcq' || hint === 'apcalculusmcq') return 'ap-calculus-mcq';
+  if (hint === 'compare-english-word' || hint === 'compareenglishword') return 'compare-english-word';
+
+  const f = String(folderPath || '').trim().toLowerCase();
+  const tid = String(taskId || '').trim().toLowerCase();
   if (
-    task?.__module === 'ap-calculus-frq' ||
-    (typeof task?.folderPath === 'string' && /ap[\s_-]?calculus[\s_-]?frq/i.test(task.folderPath)) ||
-    (typeof task?.videoId === 'string' && /ap[\s_-]?calculus[\s_-]?frq/i.test(task.videoId)) ||
-    (typeof task?.id === 'string' && /ap[\s_-]?calculus[\s_-]?frq/i.test(task.id)) ||
-    Boolean(task?.question_header) ||
-    Boolean(task?.summaryData?.question_header)
+    f.includes('apcalculusfrq') ||
+    f.includes('ap-calculus-frq') ||
+    tid.includes('ap-calculus-frq') ||
+    tid.startsWith('frq-') ||
+    tid.startsWith('frq_')
   ) {
     return 'ap-calculus-frq';
   }
   if (
-    task?.__module === 'ap-calculus-mcq' ||
-    task?.course ||
-    task?.question ||
-    (typeof task?.folderPath === 'string' && /ap[\s_-]?calculus/i.test(task.folderPath)) ||
-    (typeof task?.videoId === 'string' && /ap[\s_-]?calculus/i.test(task.videoId)) ||
-    (typeof task?.id === 'string' && /ap[\s_-]?calculus/i.test(task.id))
+    f.includes('apcalculusmcq') ||
+    f.includes('ap-calculus-mcq') ||
+    tid.includes('ap-calculus-mcq') ||
+    tid.startsWith('mcq-') ||
+    tid.startsWith('mcq_')
   ) {
     return 'ap-calculus-mcq';
   }
   return 'compare-english-word';
 }
 
+export function detectTaskModule(task: any): VideoModule {
+  if (!task || typeof task !== 'object') return 'compare-english-word';
+
+  const explicitHint = task.__module || task.module;
+  const folderStr = typeof task.folderPath === 'string' ? task.folderPath : '';
+  const idStr = typeof task.videoId === 'string' ? task.videoId : (task.id != null ? String(task.id) : '');
+
+  if (
+    explicitHint ||
+    /ap[\s_-]?calculus|^(frq|mcq)[-_]/i.test(folderStr) ||
+    /ap[\s_-]?calculus|^(frq|mcq)[-_]/i.test(idStr)
+  ) {
+    const inferred = inferModuleFromHints(explicitHint, folderStr, idStr);
+    if (inferred !== 'compare-english-word' || String(explicitHint || '').toLowerCase().includes('compare')) {
+      return inferred;
+    }
+  }
+
+  const summary = task.summaryData && typeof task.summaryData === 'object' ? task.summaryData : null;
+  // 仅依据 FRQ 专属结构字段判断（禁用 question_header，因 MCQ 也携带该字段会导致错判 404）
+  if (
+    Boolean(task.boards) ||
+    Boolean(summary?.boards) ||
+    Boolean(task.official_scoring_rubric) ||
+    Boolean(summary?.official_scoring_rubric) ||
+    Boolean(task.problem_analysis) ||
+    Boolean(summary?.problem_analysis) ||
+    Boolean(task.diagram) ||
+    Boolean(summary?.diagram) ||
+    Boolean(task.parts) ||
+    Boolean(summary?.parts) ||
+    Boolean(summary?._meta?.slot_meta)
+  ) {
+    return 'ap-calculus-frq';
+  }
+
+  if (
+    Boolean(task.scene_1_intro) ||
+    Boolean(summary?.scene_1_intro) ||
+    Boolean(task.scene_2_derivation) ||
+    Boolean(summary?.scene_2_derivation) ||
+    Boolean(task.scene_3_traps) ||
+    Boolean(summary?.scene_3_traps) ||
+    Boolean(task.scene_5_challenge) ||
+    Boolean(summary?.scene_5_challenge) ||
+    Boolean(task.course) ||
+    Boolean(task.question)
+  ) {
+    return 'ap-calculus-mcq';
+  }
+
+  return 'compare-english-word';
+}
+
 async function claimNextTask(
   baseUrl: string,
   token: string = CURRENT_AUTH_TOKEN,
-  scope: 'current_user' | 'all_users' = (IS_ELECTRON_CLIENT ? 'current_user' : 'all_users'),
+  scope: 'current_user' | 'all_users' = activeClientScope,
   module: VideoModule = 'compare-english-word'
 ): Promise<any | null> {
   const endpoint = module === 'ap-calculus-frq' ? 'ap-calculus-frq' : module === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
   const targetUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/${endpoint}/tasks`;
   try {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const headers = buildWorkerRequestHeaders({ 'Content-Type': 'application/json' }, token, scope);
 
     const res = await fetch(targetUrl, {
       method: 'POST',
@@ -1497,22 +2553,32 @@ async function claimNextTask(
   }
 }
 
+let lastSuccessfulModule: VideoModule = 'ap-calculus-frq';
+
 async function claimNextTaskAnyModule(
   baseUrl: string,
   token: string = CURRENT_AUTH_TOKEN,
-  scope: 'current_user' | 'all_users' = (IS_ELECTRON_CLIENT ? 'current_user' : 'all_users')
+  scope: 'current_user' | 'all_users' = activeClientScope
 ): Promise<any | null> {
-  const cewTask = await claimNextTask(baseUrl, token, scope, 'compare-english-word');
-  if (cewTask) return cewTask;
-  const mcqTask = await claimNextTask(baseUrl, token, scope, 'ap-calculus-mcq');
-  if (mcqTask) return mcqTask;
-  const frqTask = await claimNextTask(baseUrl, token, scope, 'ap-calculus-frq');
-  if (frqTask) return frqTask;
+  const allModules: VideoModule[] = ['compare-english-word', 'ap-calculus-mcq', 'ap-calculus-frq'];
+  // 智能记忆亲和性：优先探测最近成功抢单的模块，避免每次批量任务都产生 2 次冗余无效 HTTP 与 D1 请求
+  const orderedModules = [
+    lastSuccessfulModule,
+    ...allModules.filter((m) => m !== lastSuccessfulModule),
+  ];
+
+  for (const mod of orderedModules) {
+    const task = await claimNextTask(baseUrl, token, scope, mod);
+    if (task) {
+      lastSuccessfulModule = mod;
+      return task;
+    }
+  }
   return null;
 }
 
 // ── 2. 更新任务状态 ─────────────────────────────────────────────
-async function updateTaskStatus(
+export async function updateTaskStatus(
   baseUrl: string,
   taskId: string | number,
   status: 'rendering' | 'video_finished' | 'waiting_render',
@@ -1521,35 +2587,25 @@ async function updateTaskStatus(
   videoSize?: number,
   videos?: Record<string, string>,
   token: string = CURRENT_AUTH_TOKEN,
-  module?: VideoModule
+  module?: VideoModule,
+  scope: 'current_user' | 'all_users' = activeClientScope
 ): Promise<boolean> {
-  let effectiveModule: VideoModule = module || 'compare-english-word';
-  if (!module) {
-    const f = String(folderPath || '').toLowerCase();
-    const tid = String(taskId || '').toLowerCase();
-    if (f.includes('apcalculusfrq') || f.includes('ap-calculus-frq') || tid.includes('ap-calculus-frq')) {
-      effectiveModule = 'ap-calculus-frq';
-    } else if (f.includes('apcalculusmcq') || f.includes('ap-calculus-mcq') || tid.includes('ap-calculus-mcq')) {
-      effectiveModule = 'ap-calculus-mcq';
-    }
-  }
+  const effectiveModule: VideoModule = inferModuleFromHints(module, folderPath, taskId);
   const endpoint = effectiveModule === 'ap-calculus-frq' ? 'ap-calculus-frq' : effectiveModule === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
   const targetUrl = `${baseUrl.replace(/\/+$/, '')}/api/video/${endpoint}/tasks`;
   try {
     return await retryOperation(
       async () => {
-        const headers: Record<string, string> = {
+        const headers = buildWorkerRequestHeaders({
           'Content-Type': 'application/json',
-        };
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
+        }, token, scope);
 
         const res = await fetch(targetUrl, {
           method: 'POST',
           headers,
           body: JSON.stringify({
             action: 'update_render_status',
+            scope,
             taskId,
             folderPath,
             status,
@@ -1563,7 +2619,12 @@ async function updateTaskStatus(
           return true;
         }
         if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: ${data?.error || res.statusText || 'Request failed'}`);
+          const httpErr: any = new Error(`HTTP ${res.status}: ${data?.error || res.statusText || 'Request failed'}`);
+          httpErr.statusCode = res.status;
+          if ([400, 401, 403, 404, 405].includes(res.status)) {
+            httpErr.isFatal = true;
+          }
+          throw httpErr;
         }
         if (!data?.success) {
           throw new Error(data?.error || 'Server returned unsuccessful response');
@@ -1601,7 +2662,7 @@ const keepAliveHttpAgent = new HttpAgentClass({
  * 健壮的 HTTP/HTTPS 二进制大文件上传，专为视频大文件设计：
  * 1. 基于 Node.js 原生 https/http 模块，零第三方依赖，彻底规避 Node 18+ undici fetch 默认 30 秒 bodyTimeout / headersTimeout 截断问题
  * 2. 显式设置 Content-Length，防止反向代理和 CDN 按 Chunked 方式处理大文件引发网络重置
- * 3. 超长 TCP/Socket 超时保护 (10分钟 / 600000ms)，支持 Keep-Alive
+ * 3. 超长 TCP/Socket 超时保护 (10分钟 / 600000ms)，支持 Keep-Alive 连接复用
  * 4. 流式管道上传 (fs.createReadStream)，不占用大量内存 Buffer
  * 5. 详细捕获底层 Socket / DNS / TLS / HTTP 状态错误
  */
@@ -1734,7 +2795,7 @@ async function uploadFileViaNativeHttp(
 }
 
 // ── 2.1 服务端代理上传 MP4 产物至 Cloudflare R2 ─────────────────────────
-async function uploadVideoViaServerProxy(
+export async function uploadVideoViaServerProxy(
   baseUrl: string,
   taskId: string | number,
   lang: string,
@@ -1743,18 +2804,10 @@ async function uploadVideoViaServerProxy(
   folderPath?: string,
   token: string = CURRENT_AUTH_TOKEN,
   isFinished: boolean = false,
-  module?: VideoModule
+  module?: VideoModule,
+  scope: 'current_user' | 'all_users' = activeClientScope
 ): Promise<{ success: boolean; cdnUrl?: string; error?: string }> {
-  let effectiveModule: VideoModule = module || 'compare-english-word';
-  if (!module) {
-    const f = String(folderPath || '').toLowerCase();
-    const tid = String(taskId || '').toLowerCase();
-    if (f.includes('apcalculusfrq') || f.includes('ap-calculus-frq') || tid.includes('ap-calculus-frq')) {
-      effectiveModule = 'ap-calculus-frq';
-    } else if (f.includes('apcalculusmcq') || f.includes('ap-calculus-mcq') || tid.includes('ap-calculus-mcq')) {
-      effectiveModule = 'ap-calculus-mcq';
-    }
-  }
+  const effectiveModule: VideoModule = inferModuleFromHints(module, folderPath, taskId);
   const endpoint = effectiveModule === 'ap-calculus-frq' ? 'ap-calculus-frq' : effectiveModule === 'ap-calculus-mcq' ? 'ap-calculus-mcq' : 'compare-english-word';
   const targetUrl = new URL(`${baseUrl.replace(/\/+$/, '')}/api/video/${endpoint}/upload-video`);
   targetUrl.searchParams.set('taskId', String(taskId));
@@ -1770,7 +2823,7 @@ async function uploadVideoViaServerProxy(
   const stat = fs.existsSync(filePath) ? fs.statSync(filePath) : null;
   const fileSize = stat ? stat.size : 0;
 
-  const headers: Record<string, string> = {
+  const baseUploadHeaders: Record<string, string> = {
     'Content-Type': 'video/mp4',
     'Content-Length': String(fileSize),
     'x-task-id': encodeURIComponent(String(taskId)),
@@ -1778,42 +2831,56 @@ async function uploadVideoViaServerProxy(
     'x-filename': encodeURIComponent(filename),
   };
   if (isFinished) {
-    headers['x-is-finished'] = 'true';
+    baseUploadHeaders['x-is-finished'] = 'true';
   }
   if (folderPath) {
-    headers['x-folder-path'] = encodeURIComponent(folderPath);
+    baseUploadHeaders['x-folder-path'] = encodeURIComponent(folderPath);
   }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  } else {
+  const headers = buildWorkerRequestHeaders(baseUploadHeaders, token, scope);
+  if (!token) {
     log(localizeScriptLog(`⚠️ [鉴权警告] 当前未传入登录 Token (CURRENT_AUTH_TOKEN 为空)，代理上传将被服务端拒绝 (401)`), 'red');
   }
 
   return await retryOperation(
     async () => {
       try {
+        // 优先使用原生流式高抗超时 HTTP 请求通道
         return await uploadFileViaNativeHttp(targetUrl, filePath, headers, 600000);
       } catch (nativeErr: any) {
         // 若已是明确的不可重试错误（如 401 凭证失效、404 任务不存在等），直接抛出，无需无谓回退
         if (nativeErr?.isFatal || (nativeErr?.statusCode && [400, 401, 403, 404, 405].includes(nativeErr.statusCode))) {
           throw nativeErr;
         }
+        // 若原生通道异常，回退尝试显式 Content-Length 的 fetch 上传
         try {
           const fileBytes = fs.readFileSync(filePath);
           const res = await fetch(targetUrl.toString(), {
             method: 'POST',
             headers,
             body: new Uint8Array(fileBytes),
-            signal: AbortSignal.timeout(300000),
+            signal: AbortSignal.timeout(300000), // 5分钟
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok || !data.success) {
-            throw new Error(data.error || `HTTP ${res.status} ${res.statusText}`);
+            const fetchErr: any = new Error(data.error || `HTTP ${res.status} ${res.statusText}`);
+            fetchErr.statusCode = res.status;
+            if ([400, 401, 403, 404, 405].includes(res.status)) {
+              fetchErr.isFatal = true;
+            }
+            throw fetchErr;
           }
           return { success: true, cdnUrl: data.cdnUrl };
         } catch (fetchErr: any) {
-          const combined = nativeErr?.message ? `${nativeErr.message} (fallback: ${fetchErr?.message})` : fetchErr?.message;
-          throw new Error(combined);
+          // 抛出更详尽的错误根因并保留致命 HTTP 状态码
+          const statusCode = fetchErr?.statusCode ?? nativeErr?.statusCode;
+          const isFatal = Boolean(fetchErr?.isFatal || nativeErr?.isFatal || (statusCode && [400, 401, 403, 404, 405].includes(statusCode)));
+          const combined = nativeErr?.message && fetchErr?.message !== nativeErr?.message
+            ? `${nativeErr.message} (fallback: ${fetchErr?.message})`
+            : (fetchErr?.message || nativeErr?.message || 'Upload failed');
+          const combinedErr: any = new Error(combined);
+          if (statusCode) combinedErr.statusCode = statusCode;
+          if (isFatal) combinedErr.isFatal = true;
+          throw combinedErr;
         }
       }
     },
@@ -2059,30 +3126,7 @@ function ensureRemotionBundle(forceRebuild = false, moduleName: string = 'Compar
     }
   }
 
-  // 2. 独立模板快速派生机制：若已有基础 bundle 缓存且包含多模板代码，快速派生至专属模块目录
-  const fallbackBaseDir = path.resolve(ROOT_DIR, 'BundledCodeCache', 'CompareEnglishWord');
-  if (moduleName !== 'CompareEnglishWord' && isRemotionBundleValid(fallbackBaseDir, moduleName)) {
-    log(localizeScriptLog(`📦 正在从已有核心包派生 [${moduleName}] 专属缓存目录: ${targetCacheDir}...`), 'blue');
-    try {
-      if (!fs.existsSync(targetCacheDir)) {
-        fs.mkdirSync(targetCacheDir, { recursive: true });
-      }
-      copyDirSafe(fallbackBaseDir, targetCacheDir);
-      // 清除专属缓存中的旧模块静态媒体资源目录，确保微积分缓存干净独立
-      const dirtySub = path.join(targetCacheDir, 'CompareEnglishWord');
-      if (fs.existsSync(dirtySub)) {
-        try { fs.rmSync(dirtySub, { recursive: true, force: true }); } catch (_) {}
-      }
-      if (isRemotionBundleValid(targetCacheDir, moduleName)) {
-        log(localizeScriptLog(`✅ 成功就绪 [${moduleName}] 专属渲染核心缓存: ${targetCacheDir}`), 'green');
-        return Promise.resolve(targetCacheDir);
-      }
-    } catch (deriveErr: any) {
-      log(localizeScriptLog(`⚠️ 派生专属缓存跳过: ${deriveErr.message}`), 'yellow');
-    }
-  }
-
-  // 3. 源码环境动态编译：若存在 src/index.ts，通过 Remotion CLI 打包生成
+  // 2. 源码环境动态编译：若存在 src/index.ts，优先通过 Remotion CLI 打包生成最新专属核心
   const srcEntryPoint = path.resolve(ROOT_DIR, 'src/index.ts');
   if (fs.existsSync(srcEntryPoint)) {
     log(localizeScriptLog(`⚙️ 正在通过 Remotion CLI 编译 [${moduleName}] 专属渲染核心: ${targetCacheDir}...`), 'blue');
@@ -2107,6 +3151,29 @@ function ensureRemotionBundle(forceRebuild = false, moduleName: string = 'Compar
       }
     } catch (bundleErr: any) {
       log(localizeScriptLog(`⚠️ 动态编译 Remotion 核心失败: ${bundleErr.message}`), 'yellow');
+    }
+  }
+
+  // 3. 独立模板快速派生机制：若已有基础 bundle 缓存且包含多模板代码，快速派生至专属模块目录
+  const fallbackBaseDir = path.resolve(ROOT_DIR, 'BundledCodeCache', 'CompareEnglishWord');
+  if (moduleName !== 'CompareEnglishWord' && isRemotionBundleValid(fallbackBaseDir, moduleName)) {
+    log(localizeScriptLog(`📦 正在从已有核心包派生 [${moduleName}] 专属缓存目录: ${targetCacheDir}...`), 'blue');
+    try {
+      if (!fs.existsSync(targetCacheDir)) {
+        fs.mkdirSync(targetCacheDir, { recursive: true });
+      }
+      copyDirSafe(fallbackBaseDir, targetCacheDir);
+      // 清除专属缓存中的旧模块静态媒体资源目录，确保微积分缓存干净独立
+      const dirtySub = path.join(targetCacheDir, 'CompareEnglishWord');
+      if (fs.existsSync(dirtySub)) {
+        try { fs.rmSync(dirtySub, { recursive: true, force: true }); } catch (_) {}
+      }
+      if (isRemotionBundleValid(targetCacheDir, moduleName)) {
+        log(localizeScriptLog(`✅ 成功就绪 [${moduleName}] 专属渲染核心缓存: ${targetCacheDir}`), 'green');
+        return Promise.resolve(targetCacheDir);
+      }
+    } catch (deriveErr: any) {
+      log(localizeScriptLog(`⚠️ 派生专属缓存跳过: ${deriveErr.message}`), 'yellow');
     }
   }
 
@@ -2303,6 +3370,7 @@ async function executeRemotionRender(
     let stdoutBuffer = '';
     let isOomError = false;
     let hasLoggedOomWarning = false;
+    const recentErrorLines: string[] = [];
 
     // 过滤掉内部 FFmpeg 与浏览器崩溃时倾泻的大量底层编译配置、模块版本、以及堆栈调试杂音
     const NOISY_FFMPEG_LOG_REGEX = /^(?:ffmpeg version|built with|configuration:\s*--prefix|libavutil|libavcodec|libavformat|libavdevice|libavfilter|libswscale|libswresample|libpostproc|\[swscaler\s*@|\[libx264\s*@|\[vost#|\[vf#|\[out#|Conversion failed!|Nothing was written into output file|Terminating thread with return code|Task finished with error code|at renderFramesProc|at async renderFrameWithOptionToReject|Error:\s*FFmpeg quit with code|x264\s*\[error\]:\s*malloc.*failed|.*net::ERR_INSUFFICIENT_RESOURCES|.*ProtocolError:\s*Protocol error|.*Target closed|.*remotion\.dev\/docs\/target-closed)/i;
@@ -2328,6 +3396,15 @@ async function executeRemotionRender(
           }
         }
 
+        // 收集关键错误特征行用于智能熔断分类判定
+        if (
+          /error|exception|referenceerror|typeerror|syntaxerror|inputrange/i.test(trimmedLine) &&
+          !NOISY_FFMPEG_LOG_REGEX.test(trimmedLine)
+        ) {
+          recentErrorLines.push(trimmedLine);
+          if (recentErrorLines.length > 10) recentErrorLines.shift();
+        }
+
         // 屏蔽 FFmpeg 崩溃时底层的冗长日志输出
         if (
           NOISY_FFMPEG_LOG_REGEX.test(trimmedLine) ||
@@ -2343,12 +3420,13 @@ async function executeRemotionRender(
           const tot = parseInt(progressMatch[2], 10);
           const eta = progressMatch[3] ? ` | 剩余预计: ${progressMatch[3].trim()}` : '';
           const pct = ((cur / tot) * 100).toFixed(1);
+          const progLine = localizeScriptLog(`⏳ 渲染进度: ${pct}% (${cur}/${tot} 帧)${eta}`);
 
           if (process.stdout.isTTY) {
-            process.stdout.write(`\r\x1b[K⏳ 渲染进度: ${pct}% (${cur}/${tot} 帧)${eta}`);
+            process.stdout.write(`\r\x1b[K${progLine}`);
           } else {
             if (cur === 1 || cur === tot || cur % 50 === 0) {
-              process.stdout.write(`⏳ 渲染进度: ${pct}% (${cur}/${tot} 帧)${eta}\n`);
+              process.stdout.write(`${progLine}\n`);
             }
           }
           lastIsProgress = true;
@@ -2389,12 +3467,15 @@ async function executeRemotionRender(
       if (code === 0) {
         resolve();
       } else {
+        const errorDetail = recentErrorLines.filter(Boolean).join('\n');
+        const defaultMsg = localizeScriptLog(`Remotion 渲染进程异常退出，状态码: ${code}`);
         const errorMsg = isOomError
           ? localizeScriptLog('检测到渲染内存不足 (Out of memory / malloc failed)')
-          : localizeScriptLog(`Remotion 渲染进程异常退出，状态码: ${code}`);
+          : (errorDetail || defaultMsg);
         const err: any = new Error(errorMsg);
         err.isOom = isOomError;
         err.exitCode = code;
+        err.errorSnippet = errorDetail;
         reject(err);
       }
     });
@@ -2471,20 +3552,21 @@ function resolveSafeAudioForRender(rawAudioUrl: any, bundleDirName: string): str
   } catch (_) {}
   return undefined;
 }
+
 /**
  * 智能挑选最佳有效音轨：优先挑选合法 CDN 远程链接或真实本地文件，杜绝相对假路径遮挡真实音频
  */
 function pickBestAudioForRender(candidates: any[], bundleDirName: string): string | undefined {
   // 1. 优先在候选列表中寻找真实可用的远程 CDN 或真实存在的本地绝对路径
   for (const c of candidates) {
-    if (!c || typeof c !== "string") continue;
+    if (!c || typeof c !== 'string') continue;
     const s = c.trim();
-    if (s.startsWith("http://") || s.startsWith("https://")) return s;
+    if (s.startsWith('http://') || s.startsWith('https://')) return s;
     if (/^[a-zA-Z]:\\/.test(s) && fs.existsSync(s)) return s;
   }
   // 2. 其次通过 resolveSafeAudioForRender 验证本地或缓存中的文件
   for (const c of candidates) {
-    if (!c || typeof c !== "string") continue;
+    if (!c || typeof c !== 'string') continue;
     const safe = resolveSafeAudioForRender(c, bundleDirName);
     if (safe) return safe;
   }
@@ -3128,7 +4210,7 @@ async function processSingleTask(
 
   if (!summaryData || !Array.isArray(summaryData.segments) || summaryData.segments.length === 0) {
     log(localizeScriptLog(`❌ 素材缺失: 未能获取到有效的文字段落数据 (segments 为空)，拦截渲染以保护质量。`), 'red');
-    await updateTaskStatus(baseUrl, taskId, 'waiting_render', undefined, task.folderPath);
+    await updateTaskStatus(baseUrl, taskId, 'waiting_render', undefined, task.folderPath, undefined, undefined, CURRENT_AUTH_TOKEN, 'compare-english-word');
     return;
   }
 
@@ -3144,7 +4226,7 @@ async function processSingleTask(
 
   if (!audioDownloaded && !fs.existsSync(localAudioPath)) {
     log(localizeScriptLog(`❌ 音频素材准备失败: 无法下载或音频文件无效 (${rawAudioUrl})`), 'red');
-    await updateTaskStatus(baseUrl, taskId, 'waiting_render', undefined, task.folderPath);
+    await updateTaskStatus(baseUrl, taskId, 'waiting_render', undefined, task.folderPath, undefined, undefined, CURRENT_AUTH_TOKEN, 'compare-english-word');
     return;
   }
 
@@ -3203,10 +4285,7 @@ async function processSingleTask(
       try {
         const traceRes = await fetch(`${baseUrl.replace(/\/+$/, '')}/api/video/compare-english-word/tasks`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(CURRENT_AUTH_TOKEN ? { Authorization: `Bearer ${CURRENT_AUTH_TOKEN}` } : {}),
-          },
+          headers: buildWorkerRequestHeaders({ 'Content-Type': 'application/json' }, CURRENT_AUTH_TOKEN, options.scope || activeClientScope),
           body: JSON.stringify({
             action: 'get_share_source_media',
             taskId: taskId,
@@ -3248,7 +4327,7 @@ async function processSingleTask(
 
   if (!img1Ok || !img2Ok) {
     log(localizeScriptLog(`❌ 图片素材准备失败: 01.png 或 02.png 无法下载或损坏，拦截渲染。`), 'red');
-    await updateTaskStatus(baseUrl, taskId, 'waiting_render', undefined, task.folderPath);
+    await updateTaskStatus(baseUrl, taskId, 'waiting_render', undefined, task.folderPath, undefined, undefined, CURRENT_AUTH_TOKEN, 'compare-english-word');
     return;
   }
 
@@ -3388,13 +4467,13 @@ async function processSingleTask(
     } catch (renderErr: any) {
       log(localizeScriptLog(`❌ 【${label}】渲染失败: ${renderErr.message}`), 'red');
       // waiting_render
-      await updateTaskStatus(baseUrl, taskId, 'waiting_render', undefined, task.folderPath);
+      await updateTaskStatus(baseUrl, taskId, 'waiting_render', undefined, task.folderPath, undefined, undefined, CURRENT_AUTH_TOKEN, 'compare-english-word');
       return;
     }
 
     if (!fs.existsSync(langOutputFile)) {
       log(localizeScriptLog(`❌ 【${label}】渲染流程完成但未在本地找到目标 MP4 文件: ${langOutputFile}`), 'red');
-      await updateTaskStatus(baseUrl, taskId, 'waiting_render', undefined, task.folderPath);
+      await updateTaskStatus(baseUrl, taskId, 'waiting_render', undefined, task.folderPath, undefined, undefined, CURRENT_AUTH_TOKEN, 'compare-english-word');
       return;
     }
 
@@ -3556,16 +4635,150 @@ async function processSingleTask(
   }
 }
 
-// ── 5.   ──────────────────────────────────────────────
+// ── 5. 渲染任务队列与同类错误熔断机制 ──────────────────────────────────────
 let isProcessingQueue = false;
 let currentRunningTaskId: string | number | null = null;
 const pendingQueue: any[] = [];
+
+// 同类错误连续触发熔断保护 (防止无限重试死循环)
+let consecutiveSameErrorCount = 0;
+let lastErrorCategory: string | null = null;
+const MAX_CONSECUTIVE_SAME_ERROR = 3;
+let isCircuitBreakerTripped = false;
+
+function resetErrorCircuitBreaker() {
+  if (consecutiveSameErrorCount > 0 || lastErrorCategory !== null) {
+    consecutiveSameErrorCount = 0;
+    lastErrorCategory = null;
+  }
+}
+
+export function extractErrorCategory(err: any): string {
+  if (!err) return 'UnknownError';
+  const fullText = [
+    err.message,
+    err.errorSnippet,
+    err.details,
+    err.stderr,
+    err.stdout,
+    String(err),
+  ].filter(Boolean).join(' ');
+
+  // 0. HTTP 致命客户端/权限/任务缺失错误 (优先归类，禁止静默掩盖 4xx)
+  const explicitCode = Number(err?.statusCode);
+  if ([400, 401, 403, 404, 405].includes(explicitCode)) {
+    return `HttpFatalError (${explicitCode})`;
+  }
+  const httpMatch = fullText.match(/\bHTTP\s+(400|401|403|404|405)\b/i);
+  if (httpMatch) {
+    return `HttpFatalError (${httpMatch[1]})`;
+  }
+
+  // 1. 网络连接 / 超时 / 代理上传异常 (优先于普通 TypeError 匹配，防止 TypeError: fetch failed 被误判为代码逻辑错误)
+  if (
+    /ECONNREFUSED|ETIMEDOUT|ECONNRESET|EHOSTUNREACH|ENOTFOUND|socket hang up|fetch failed|timed out|Network error|TimeoutError/i.test(fullText)
+  ) {
+    return 'NetworkConnectionError';
+  }
+  // 2. Remotion 单调递增区间校验失败 (inputRange must be strictly monotonically increasing)
+  if (fullText.includes('inputRange must be strictly monotonically increasing')) {
+    return 'RemotionMonotonicInputRangeError';
+  }
+  // 3. ReferenceError: xxx is not defined
+  if (fullText.includes('ReferenceError')) {
+    const match = fullText.match(/ReferenceError:\s*(\w+)/);
+    return match ? `ReferenceError (${match[1]})` : 'ReferenceError';
+  }
+  // 4. TypeError
+  if (fullText.includes('TypeError')) {
+    const match = fullText.match(/TypeError:\s*([^:\n\r]+)/);
+    return match ? `TypeError (${match[1].trim().slice(0, 30)})` : 'TypeError';
+  }
+  // 5. SyntaxError
+  if (fullText.includes('SyntaxError')) {
+    return 'SyntaxError';
+  }
+  // 6. 内存溢出 / OOM
+  if (err.isOom || /Out of memory|malloc.*failed|ERR_INSUFFICIENT_RESOURCES/i.test(fullText)) {
+    return 'OutOfMemoryError';
+  }
+  // 7. Remotion 进程崩溃退出
+  if (fullText.includes('Remotion 渲染进程异常退出') || fullText.includes('Remotion render process exited unexpectedly')) {
+    const match = fullText.match(/状态码[:：]\s*(\d+)|status code:\s*(\d+)/i);
+    const code = match ? (match[1] || match[2]) : (err.exitCode != null ? String(err.exitCode) : 'unknown');
+    return `RemotionProcessExit (code ${code})`;
+  }
+  // 8. 磁盘满
+  if (fullText.includes('ENOSPC')) {
+    return 'DiskFullError';
+  }
+  // 9. 匹配通用标准 Error 名称
+  const errMatch = fullText.match(/^([A-Za-z]+Error):/);
+  if (errMatch) return errMatch[1];
+
+  const firstLine = String(err.message || fullText).split(/[\r\n]/)[0].trim();
+  return firstLine.slice(0, 50) || 'UnknownError';
+}
+
+export async function handleTaskErrorWithCircuitBreaker(task: any, baseUrl: string, err: any) {
+  const currentCategory = extractErrorCategory(err);
+  if (lastErrorCategory && currentCategory === lastErrorCategory) {
+    consecutiveSameErrorCount++;
+  } else {
+    lastErrorCategory = currentCategory;
+    consecutiveSameErrorCount = 1;
+  }
+
+  const taskLabel = currentRunningTaskId ?? task?.videoId ?? task?.id ?? 'unknown';
+  let restored = false;
+  if (taskLabel && taskLabel !== 'unknown') {
+    const mod: VideoModule = detectTaskModule(task);
+    restored = await updateTaskStatus(
+      baseUrl,
+      taskLabel,
+      'waiting_render',
+      undefined,
+      task?.folderPath,
+      undefined,
+      undefined,
+      CURRENT_AUTH_TOKEN,
+      mod
+    ).catch(() => false);
+  }
+
+  if (restored) {
+    log(localizeScriptLog(`❌ 任务 [${taskLabel}] 执行异常: ${err.message}，已自动恢复为待渲染状态`), 'red');
+  } else {
+    log(localizeScriptLog(`❌ 任务 [${taskLabel}] 执行异常: ${err.message}（尝试恢复待渲染状态失败，请核查服务端状态）`), 'red');
+  }
+
+  if (consecutiveSameErrorCount > 1 && consecutiveSameErrorCount < MAX_CONSECUTIVE_SAME_ERROR) {
+    log(localizeScriptLog(`⚠️ 同类型错误 [${currentCategory}] 连续出现 (${consecutiveSameErrorCount}/${MAX_CONSECUTIVE_SAME_ERROR}) 次`), 'yellow');
+  }
+
+  if (consecutiveSameErrorCount >= MAX_CONSECUTIVE_SAME_ERROR) {
+    if (currentCategory === 'NetworkConnectionError') {
+      // 网络连接/代理上传异常属于瞬态网络抖动，不杀死整个渲染进程，而是进行网络恢复冷却后重置计数器
+      log(localizeScriptLog(`\n⚠️ 检测到网络连接/代理上传异常已发生 ${consecutiveSameErrorCount} 次，正在进入 10 秒网络恢复冷却等待，稍后继续任务轮询...`), 'yellow');
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+      consecutiveSameErrorCount = 0;
+      return;
+    }
+
+    isCircuitBreakerTripped = true;
+    log(localizeScriptLog(`\n🛑 [熔断机制触发] 同类型错误 [${currentCategory}] 已连续出现 3 次，为防止系统无限死循环重试，立即停止执行后续渲染操作！`), 'red');
+    pendingQueue.length = 0;
+  }
+}
 
 async function enqueueRenderTask(
   task: any,
   baseUrl: string,
   options: RenderWorkerOptions = {}
 ) {
+  if (isCircuitBreakerTripped) {
+    return;
+  }
   const taskId = task.videoId || task.id;
   // ，
   if (currentRunningTaskId != null && currentRunningTaskId === taskId) {
@@ -3583,15 +4796,15 @@ async function triggerQueue(
   baseUrl: string,
   options: RenderWorkerOptions = {}
 ) {
-  if (isProcessingQueue) return;
+  if (isProcessingQueue || isCircuitBreakerTripped) return;
   isProcessingQueue = true;
 
   try {
-    while (true) {
+    while (!isCircuitBreakerTripped) {
       let task = pendingQueue.shift();
       if (!task) {
         // 尝试即刻连贯抢占下一个任务，实现批量任务流水线无缝渲染，免除空档等待
-        const clientScope = options.scope || (IS_ELECTRON_CLIENT ? 'current_user' : 'all_users');
+        const clientScope = options.scope || activeClientScope;
         const nextTask = await claimNextTaskAnyModule(baseUrl, CURRENT_AUTH_TOKEN, clientScope);
         if (nextTask) {
           const modName = nextTask.__module === 'ap-calculus-frq' ? '[微积分 FRQ]' : nextTask.__module === 'ap-calculus-mcq' ? '[微积分 MCQ]' : '[对比学单词]';
@@ -3608,12 +4821,15 @@ async function triggerQueue(
       currentRunningTaskId = task.videoId || task.id;
       try {
         await processSingleTask(task, baseUrl, options);
+        // 成功完成任务，重置同类错误熔断器
+        resetErrorCircuitBreaker();
       } catch (err: any) {
-        log(localizeScriptLog(`❌ 任务 [${currentRunningTaskId}] 执行异常: ${err.message}，已自动恢复为待渲染状态`), 'red');
-        if (currentRunningTaskId) {
-          const mod: VideoModule = detectTaskModule(task);
-          await updateTaskStatus(baseUrl, currentRunningTaskId, 'waiting_render', undefined, task.folderPath, undefined, undefined, CURRENT_AUTH_TOKEN, mod).catch(() => null);
+        await handleTaskErrorWithCircuitBreaker(task, baseUrl, err);
+        if (isCircuitBreakerTripped) {
+          break;
         }
+        // 异常冷静防抖缓冲：休眠 3 秒，避免极速死循环抢单消耗系统与数据库资源
+        await new Promise((resolve) => setTimeout(resolve, 3000));
       } finally {
         currentRunningTaskId = null;
       }
@@ -3634,15 +4850,18 @@ async function listenSSEForModule(
   const modLabel = module === 'ap-calculus-frq' ? '微积分 FRQ' : module === 'ap-calculus-mcq' ? '微积分 MCQ' : '对比学单词';
 
   while (true) {
+    if (isCircuitBreakerTripped) return;
     try {
       log(localizeScriptLog(`📡 正在建立 [${modLabel}] SSE 实时任务下发长连接: ${eventsUrl}...`), 'blue');
-      const headers: Record<string, string> = {
-        'Accept': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-      };
-      if (CURRENT_AUTH_TOKEN) {
-        headers['Authorization'] = `Bearer ${CURRENT_AUTH_TOKEN}`;
-      }
+      const clientScope = options.scope || activeClientScope;
+      const headers = buildWorkerRequestHeaders(
+        {
+          'Accept': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+        },
+        CURRENT_AUTH_TOKEN,
+        clientScope
+      );
       const res = await fetch(eventsUrl, { headers });
 
       if (!res.ok || !res.body) {
@@ -3656,6 +4875,10 @@ async function listenSSEForModule(
       let buffer = '';
 
       while (true) {
+        if (isCircuitBreakerTripped) {
+          try { await reader.cancel(); } catch (_) {}
+          return;
+        }
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -3680,10 +4903,9 @@ async function listenSSEForModule(
 
           if (eventName === 'new_task' && dataStr) {
             try {
-              const clientScope = options.scope || (IS_ELECTRON_CLIENT ? 'current_user' : 'all_users');
               const claimedTask = await claimNextTask(baseUrl, CURRENT_AUTH_TOKEN, clientScope, module);
               if (claimedTask) {
-                const taskDesc = module === 'ap-calculus-mcq'
+                const taskDesc = module === 'ap-calculus-frq' || module === 'ap-calculus-mcq'
                   ? `${claimedTask.title || claimedTask.folderPath || claimedTask.id}`
                   : `${claimedTask.wordA} vs ${claimedTask.wordB}`;
                 log(localizeScriptLog(`\n🔔 [${modLabel} SSE 抢单成功] 成功锁定待渲染任务: [${claimedTask.videoId || claimedTask.id}] ${taskDesc}`), 'green');
@@ -3711,7 +4933,7 @@ async function startSSEListener(
   baseUrl: string,
   options: RenderWorkerOptions = {}
 ) {
-  // 同时监听 CompareEnglishWord 与 ApCalculusMCQ 两个频道的任务下发
+  // 同时监听 CompareEnglishWord 与 ApCalculusMCQ/FRQ 频道的任务下发
   listenSSEForModule(baseUrl, 'compare-english-word', options).catch((err) => {
     log(localizeScriptLog(`[对比学单词] SSE 线程异常: ${err.message}`), 'red');
   });
@@ -3745,6 +4967,7 @@ async function main() {
   const clientScope: 'current_user' | 'all_users' = scopeArg
     ? (scopeArg.split('=')[1]?.trim() as 'current_user' | 'all_users')
     : (isElectronClient ? 'current_user' : 'all_users');
+  activeClientScope = clientScope;
 
   const options: RenderWorkerOptions = { skipUpload, concurrency, lang: targetLang, scope: clientScope };
 
@@ -3792,13 +5015,20 @@ async function main() {
     });
   }
 
-  // 主轮询循环：补偿 SSE 丢包/重连空档，每隔 POLL_INTERVAL_MS 向服务端原子抢单
+  // 主轮询循环：补偿 SSE 丢包/重连空档，每隔 POLL_INTERVAL_MS 向服务端原子抢单 (支持空闲智能自适应退避)
+  let idlePollCount = 0;
   while (true) {
+    if (isCircuitBreakerTripped) {
+      log(localizeScriptLog(`🛑 渲染器已触发同类错误 3 次熔断机制并停止，请排查原因修复后重新启动。`), 'red');
+      process.exit(1);
+    }
+
     try {
       // 如果当前已有任务正在执行或队列非空，跳过主动轮询，避免超额抢单
       if (!isProcessingQueue && pendingQueue.length === 0 && currentRunningTaskId == null) {
         const claimedTask = await claimNextTaskAnyModule(baseUrl, CURRENT_AUTH_TOKEN, clientScope);
         if (claimedTask) {
+          idlePollCount = 0;
           const modName = claimedTask.__module === 'ap-calculus-frq' ? '[微积分 FRQ]' : claimedTask.__module === 'ap-calculus-mcq' ? '[微积分 MCQ]' : '[对比学单词]';
           const taskDesc = claimedTask.__module === 'ap-calculus-frq' || claimedTask.__module === 'ap-calculus-mcq'
             ? `${claimedTask.title || claimedTask.folderPath || claimedTask.id}`
@@ -3806,27 +5036,41 @@ async function main() {
           log(localizeScriptLog(`\n⚡ [轮询抢单] 成功锁定待渲染任务: ${modName} [${claimedTask.videoId || claimedTask.id}] ${taskDesc}`), 'green');
           enqueueRenderTask(claimedTask, baseUrl, options);
         } else if (!isProcessingQueue && currentRunningTaskId == null) {
-          process.stdout.write(localizeScriptLog(`\r渲染调度服务端连接正常，当前队列中没有视频任务，等待中...\n`));
+          idlePollCount++;
+          if (idlePollCount === 1 || idlePollCount % 6 === 0) {
+            log(localizeScriptLog(`⏳ 渲染调度服务端连接正常，当前队列中没有待渲染视频任务，静默等待中...`), 'gray');
+          }
         }
       }
 
       if (isOnce) {
         while (isProcessingQueue || pendingQueue.length > 0) {
+          if (isCircuitBreakerTripped) {
+            log(localizeScriptLog(`🛑 渲染器已触发同类错误 3 次熔断机制并停止，请排查原因修复后重新启动。`), 'red');
+            process.exit(1);
+          }
           await new Promise((resolve) => setTimeout(resolve, 500));
         }
         log(localizeScriptLog(`\n单次运行模式完成，退出。`), 'gray');
         break;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-    } catch (e) {
+      const adaptiveInterval = Math.min(60000, POLL_INTERVAL_MS + Math.min(idlePollCount, 6) * 5000);
+      await new Promise((resolve) => setTimeout(resolve, adaptiveInterval));
+    } catch (e: any) {
+      if (isCircuitBreakerTripped) {
+        log(localizeScriptLog(`🛑 渲染器已触发同类错误 3 次熔断机制并停止，请排查原因修复后重新启动。`), 'red');
+        process.exit(1);
+      }
       log(localizeScriptLog(`轮询异常: ${e.message}`), 'red');
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     }
   }
 }
 
-main().catch((err) => {
-  console.error('Fatal Worker Error:', err);
-  process.exit(1);
-});
+if (typeof require !== 'undefined' && require.main === module) {
+  main().catch((err) => {
+    console.error('Fatal Worker Error:', err);
+    process.exit(1);
+  });
+}

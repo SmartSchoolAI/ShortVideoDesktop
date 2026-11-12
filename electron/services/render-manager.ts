@@ -113,10 +113,16 @@ export class RenderManager {
     });
 
     ipcMain.handle('render:get-state', async () => {
+      let lang = 'zh';
+      try {
+        const { windowManager } = require('./window-manager');
+        lang = windowManager?.getCurrentLanguage?.() || 'zh';
+      } catch {}
       return {
         state: this.getState(),
         logs: this.logs,
         projectDir: this.resolvePhysicalWorkingDir(),
+        language: lang,
       };
     });
 
@@ -192,12 +198,18 @@ export class RenderManager {
       this.subscribers.delete(webContents);
     });
 
-    // 立即向新订阅者推送当前状态和已有日志
+    // 立即向新订阅者推送当前状态、语言和已有日志
     try {
+      let lang = 'zh';
+      try {
+        const { windowManager } = require('./window-manager');
+        lang = windowManager?.getCurrentLanguage?.() || 'zh';
+      } catch {}
       webContents.send('render:init', {
         state: this.getState(),
         logs: this.logs,
         projectDir: this.resolvePhysicalWorkingDir(),
+        language: lang,
       });
     } catch { }
   }
@@ -238,7 +250,8 @@ export class RenderManager {
       /Rendering frame\s+\d+/i.test(t) ||
       /\[\s*\d+%\s*\]/i.test(t) ||
       /渲染进度/i.test(t) ||
-      /Rendering progress/i.test(t);
+      /Render(?:ing)?\s+progress/i.test(t) ||
+      /\d+(?:\.\d+)?%\s*\(\d+\/\d+\s*[^)]+\)/i.test(t);
   }
 
   /**
@@ -258,8 +271,13 @@ export class RenderManager {
   private isIdleWaitLog(t: string): boolean {
     if (!t) return false;
     return t.includes('当前队列中没有视频任务') ||
+      t.includes('当前队列中没有待渲染视频任务') ||
       t.includes('等待中...') ||
-      t.includes('渲染调度服务端连接正常');
+      t.includes('渲染调度服务端连接正常') ||
+      /Render scheduler server connected/i.test(t) ||
+      /no pending video tasks/i.test(t) ||
+      /no video tasks in queue/i.test(t) ||
+      /waiting silently/i.test(t);
   }
 
   /**
@@ -294,21 +312,23 @@ export class RenderManager {
    * 解析日志文本中的帧进度与百分比
    */
   private parseProgress(text: string): RenderLogEntry['progress'] | undefined {
-    // 匹配中文渲染进度: 渲染进度: 72.3% (5600/7749 帧) | 剩余预计: 2m 38s
-    const mZh = text.match(/渲染进度[:：]?\s*([\d\.]+)%\s*\((\d+)\/(\d+)\s*帧\)(?:.*?剩余预计[:：]?\s*([^\r\n]+))?/i);
-    if (mZh) {
-      const pct = parseFloat(mZh[1]);
-      const cur = parseInt(mZh[2], 10);
-      const tot = parseInt(mZh[3], 10);
-      return {
-        current: cur,
-        total: tot,
-        percent: pct,
-        eta: mZh[4] ? mZh[4].trim() : undefined,
-      };
+    // 1. 匹配本地化渲染进度（中文、英文及其他语言）: 渲染进度: 72.3% (5600/7749 帧) | 剩余预计: 2m 38s / Rendering progress: 97.5% (1899/1949 frames) | ETA: 3s
+    const mLoc = text.match(/([\d.]+)%\s*\((\d+)\/(\d+)[^)]*\)(?:.*?(?:剩余预计|ETA|Est\.?\s*Remaining|Time\s*left|残り時間|남은\s*시간|Còn\s*lại|เวลาที่เหลือ|Sisa\s*waktu|Restante|Temps\s*restant|Verbleibend|Rimasto|Осталось|Kalan)[:：]?\s*([^\r\n]+))?/i);
+    if (mLoc) {
+      const pct = parseFloat(mLoc[1]);
+      const cur = parseInt(mLoc[2], 10);
+      const tot = parseInt(mLoc[3], 10);
+      if (tot > 0) {
+        return {
+          current: cur,
+          total: tot,
+          percent: Math.min(100, pct),
+          eta: mLoc[4] ? mLoc[4].trim() : undefined,
+        };
+      }
     }
 
-    // 匹配 Remotion 输出: Rendered 416/607, time remaining: 9s
+    // 2. 匹配 Remotion 原始输出: Rendered 416/607, time remaining: 9s
     const m = text.match(/Rendered\s+(\d+)\/(\d+)(?:,\s*time remaining:\s*([0-9a-zA-Z\s]+))?/i);
     if (m) {
       const cur = parseInt(m[1], 10);
@@ -322,7 +342,7 @@ export class RenderManager {
         };
       }
     }
-    // 匹配百分比进度: [45%] 或 45.5%
+    // 3. 匹配百分比进度: [45%] 或 45.5%
     const m2 = text.match(/(\d+(?:\.\d+)?)%/);
     if (m2) {
       const pct = parseFloat(m2[1]);
@@ -413,7 +433,17 @@ export class RenderManager {
     }
 
     // 若一个渲染阶段结束或进入新步骤（如完成、失败、开始新语言），重置 activeProgressLogId
-    if (text.includes('渲染完成') || text.includes('渲染失败') || text.includes('▶️') || text.includes('🏆') || text.includes('全部')) {
+    if (
+      text.includes('渲染完成') ||
+      text.includes('渲染失败') ||
+      text.includes('▶️') ||
+      text.includes('🏆') ||
+      text.includes('全部') ||
+      /render\s+(?:completed|finished|failed)/i.test(text) ||
+      /rendering\s+(?:failed|completed)/i.test(text) ||
+      /uploaded successfully|upload failed/i.test(text) ||
+      /All\s+\d+\s+language/i.test(text)
+    ) {
       this.activeProgressLogId = null;
       this.activeNoiseLogId = null;
     }

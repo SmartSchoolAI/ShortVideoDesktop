@@ -1473,7 +1473,7 @@
     // 视频渲染控制台日志多语言规则表 (支持项目全量 14 种核心语言与兼容语种)
     const RENDER_LOG_RULES = [
       {
-        pattern: /(?:(?:🎯|🚀)\\s*)?拾取待渲染任务[:：]\\s*(.*)/i,
+        pattern: /(?:(?:🎯|🚀)\s*)?拾取待渲染任务[:：]\s*(.*)/i,
         templates: {
           zh: '🎯 拾取待渲染任务: $1',
           en: '🎯 Picked pending video render task: $1',
@@ -1494,7 +1494,7 @@
         }
       },
       {
-        pattern: /(?:(?:📂|📁)\\s*)?(?:存储目录路径|任务目录路径)[:：]\\s*(.*)/i,
+        pattern: /(?:(?:📂|📁)\s*)?(?:存储目录路径|任务目录路径)[:：]\s*(.*)/i,
         templates: {
           zh: '📁 任务目录路径: $1',
           en: '📁 Task directory path: $1',
@@ -1515,7 +1515,7 @@
         }
       },
       {
-        pattern: /(?:(?:💾|🎬)\\s*)?(?:本地存储位置|本次目标文件)[:：]\\s*(.*)/i,
+        pattern: /(?:(?:💾|🎬)\s*)?(?:本地存储位置|本次目标文件)[:：]\s*(.*)/i,
         templates: {
           zh: '🎬 本次目标文件: $1',
           en: '🎬 Target output file: $1',
@@ -1599,7 +1599,7 @@
         }
       },
       {
-        pattern: /(?:(?:✅|📊)\\s*)?核心素材(?:全部|全局)就绪[:：]\\s*采用\\s*meta\\.duration_en\\s*(?:视频时长|预估时长)\\s*([\\d.]+)s*\\(([\\d]+)\\s*帧\\)/i,
+        pattern: /(?:(?:✅|📊)\s*)?核心素材(?:全部|全局)就绪[:：]\s*采用\s*meta\.duration_en\s*(?:视频时长|预估时长)\s*([\d.]+)s\s*\(([\d]+)\s*帧\)/i,
         templates: {
           zh: '📊 核心素材全局就绪: 采用 meta.duration_en 预估时长 $1s ($2 帧)',
           en: '📊 Core assets ready: using meta.duration_en estimated duration $1s ($2 frames)',
@@ -1704,7 +1704,7 @@
         }
       },
       {
-        pattern: /(?:(?:🚀|🎬)\s*)?执行渲染命令\s*(?:并发[:：]\s*(\d+)x)\s*[:：]?\s*(.*)/i,
+        pattern: /(?:(?:🚀|🎬)\s*)?执行渲染命令\s*[(（]?并发[:：]\s*(\d+)x[)）]?\s*[:：]?\s*(.*)/i,
         templates: {
           zh: '🎬 执行渲染命令 (并发: $1x): $2',
           en: '🎬 Executing render command (concurrency: $1x): $2',
@@ -2754,28 +2754,808 @@
           tr: '🎉 Video işleme ve sentezi başarıyla tamamlandı! $1',
           ur: '🎉 ویڈیو رینڈرنگ اور ترکیب کامیاب ہو گئی! $1',
         }
+      },
+      {
+        pattern: /⏳\s*渲染进度:\s*([\d.]+)%\s*\((\d+)\/(\d+)\s*帧\)\s*\|\s*剩余预计:\s*(.+)/i,
+        templates: {
+          zh: '⏳ 渲染进度: $1% ($2/$3 帧) | 剩余预计: $4',
+          en: '⏳ Render Progress: $1% ($2/$3 frames) | ETA: $4',
+          ja: '⏳ レンダリング進捗: $1% ($2/$3 フレーム) | 残り時間: $4',
+          ko: '⏳ 렌더링 진행률: $1% ($2/$3 프레임) | 남은 예상 시간: $4',
+          vi: '⏳ Tiến độ kết xuất: $1% ($2/$3 khung hình) | Còn lại: $4',
+          th: '⏳ ความคืบหน้าการเรนเดอร์: $1% ($2/$3 เฟรม) | เหลือเวลา: $4',
+          bn: '⏳ রেন্ডার অগ্রগতি: $1% ($2/$3 ফ্রেম) | আনুমানিক বাকি: $4',
+          id: '⏳ Progres Render: $1% ($2/$3 frame) | Perkiraan sisa: $4',
+          es: '⏳ Progreso de renderizado: $1% ($2/$3 fotogramas) | Restante: $4',
+          fr: '⏳ Progression du rendu : $1% ($2/$3 images) | Restant : $4',
+          pt: '⏳ Progresso da renderização: $1% ($2/$3 quadros) | Restante: $4',
+          de: '⏳ Render-Fortschritt: $1% ($2/$3 Frames) | Verbleibend: $4',
+          it: '⏳ Avanzamento rendering: $1% ($2/$3 fotogrammi) | Rimanente: $4',
+          ru: '⏳ Прогресс рендеринга: $1% ($2/$3 кадров) | Осталось: $4',
+          tr: '⏳ İşleme İlerlemesi: %$1 ($2/$3 kare) | Kalan: $4',
+          ur: '⏳ رینڈر پیش رفت: $1% ($2/$3 فریم) | باقی وقت: $4',
+        }
+      },
+      {
+        pattern: /⏳\s*渲染进度:\s*([\d.]+)%\s*\((\d+)\/(\d+)\s*帧\)/i,
+        templates: {
+          zh: '⏳ 渲染进度: $1% ($2/$3 帧)',
+          en: '⏳ Render Progress: $1% ($2/$3 frames)',
+          ja: '⏳ レンダリング進捗: $1% ($2/$3 フレーム)',
+          ko: '⏳ 렌더링 진행률: $1% ($2/$3 프레임)',
+          vi: '⏳ Tiến độ kết xuất: $1% ($2/$3 khung hình)',
+          th: '⏳ ความคืบหน้าการเรนเดอร์: $1% ($2/$3 เฟรม)',
+          bn: '⏳ রেন্ডার অগ্রগতি: $1% ($2/$3 ফ্রেম)',
+          id: '⏳ Progres Render: $1% ($2/$3 frame)',
+          es: '⏳ Progreso de renderizado: $1% ($2/$3 fotogramas)',
+          fr: '⏳ Progression du rendu : $1% ($2/$3 images)',
+          pt: '⏳ Progresso da renderização: $1% ($2/$3 quadros)',
+          de: '⏳ Render-Fortschritt: $1% ($2/$3 Frames)',
+          it: '⏳ Avanzamento rendering: $1% ($2/$3 fotogrammi)',
+          ru: '⏳ Прогресс рендеринга: $1% ($2/$3 кадров)',
+          tr: '⏳ İşleme İlerlemesi: %$1 ($2/$3 kare)',
+          ur: '⏳ رینڈر پیش رفت: $1% ($2/$3 فریم)',
+        }
+      },
+      {
+        pattern: /🎬\s*\[(微积分 FRQ|微积分 MCQ)\]\s*开始渲染任务:\s*\[(.*?)\]\s*(.*)/i,
+        templates: {
+          zh: '🎬 [$1] 开始渲染任务: [$2] $3',
+          en: '🎬 [$1] Starting render task: [$2] $3',
+          ja: '🎬 [$1] レンダリングタスクを開始: [$2] $3',
+          ko: '🎬 [$1] 렌더링 작업 시작: [$2] $3',
+          vi: '🎬 [$1] Bắt đầu tác vụ kết xuất: [$2] $3',
+          th: '🎬 [$1] เริ่มงานเรนเดอร์: [$2] $3',
+          bn: '🎬 [$1] রেন্ডার কাজ শুরু হচ্ছে: [$2] $3',
+          id: '🎬 [$1] Memulai tugas render: [$2] $3',
+          es: '🎬 [$1] Iniciando tarea de renderizado: [$2] $3',
+          fr: '🎬 [$1] Démarrage de la tâche de rendu : [$2] $3',
+          pt: '🎬 [$1] Iniciando tarefa de renderização: [$2] $3',
+          de: '🎬 [$1] Starte Render-Aufgabe: [$2] $3',
+          it: '🎬 [$1] Avvio attività di rendering: [$2] $3',
+          ru: '🎬 [$1] Запуск задачи рендеринга: [$2] $3',
+          tr: '🎬 [$1] İşleme görevi başlatılıyor: [$2] $3',
+          ur: '🎬 [$1] رینڈر ٹاسک شروع ہو رہا ہے: [$2] $3',
+        }
+      },
+      {
+        pattern: /(?:📂|📁)\s*本地输出目录:\s*(.*)/i,
+        templates: {
+          zh: '📂 本地输出目录: $1',
+          en: '📂 Local output directory: $1',
+          ja: '📂 ローカル出力ディレクトリ: $1',
+          ko: '📂 로컬 출력 디렉터리: $1',
+          vi: '📂 Thư mục xuất cục bộ: $1',
+          th: '📂 ไดเรกทอรีเอาต์พุตในเครื่อง: $1',
+          bn: '📂 স্থানীয় আউটপুট ডিরেক্টরি: $1',
+          id: '📂 Direktori output lokal: $1',
+          es: '📂 Directorio de salida local: $1',
+          fr: '📂 Répertoire de sortie local : $1',
+          pt: '📂 Diretório de saída local: $1',
+          de: '📂 Lokales Ausgabeverzeichnis: $1',
+          it: '📂 Directory di output locale: $1',
+          ru: '📂 Локальный каталог вывода: $1',
+          tr: '📂 Yerel çıktı dizini: $1',
+          ur: '📂 مقامی آؤٹ پٹ ڈائریکٹری: $1',
+        }
+      },
+      {
+        pattern: /📥\s*已从云端同步最新微积分 FRQ 剧本与时间戳数据 \(summary\.json\)/i,
+        templates: {
+          zh: '📥 已从云端同步最新微积分 FRQ 剧本与时间戳数据 (summary.json)',
+          en: '📥 Synced latest AP Calculus FRQ script and timestamps from cloud (summary.json)',
+          ja: '📥 クラウドから最新の AP 微積分 FRQ スクリプトとタイムスタンプを同期しました (summary.json)',
+          ko: '📥 클라우드에서 최신 AP 미적분 FRQ 스크립트 및 타임스탬프 동기화 완료 (summary.json)',
+          vi: '📥 Đã đồng bộ kịch bản & dấu thời gian AP Calculus FRQ mới nhất từ đám mây (summary.json)',
+          th: '📥 ซิงค์สคริปต์และไทม์แสตมป์ AP Calculus FRQ ล่าสุดจากคลาวด์แล้ว (summary.json)',
+          bn: '📥 ক্লাউড থেকে সর্বশেষ AP Calculus FRQ স্ক্রিপ্ট এবং টাইমস্ট্যাম্প সিঙ্ক হয়েছে (summary.json)',
+          id: '📥 Menyinkronkan skrip & stempel waktu AP Calculus FRQ terbaru dari cloud (summary.json)',
+          es: '📥 Guion y marcas de tiempo de AP Calculus FRQ sincronizados desde la nube (summary.json)',
+          fr: '📥 Script et horodatages AP Calculus FRQ synchronisés depuis le cloud (summary.json)',
+          pt: '📥 Roteiro e carimbos de tempo do AP Calculus FRQ sincronizados da nuvem (summary.json)',
+          de: '📥 Aktuelles AP Calculus FRQ-Skript und Zeitstempel aus der Cloud synchronisiert (summary.json)',
+          it: '📥 Script e timestamp AP Calculus FRQ sincronizzati dal cloud (summary.json)',
+          ru: '📥 Сценарий и таймкоды AP Calculus FRQ синхронизированы из облака (summary.json)',
+          tr: '📥 En güncel AP Calculus FRQ senaryosu ve zaman damgaları buluttan senkronize edildi (summary.json)',
+          ur: '📥 کلاؤڈ سے تازہ ترین AP Calculus FRQ اسکرپٹ اور ٹائم اسٹیمپ مطابقت پذیر ہو گئے (summary.json)',
+        }
+      },
+      {
+        pattern: /📥\s*已从云端同步最新微积分 FRQ 原始数据 \(original\.json\)/i,
+        templates: {
+          zh: '📥 已从云端同步最新微积分 FRQ 原始数据 (original.json)',
+          en: '📥 Synced latest AP Calculus FRQ raw data from cloud (original.json)',
+          ja: '📥 クラウドから最新の AP 微積分 FRQ 元データを同期しました (original.json)',
+          ko: '📥 클라우드에서 최신 AP 미적분 FRQ 원본 데이터 동기화 완료 (original.json)',
+          vi: '📥 Đã đồng bộ dữ liệu gốc AP Calculus FRQ mới nhất từ đám mây (original.json)',
+          th: '📥 ซิงค์ข้อมูลดิบ AP Calculus FRQ ล่าสุดจากคลาวด์แล้ว (original.json)',
+          bn: '📥 ক্লাউড থেকে সর্বশেষ AP Calculus FRQ মূল ডেটা সিঙ্ক হয়েছে (original.json)',
+          id: '📥 Menyinkronkan data mentah AP Calculus FRQ terbaru dari cloud (original.json)',
+          es: '📥 Datos sin procesar de AP Calculus FRQ sincronizados desde la nube (original.json)',
+          fr: '📥 Données brutes AP Calculus FRQ synchronisées depuis le cloud (original.json)',
+          pt: '📥 Dados brutos do AP Calculus FRQ sincronizados da nuvem (original.json)',
+          de: '📥 Aktuelle AP Calculus FRQ-Rohdaten aus der Cloud synchronisiert (original.json)',
+          it: '📥 Dati grezzi AP Calculus FRQ sincronizzati dal cloud (original.json)',
+          ru: '📥 Исходные данные AP Calculus FRQ синхронизированы из облака (original.json)',
+          tr: '📥 En güncel AP Calculus FRQ ham verileri buluttan senkronize edildi (original.json)',
+          ur: '📥 کلاؤڈ سے تازہ ترین AP Calculus FRQ خام ڈیٹا مطابقت پذیر ہو گیا (original.json)',
+        }
+      },
+      {
+        pattern: /📥\s*已从云端同步最新微积分剧本与时间戳数据 \(summary\.json\)/i,
+        templates: {
+          zh: '📥 已从云端同步最新微积分剧本与时间戳数据 (summary.json)',
+          en: '📥 Synced latest AP Calculus MCQ script and timestamps from cloud (summary.json)',
+          ja: '📥 クラウドから最新の AP 微積分 MCQ スクリプトとタイムスタンプを同期しました (summary.json)',
+          ko: '📥 클라우드에서 최신 AP 미적분 MCQ 스크립트 및 타임스탬프 동기화 완료 (summary.json)',
+          vi: '📥 Đã đồng bộ kịch bản & dấu thời gian AP Calculus MCQ mới nhất từ đám mây (summary.json)',
+          th: '📥 ซิงค์สคริปต์และไทม์แสตมป์ AP Calculus MCQ ล่าสุดจากคลาวด์แล้ว (summary.json)',
+          bn: '📥 ক্লাউড থেকে সর্বশেষ AP Calculus MCQ স্ক্রিপ্ট এবং টাইমস্ট্যাম্প সিঙ্ক হয়েছে (summary.json)',
+          id: '📥 Menyinkronkan skrip & stempel waktu AP Calculus MCQ terbaru dari cloud (summary.json)',
+          es: '📥 Guion y marcas de tiempo de AP Calculus MCQ sincronizados desde la nube (summary.json)',
+          fr: '📥 Script et horodatages AP Calculus MCQ synchronisés depuis le cloud (summary.json)',
+          pt: '📥 Roteiro e carimbos de tempo do AP Calculus MCQ sincronizados da nuvem (summary.json)',
+          de: '📥 Aktuelles AP Calculus MCQ-Skript und Zeitstempel aus der Cloud synchronisiert (summary.json)',
+          it: '📥 Script e timestamp AP Calculus MCQ sincronizzati dal cloud (summary.json)',
+          ru: '📥 Сценарий и таймкоды AP Calculus MCQ синхронизированы из облака (summary.json)',
+          tr: '📥 En güncel AP Calculus MCQ senaryosu ve zaman damgaları buluttan senkronize edildi (summary.json)',
+          ur: '📥 کلاؤڈ سے تازہ ترین AP Calculus MCQ اسکرپٹ اور ٹائم اسٹیمپ مطابقت پذیر ہو گئے (summary.json)',
+        }
+      },
+      {
+        pattern: /\[1\/2\]\s*正在渲染中文视频 \((.*?)\)\.\.\./i,
+        templates: {
+          zh: '[1/2] 正在渲染中文视频 ($1)...',
+          en: '[1/2] Rendering Chinese video ($1)...',
+          ja: '[1/2] 中国語動画をレンダリング中 ($1)...',
+          ko: '[1/2] 중국어 동영상 렌더링 중 ($1)...',
+          vi: '[1/2] Đang kết xuất video tiếng Trung ($1)...',
+          th: '[1/2] กำลังเรนเดอร์วิดีโอภาษาจีน ($1)...',
+          bn: '[1/2] চীনা ভিডিও রেন্ডার করা হচ্ছে ($1)...',
+          id: '[1/2] Merender video Mandarin ($1)...',
+          es: '[1/2] Renderizando video en chino ($1)...',
+          fr: '[1/2] Rendu de la vidéo chinoise ($1)...',
+          pt: '[1/2] Renderizando vídeo em chinês ($1)...',
+          de: '[1/2] Chinesisches Video wird gerendert ($1)...',
+          it: '[1/2] Rendering video in cinese ($1)...',
+          ru: '[1/2] Рендеринг китайского видео ($1)...',
+          tr: '[1/2] Çince video işleniyor ($1)...',
+          ur: '[1/2] چینی ویڈیو رینڈر ہو رہی ہے ($1)...',
+        }
+      },
+      {
+        pattern: /\[2\/2\]\s*正在渲染英文视频 \((.*?)\)\.\.\./i,
+        templates: {
+          zh: '[2/2] 正在渲染英文视频 ($1)...',
+          en: '[2/2] Rendering English video ($1)...',
+          ja: '[2/2] 英語動画をレンダリング中 ($1)...',
+          ko: '[2/2] 영어 동영상 렌더링 중 ($1)...',
+          vi: '[2/2] Đang kết xuất video tiếng Anh ($1)...',
+          th: '[2/2] กำลังเรนเดอร์วิดีโอภาษาอังกฤษ ($1)...',
+          bn: '[2/2] ইংরেজি ভিডিও রেন্ডার করা হচ্ছে ($1)...',
+          id: '[2/2] Merender video Bahasa Inggris ($1)...',
+          es: '[2/2] Renderizando video en inglés ($1)...',
+          fr: '[2/2] Rendu de la vidéo anglaise ($1)...',
+          pt: '[2/2] Renderizando vídeo em inglês ($1)...',
+          de: '[2/2] Englisches Video wird gerendert ($1)...',
+          it: '[2/2] Rendering video in inglese ($1)...',
+          ru: '[2/2] Рендеринг английского видео ($1)...',
+          tr: '[2/2] İngilizce video işleniyor ($1)...',
+          ur: '[2/2] انگریزی ویڈیو رینڈر ہو رہی ہے ($1)...',
+        }
+      },
+      {
+        pattern: /✅\s*中文视频渲染完成:\s*(.*)/i,
+        templates: {
+          zh: '✅ 中文视频渲染完成: $1',
+          en: '✅ Chinese video rendered: $1',
+          ja: '✅ 中国語動画レンダリング完了: $1',
+          ko: '✅ 중국어 동영상 렌더링 완료: $1',
+          vi: '✅ Hoàn tất kết xuất video tiếng Trung: $1',
+          th: '✅ เรนเดอร์วิดีโอภาษาจีนเสร็จสมบูรณ์: $1',
+          bn: '✅ চীনা ভিডিও রেন্ডার সম্পন্ন: $1',
+          id: '✅ Video Mandarin selesai dirender: $1',
+          es: '✅ Video en chino renderizado: $1',
+          fr: '✅ Vidéo chinoise rendue : $1',
+          pt: '✅ Vídeo em chinês renderizado: $1',
+          de: '✅ Chinesisches Video gerendert: $1',
+          it: '✅ Video in cinese renderizzato: $1',
+          ru: '✅ Китайское видео отрендерено: $1',
+          tr: '✅ Çince video işlendi: $1',
+          ur: '✅ چینی ویڈیو رینڈر مکمل: $1',
+        }
+      },
+      {
+        pattern: /✅\s*英文视频渲染完成:\s*(.*)/i,
+        templates: {
+          zh: '✅ 英文视频渲染完成: $1',
+          en: '✅ English video rendered: $1',
+          ja: '✅ 英語動画レンダリング完了: $1',
+          ko: '✅ 영어 동영상 렌더링 완료: $1',
+          vi: '✅ Hoàn tất kết xuất video tiếng Anh: $1',
+          th: '✅ เรนเดอร์วิดีโอภาษาอังกฤษเสร็จสมบูรณ์: $1',
+          bn: '✅ ইংরেজি ভিডিও রেন্ডার সম্পন্ন: $1',
+          id: '✅ Video Bahasa Inggris selesai dirender: $1',
+          es: '✅ Video en inglés renderizado: $1',
+          fr: '✅ Vidéo anglaise rendue : $1',
+          pt: '✅ Vídeo em inglês renderizado: $1',
+          de: '✅ Englisches Video gerendert: $1',
+          it: '✅ Video in inglese renderizzato: $1',
+          ru: '✅ Английское видео отрендерено: $1',
+          tr: '✅ İngilizce video işlendi: $1',
+          ur: '✅ انگریزی ویڈیو رینڈر مکمل: $1',
+        }
+      },
+      {
+        pattern: /☁️\s*正在上传中文视频\.\.\./i,
+        templates: {
+          zh: '☁️ 正在上传中文视频...',
+          en: '☁️ Uploading Chinese video...',
+          ja: '☁️ 中国語動画をアップロード中...',
+          ko: '☁️ 중국어 동영상 업로드 중...',
+          vi: '☁️ Đang tải lên video tiếng Trung...',
+          th: '☁️ กำลังอัปโหลดวิดีโอภาษาจีน...',
+          bn: '☁️ চীনা ভিডিও আপলোড হচ্ছে...',
+          id: '☁️ Mengunggah video Mandarin...',
+          es: '☁️ Subiendo video en chino...',
+          fr: '☁️ Téléversement de la vidéo en chinois...',
+          pt: '☁️ Enviando vídeo em chinês...',
+          de: '☁️ Lade chinesisches Video hoch...',
+          it: '☁️ Caricamento video in cinese...',
+          ru: '☁️ Загрузка китайского видео...',
+          tr: '☁️ Çince video yükleniyor...',
+          ur: '☁️ چینی ویڈیو اپ لوڈ ہو رہی ہے...',
+        }
+      },
+      {
+        pattern: /☁️\s*正在上传英文视频\.\.\./i,
+        templates: {
+          zh: '☁️ 正在上传英文视频...',
+          en: '☁️ Uploading English video...',
+          ja: '☁️ 英語動画をアップロード中...',
+          ko: '☁️ 영어 동영상 업로드 중...',
+          vi: '☁️ Đang tải lên video tiếng Anh...',
+          th: '☁️ กำลังอัปโหลดวิดีโอภาษาอังกฤษ...',
+          bn: '☁️ ইংরেজি ভিডিও আপলোড হচ্ছে...',
+          id: '☁️ Mengunggah video Bahasa Inggris...',
+          es: '☁️ Subiendo video en inglés...',
+          fr: '☁️ Téléversement de la vidéo en anglais...',
+          pt: '☁️ Enviando vídeo em inglês...',
+          de: '☁️ Lade englisches Video hoch...',
+          it: '☁️ Caricamento video in inglese...',
+          ru: '☁️ Загрузка английского видео...',
+          tr: '☁️ İngilizce video yükleniyor...',
+          ur: '☁️ انگریزی ویڈیو اپ لوڈ ہو رہی ہے...',
+        }
+      },
+      {
+        pattern: /⏩\s*跳过云端上传 \(--skip-upload\)/i,
+        templates: {
+          zh: '⏩ 跳过云端上传 (--skip-upload)',
+          en: '⏩ Skipping cloud upload (--skip-upload)',
+          ja: '⏩ クラウドアップロードをスキップ (--skip-upload)',
+          ko: '⏩ 클라우드 업로드 건너뛰기 (--skip-upload)',
+          vi: '⏩ Bỏ qua tải lên đám mây (--skip-upload)',
+          th: '⏩ ข้ามการอัปโหลดขึ้นคลาวด์ (--skip-upload)',
+          bn: '⏩ ক্লাউড আপলোড এড়ানো হচ্ছে (--skip-upload)',
+          id: '⏩ Melewati unggahan cloud (--skip-upload)',
+          es: '⏩ Omitiendo subida a la nube (--skip-upload)',
+          fr: '⏩ Téléversement cloud ignoré (--skip-upload)',
+          pt: '⏩ Ignorando upload na nuvem (--skip-upload)',
+          de: '⏩ Cloud-Upload übersprungen (--skip-upload)',
+          it: '⏩ Caricamento cloud saltato (--skip-upload)',
+          ru: '⏩ Пропуск загрузки в облако (--skip-upload)',
+          tr: '⏩ Bulut yüklemesi atlanıyor (--skip-upload)',
+          ur: '⏩ کلاؤڈ اپ لوڈ نظر انداز کیا جا رہا ہے (--skip-upload)',
+        }
+      },
+      {
+        pattern: /📝\s*正在更新微积分(?: FRQ)? 视频任务状态为已完成 \(video_finished\)\.\.\./i,
+        templates: {
+          zh: '📝 正在更新微积分视频任务状态为已完成 (video_finished)...',
+          en: '📝 Updating AP Calculus video task status to completed (video_finished)...',
+          ja: '📝 AP 微積分動画タスクのステータスを完了 (video_finished) に更新中...',
+          ko: '📝 AP 미적분 비디오 작업 상태를 완료 (video_finished)로 업데이트 중...',
+          vi: '📝 Đang cập nhật trạng thái tác vụ video AP Calculus thành hoàn thành (video_finished)...',
+          th: '📝 กำลังอัปเดตสถานะงานวิดีโอ AP Calculus เป็นเสร็จสมบูรณ์ (video_finished)...',
+          bn: '📝 AP Calculus ভিডিও টাস্কের স্ট্যাটাস সম্পন্ন (video_finished) হিসেবে আপডেট হচ্ছে...',
+          id: '📝 Memperbarui status tugas video AP Calculus ke selesai (video_finished)...',
+          es: '📝 Actualizando estado de tarea de AP Calculus a completado (video_finished)...',
+          fr: '📝 Mise à jour du statut de la tâche AP Calculus vers terminé (video_finished)...',
+          pt: '📝 Atualizando status da tarefa AP Calculus para concluído (video_finished)...',
+          de: '📝 Aktualisiere AP Calculus Aufgabenstatus auf abgeschlossen (video_finished)...',
+          it: '📝 Aggiornamento stato attività AP Calculus a completato (video_finished)...',
+          ru: '📝 Обновление статуса задачи AP Calculus на завершено (video_finished)...',
+          tr: '📝 AP Calculus video görevi durumu tamamlandı (video_finished) olarak güncelleniyor...',
+          ur: '📝 AP Calculus ویڈیو ٹاسک کی حیثیت مکمل (video_finished) پر اپ ڈیٹ ہو رہی ہے...',
+        }
+      },
+      {
+        pattern: /🎉\s*\[(.*?)\]\s*任务 \[(.*?)\] 全部渲染与上传完成!/i,
+        templates: {
+          zh: '🎉 [$1] 任务 [$2] 全部渲染与上传完成!',
+          en: '🎉 [$1] Task [$2] all renders and uploads completed!',
+          ja: '🎉 [$1] タスク [$2] すべてのレンダリングとアップロードが完了しました!',
+          ko: '🎉 [$1] 작업 [$2] 모든 렌더링 및 업로드 완료!',
+          vi: '🎉 [$1] Tác vụ [$2] đã hoàn tất toàn bộ kết xuất & tải lên!',
+          th: '🎉 [$1] งาน [$2] เรนเดอร์และอัปโหลดทั้งหมดเสร็จสมบูรณ์!',
+          bn: '🎉 [$1] টাস্ক [$2] সব রেন্ডার ও আপলোড সম্পন্ন!',
+          id: '🎉 [$1] Tugas [$2] semua render dan unggahan selesai!',
+          es: '🎉 [$1] ¡Tarea [$2] renderizada y subida por completo!',
+          fr: '🎉 [$1] Tâche [$2] entièrement rendue et téléversée !',
+          pt: '🎉 [$1] Tarefa [$2] concluída com sucesso!',
+          de: '🎉 [$1] Aufgabe [$2] vollständig gerendert und hochgeladen!',
+          it: '🎉 [$1] Attività [$2] rendering e caricamento completati!',
+          ru: '🎉 [$1] Задача [$2] полностью отрендерена и загружена!',
+          tr: '🎉 [$1] Görev [$2] tüm işleme ve yüklemeler tamamlandı!',
+          ur: '🎉 [$1] ٹاسک [$2] تمام رینڈر اور اپ لوڈ مکمل!',
+        }
+      },
+      {
+        pattern: /⚠️\s*\[(.*?)\]\s*任务 \[(.*?)\] 视频已生成，但更新服务端状态失败/i,
+        templates: {
+          zh: '⚠️ [$1] 任务 [$2] 视频已生成，但更新服务端状态失败',
+          en: '⚠️ [$1] Task [$2] video generated, but failed to update server status',
+          ja: '⚠️ [$1] タスク [$2] 動画は生成されましたが、サーバー状態の更新に失敗しました',
+          ko: '⚠️ [$1] 작업 [$2] 비디오가 생성되었으나 서버 상태 업데이트에 실패했습니다',
+          vi: '⚠️ [$1] Tác vụ [$2] đã tạo video nhưng cập nhật trạng thái máy chủ thất bại',
+          th: '⚠️ [$1] งาน [$2] สร้างวิดีโอแล้วแต่อัปเดตสถานะเซิร์ฟเวอร์ล้มเหลว',
+          bn: '⚠️ [$1] টাস্ক [$2] ভিডিও তৈরি হয়েছে, তবে সার্ভার স্ট্যাটাস আপডেট ব্যর্থ',
+          id: '⚠️ [$1] Tugas [$2] video dibuat, namun gagal memperbarui status server',
+          es: '⚠️ [$1] Video de tarea [$2] generado, pero falló la actualización de estado en el servidor',
+          fr: '⚠️ [$1] Vidéo de tâche [$2] générée, mais échec de mise à jour du statut serveur',
+          pt: '⚠️ [$1] Vídeo da tarefa [$2] gerado, mas falha ao atualizar status no servidor',
+          de: '⚠️ [$1] Video für Aufgabe [$2] erstellt, aber Serverstatus-Update fehlgeschlagen',
+          it: '⚠️ [$1] Video attività [$2] generato, ma aggiornamento stato server non riuscito',
+          ru: '⚠️ [$1] Видео для задачи [$2] создано, но обновить статус на сервере не удалось',
+          tr: '⚠️ [$1] Görev [$2] videosu oluşturuldu ancak sunucu durumu güncellenemedi',
+          ur: '⚠️ [$1] ٹاسک [$2] ویڈیو بن گئی، لیکن سرور اسٹیٹس اپ ڈیٹ ناکام رہا',
+        }
+      },
+      {
+        pattern: /⚡\s*检测到已有\s*\[(.*?)\]\s*Remotion\s*渲染核心缓存\s*\((.*?)\):\s*(.*?)，直接复用免打包/i,
+        templates: {
+          zh: '⚡ 检测到已有 [$1] Remotion 渲染核心缓存 ($2): $3，直接复用免打包',
+          en: '⚡ Found existing [$1] Remotion bundle cache ($2): $3, reusing directly',
+          ja: '⚡ 既存の [$1] Remotion レンダーキャッシュ ($2) を検出: $3（再バンドル不要で再利用）',
+          ko: '⚡ 기존 [$1] Remotion 렌더 캐시 ($2) 감지됨: $3 (번들링 생략 후 재사용)',
+          vi: '⚡ Đã tìm thấy bộ nhớ đệm Remotion [$1] ($2): $3, dùng lại trực tiếp',
+          th: '⚡ พบแคชแกนเรนเดอร์ [$1] Remotion ($2): $3 นำมาใช้ซ้ำทันที',
+          bn: '⚡ বিদ্যমান [$1] Remotion বান্ডেল ক্যাশ ($2) পাওয়া গেছে: $3, সরাসরি পুনর্ব্যবহার করা হচ্ছে',
+          id: '⚡ Cache inti render [$1] Remotion ditemukan ($2): $3, digunakan langsung',
+          es: '⚡ Caché Remotion [$1] detectada ($2): $3, reutilizando directamente',
+          fr: '⚡ Cache Remotion [$1] détecté ($2) : $3, réutilisation directe',
+          pt: '⚡ Cache Remotion [$1] encontrado ($2): $3, reutilizando diretamente',
+          de: '⚡ Vorhandener [$1] Remotion-Cache ($2) gefunden: $3, direkte Wiederverwendung',
+          it: '⚡ Rilevata cache Remotion [$1] ($2): $3, riutilizzo diretto',
+          ru: '⚡ Обнаружен кэш Remotion [$1] ($2): $3, прямое переиспользование',
+          tr: '⚡ Mevcut [$1] Remotion önbelleği ($2) bulundu: $3, doğrudan kullanılıyor',
+          ur: '⚡ موجودہ [$1] Remotion بنڈل کیش ($2) مل گیا: $3، براہ راست استعمال ہو رہا ہے',
+        }
+      },
+      {
+        pattern: /🧹\s*检测到\s*\[(.*?)\]\s*Remotion\s*缓存版本过期或不完整，自动清理并刷新:\s*(.*)/i,
+        templates: {
+          zh: '🧹 检测到 [$1] Remotion 缓存版本过期或不完整，自动清理并刷新: $2',
+          en: '🧹 Detected stale or incomplete [$1] Remotion cache, cleaning and refreshing: $2',
+          ja: '🧹 [$1] Remotion キャッシュの期限切れ/不完全を検出、クリーンアップして更新中: $2',
+          ko: '🧹 [$1] Remotion 캐시가 만료되었거나 불완전하여 정리 및 새로고침 중: $2',
+          vi: '🧹 Phát hiện cache Remotion [$1] cũ hoặc thiếu, đang dọn dẹp và làm mới: $2',
+          th: '🧹 พบแคช [$1] Remotion ล้าสมัยหรือเสียหาย กำลังล้างและรีเฟรช: $2',
+          bn: '🧹 পুরানো বা অসম্পূর্ণ [$1] Remotion ক্যাশ সনাক্ত, পরিষ্কার ও রিফ্রেশ হচ্ছে: $2',
+          id: '🧹 Cache Remotion [$1] kedaluwarsa/tidak lengkap, membersihkan dan menyegarkan: $2',
+          es: '🧹 Caché Remotion [$1] obsoleta o incompleta, limpiando y actualizando: $2',
+          fr: '🧹 Cache Remotion [$1] obsolète ou incomplet, nettoyage et rafraîchissement : $2',
+          pt: '🧹 Cache Remotion [$1] desatualizado ou incompleto, limpando e atualizando: $2',
+          de: '🧹 Veralteter/unvollständiger [$1] Remotion-Cache erkannt, bereinige: $2',
+          it: '🧹 Rilevata cache Remotion [$1] obsoleta/incompleta, pulizia e aggiornamento: $2',
+          ru: '🧹 Кэш Remotion [$1] устарел или поврежден, очистка и обновление: $2',
+          tr: '🧹 Eski veya eksik [$1] Remotion önbelleği algılandı, temizlenip yenileniyor: $2',
+          ur: '🧹 پرانی یا نامکمل [$1] Remotion کیش ملی، صاف اور تازہ کیا جا رہا ہے: $2',
+        }
+      },
+      {
+        pattern: /❌\s*任务\s*\[(.*?)\]\s*执行异常:\s*(.*?)（尝试恢复待渲染状态失败，请核查服务端状态）/i,
+        templates: {
+          zh: '❌ 任务 [$1] 执行异常: $2（尝试恢复待渲染状态失败，请核查服务端状态）',
+          en: '❌ Task [$1] execution error: $2 (Failed to restore waiting_render status; please check server state)',
+          ja: '❌ タスク [$1] 実行エラー: $2（waiting_render への復元に失敗しました。サーバー状態を確認してください）',
+          ko: '❌ 작업 [$1] 실행 오류: $2 (대기 상태 복원 실패, 서버 상태를 확인하세요)',
+          vi: '❌ Tác vụ [$1] lỗi thực thi: $2 (Không thể khôi phục trạng thái waiting_render, vui lòng kiểm tra máy chủ)',
+          th: '❌ งาน [$1] เกิดข้อผิดพลาด: $2 (ไม่สามารถกู้คืนสถานะ waiting_render โปรดตรวจสอบเซิร์ฟเวอร์)',
+          bn: '❌ টাস্ক [$1] কার্যকরী ত্রুটি: $2 (waiting_render স্ট্যাটাস পুনরুদ্ধার ব্যর্থ; সার্ভার পরীক্ষা করুন)',
+          id: '❌ Tugas [$1] kesalahan eksekusi: $2 (Gagal memulihkan status waiting_render, harap periksa server)',
+          es: '❌ Error en tarea [$1]: $2 (Error al restaurar waiting_render; verifique el estado en el servidor)',
+          fr: '❌ Erreur tâche [$1] : $2 (Échec de restauration waiting_render ; vérifiez le serveur)',
+          pt: '❌ Erro na tarefa [$1]: $2 (Falha ao restaurar waiting_render; verifique o servidor)',
+          de: '❌ Fehler Aufgabe [$1]: $2 (Wiederherstellung von waiting_render fehlgeschlagen; Serverstatus prüfen)',
+          it: '❌ Errore attività [$1]: $2 (Ripristino waiting_render non riuscito; verificare lo stato sul server)',
+          ru: '❌ Ошибка задачи [$1]: $2 (Не удалось восстановить waiting_render; проверьте сервер)',
+          tr: '❌ Görev [$1] hatası: $2 (waiting_render durumu geri yüklenemedi; sunucuyu kontrol edin)',
+          ur: '❌ ٹاسک [$1] میں خرابی: $2 (waiting_render بحال کرنے میں ناکامی؛ سرور چیک کریں)',
+        }
+      },
+      {
+        pattern: /❌\s*任务\s*\[(.*?)\]\s*执行异常:\s*(.*?)，已自动恢复为待渲染状态/i,
+        templates: {
+          zh: '❌ 任务 [$1] 执行异常: $2，已自动恢复为待渲染状态',
+          en: '❌ Task [$1] execution error: $2. Restored status to waiting_render',
+          ja: '❌ タスク [$1] 実行エラー: $2。waiting_render 状態に戻しました',
+          ko: '❌ 작업 [$1] 실행 오류: $2. 대기 상태(waiting_render)로 복원되었습니다',
+          vi: '❌ Tác vụ [$1] lỗi thực thi: $2. Đã khôi phục về trạng thái chờ kết xuất',
+          th: '❌ งาน [$1] เกิดข้อผิดพลาด: $2 กู้คืนสถานะเป็น waiting_render แล้ว',
+          bn: '❌ টাস্ক [$1] কার্যকরী ত্রুটি: $2। স্ট্যাটাস waiting_render-এ পুনরুদ্ধার করা হয়েছে',
+          id: '❌ Tugas [$1] kesalahan eksekusi: $2. Status dikembalikan ke waiting_render',
+          es: '❌ Error de ejecución en tarea [$1]: $2. Estado restaurado a waiting_render',
+          fr: '❌ Erreur d\'exécution tâche [$1] : $2. Statut restauré à waiting_render',
+          pt: '❌ Erro de execução da tarefa [$1]: $2. Status restaurado para waiting_render',
+          de: '❌ Ausführungsfehler Aufgabe [$1]: $2. Status auf waiting_render zurückgesetzt',
+          it: '❌ Errore esecuzione attività [$1]: $2. Stato ripristinato a waiting_render',
+          ru: '❌ Ошибка выполнения задачи [$1]: $2. Статус возвращен в waiting_render',
+          tr: '❌ Görev [$1] yürütme hatası: $2. Durum waiting_render olarak geri yüklendi',
+          ur: '❌ ٹاسک [$1] میں خرابی: $2۔ حیثیت waiting_render پر بحال کر دی گئی',
+        }
+      },
+      {
+        pattern: /\[重试\s*(\d+)\/(\d+)\]\s*(.*?)\s*发生异常:\s*(.*?)，([\d.]+)秒后重试\.\.\./i,
+        templates: {
+          zh: '[重试 $1/$2] $3 发生异常: $4，$5秒后重试...',
+          en: '[Retry $1/$2] $3 exception: $4, retrying in $5s...',
+          ja: '[リトライ $1/$2] $3 で例外発生: $4、$5秒後に再試行...',
+          ko: '[재시도 $1/$2] $3 예외 발생: $4, $5초 후 재시도...',
+          vi: '[Thử lại $1/$2] $3 gặp ngoại lệ: $4, thử lại sau $5 giây...',
+          th: '[ลองใหม่ $1/$2] $3 เกิดข้อผิดพลาด: $4, ลองใหม่ใน $5 วิ...',
+          bn: '[পুনরায় চেষ্টা $1/$2] $3 ত্রুটি: $4, $5 সেকেন্ড পর আবার চেষ্টা করা হচ্ছে...',
+          id: '[Ulang $1/$2] $3 terjadi kesalahan: $4, mencoba lagi dalam $5 dtk...',
+          es: '[Reintento $1/$2] Excepción en $3: $4, reintentando en $5s...',
+          fr: '[Nouvel essai $1/$2] Exception $3 : $4, nouvel essai dans $5s...',
+          pt: '[Tentativa $1/$2] Exceção em $3: $4, tentando novamente em $5s...',
+          de: '[Wiederholung $1/$2] $3 Ausnahme: $4, erneuter Versuch in $5s...',
+          it: '[Tentativo $1/$2] Eccezione $3: $4, nuovo tentativo tra $5s...',
+          ru: '[Повтор $1/$2] Исключение $3: $4, повтор через $5с...',
+          tr: '[Yeniden Deneme $1/$2] $3 istisnası: $4, $5 sn sonra tekrar deneniyor...',
+          ur: '[دوبارہ کوشش $1/$2] $3 خرابی: $4، $5 سیکنڈ میں دوبارہ کوشش...',
+        }
+      },
+      {
+        pattern: /更新任务状态\((.*?)\)失败:\s*(.*)/i,
+        templates: {
+          zh: '更新任务状态($1)失败: $2',
+          en: 'Failed to update task status ($1): $2',
+          ja: 'タスクステータス ($1) の更新に失敗しました: $2',
+          ko: '작업 상태 ($1) 업데이트 실패: $2',
+          vi: 'Cập nhật trạng thái tác vụ ($1) thất bại: $2',
+          th: 'อัปเดตสถานะงาน ($1) ล้มเหลว: $2',
+          bn: 'টাস্কের স্ট্যাটাস ($1) আপডেট ব্যর্থ: $2',
+          id: 'Gagal memperbarui status tugas ($1): $2',
+          es: 'Error al actualizar estado de tarea ($1): $2',
+          fr: 'Échec de mise à jour du statut ($1) : $2',
+          pt: 'Falha ao atualizar status da tarefa ($1): $2',
+          de: 'Aktualisierung des Aufgabenstatus ($1) fehlgeschlagen: $2',
+          it: 'Aggiornamento stato attività ($1) non riuscito: $2',
+          ru: 'Ошибка обновления статуса задачи ($1): $2',
+          tr: 'Görev durumu ($1) güncellenemedi: $2',
+          ur: 'ٹاسک اسٹیٹس ($1) اپ ڈیٹ ناکام: $2',
+        }
+      },
+      {
+        pattern: /⚡\s*\[流水线接续抢单\]\s*成功锁定待渲染任务:\s*\[(.*?)\]\s*\[(.*?)\]\s*(.*)/i,
+        templates: {
+          zh: '⚡ [流水线接续抢单] 成功锁定待渲染任务: [$1] [$2] $3',
+          en: '⚡ [Pipeline Continuous Claiming] Locked pending render task: [$1] [$2] $3',
+          ja: '⚡ [パイプライン連続取得] 待機中のレンダリングタスクを確保: [$1] [$2] $3',
+          ko: '⚡ [파이프라인 연속 작업 확보] 대기 중인 작업 잠금 성공: [$1] [$2] $3',
+          vi: '⚡ [Nhận nối tiếp Pipeline] Đã khóa tác vụ chờ kết xuất: [$1] [$2] $3',
+          th: '⚡ [การรับงานต่อเนื่อง] ล็อกงานที่รอการเรนเดอร์สำเร็จ: [$1] [$2] $3',
+          bn: '⚡ [পাইপলাইন ধারাবাহিক দাবি] অপেক্ষমাণ রেন্ডার কাজ লক হয়েছে: [$1] [$2] $3',
+          id: '⚡ [Klaim Berkelanjutan Pipeline] Tugas render tertunda terkunci: [$1] [$2] $3',
+          es: '⚡ [Reclamación Continua] Tarea de renderizado pendiente bloqueada: [$1] [$2] $3',
+          fr: '⚡ [Capture Continue] Tâche de rendu en attente verrouillée : [$1] [$2] $3',
+          pt: '⚡ [Captura Contínua] Tarefa de renderização pendente bloqueada: [$1] [$2] $3',
+          de: '⚡ [Pipeline-Übernahme] Ausstehende Render-Aufgabe gesperrt: [$1] [$2] $3',
+          it: '⚡ [Acquisizione Continua] Attività in attesa bloccata: [$1] [$2] $3',
+          ru: '⚡ [Непрерывный захват] Заблокирована задача: [$1] [$2] $3',
+          tr: '⚡ [Ardışık İş Alımı] Bekleyen işleme görevi kilitlendi: [$1] [$2] $3',
+          ur: '⚡ [پائپ لائن مسلسل کلیم] زیر التوا رینڈر ٹاسک لاک ہو گیا: [$1] [$2] $3',
+        }
+      },
+      {
+        pattern: /⚡\s*\[轮询抢单\]\s*成功锁定待渲染任务:\s*\[(.*?)\]\s*\[(.*?)\]\s*(.*)/i,
+        templates: {
+          zh: '⚡ [轮询抢单] 成功锁定待渲染任务: [$1] [$2] $3',
+          en: '⚡ [Polling Claim] Locked pending render task: [$1] [$2] $3',
+          ja: '⚡ [ポーリング取得] 待機中のレンダリングタスクを確保: [$1] [$2] $3',
+          ko: '⚡ [폴링 작업 확보] 대기 중인 작업 잠금 성공: [$1] [$2] $3',
+          vi: '⚡ [Nhận qua thăm dò] Đã khóa tác vụ chờ kết xuất: [$1] [$2] $3',
+          th: '⚡ [รับงานจากการสำรวจ] ล็อกงานเรนเดอร์ที่รอแล้ว: [$1] [$2] $3',
+          bn: '⚡ [পোলিং দাবি] অপেক্ষমাণ রেন্ডার কাজ লক হয়েছে: [$1] [$2] $3',
+          id: '⚡ [Klaim Polling] Tugas render tertunda terkunci: [$1] [$2] $3',
+          es: '⚡ [Reclamación por Sondeo] Tarea de renderizado bloqueada: [$1] [$2] $3',
+          fr: '⚡ [Capture par Scrutation] Tâche de rendu verrouillée : [$1] [$2] $3',
+          pt: '⚡ [Captura por Sondagem] Tarefa de renderização bloqueada: [$1] [$2] $3',
+          de: '⚡ [Polling-Übernahme] Render-Aufgabe reserviert: [$1] [$2] $3',
+          it: '⚡ [Acquisizione Polling] Attività bloccata: [$1] [$2] $3',
+          ru: '⚡ [Захват опросом] Задача заблокирована: [$1] [$2] $3',
+          tr: '⚡ [Yoklama Alımı] Bekleyen görev kilitlendi: [$1] [$2] $3',
+          ur: '⚡ [پولنگ کلیم] زیر التوا رینڈر ٹاسک لاک ہو گیا: [$1] [$2] $3',
+        }
+      },
+      {
+        pattern: /📡\s*正在建立\s*\[(.*?)\]\s*SSE\s*实时任务下发长连接:\s*(.*)/i,
+        templates: {
+          zh: '📡 正在建立 [$1] SSE 实时任务下发长连接: $2',
+          en: '📡 Establishing [$1] SSE real-time task connection: $2',
+          ja: '📡 [$1] SSE リアルタイムタスク接続を確立中: $2',
+          ko: '📡 [$1] SSE 실시간 작업 연결 수립 중: $2',
+          vi: '📡 Đang thiết lập kết nối SSE thời gian thực [$1]: $2',
+          th: '📡 กำลังเชื่อมต่อ SSE แบบเรียลไทม์ [$1]: $2',
+          bn: '📡 [$1] SSE রিয়েল-টাইম সংযোগ স্থাপন করা হচ্ছে: $2',
+          id: '📡 Membangun koneksi SSE real-time [$1]: $2',
+          es: '📡 Estableciendo conexión SSE en tiempo real [$1]: $2',
+          fr: '📡 Établissement de la connexion SSE temps réel [$1] : $2',
+          pt: '📡 Estabelecendo conexão SSE em tempo real [$1]: $2',
+          de: '📡 Stelle [$1] SSE-Echtzeitverbindung her: $2',
+          it: '📡 Creazione connessione SSE in tempo reale [$1]: $2',
+          ru: '📡 Установка SSE-соединения реального времени [$1]: $2',
+          tr: '📡 [$1] SSE gerçek zamanlı görev bağlantısı kuruluyor: $2',
+          ur: '📡 [$1] SSE ریئل ٹائم کنکشن قائم ہو رہا ہے: $2',
+        }
+      },
+      {
+        pattern: /⚡\s*\[(.*?)\]\s*SSE\s*任务长连接已打通！已进入「即时事件下发」监听状态。/i,
+        templates: {
+          zh: '⚡ [$1] SSE 任务长连接已打通！已进入「即时事件下发」监听状态。',
+          en: '⚡ [$1] SSE connection established! Listening for instant events.',
+          ja: '⚡ [$1] SSE 接続が確立されました！即時イベント待機状態です。',
+          ko: '⚡ [$1] SSE 연결 완료! 실시간 이벤트 대기 상태로 진입했습니다.',
+          vi: '⚡ [$1] Kết nối SSE đã thông suốt! Đang lắng nghe sự kiện tức thì.',
+          th: '⚡ [$1] เชื่อมต่อ SSE สำเร็จ! กำลังรอรับเหตุการณ์แบบทันที',
+          bn: '⚡ [$1] SSE সংযোগ স্থাপিত! তাৎক্ষণিক ইভেন্টের জন্য অপেক্ষা করছে।',
+          id: '⚡ [$1] Koneksi SSE berhasil! Mendengarkan acara instan.',
+          es: '⚡ [$1] ¡Conexión SSE establecida! Escuchando eventos instantáneos.',
+          fr: '⚡ [$1] Connexion SSE établie ! À l\'écoute des événements instantanés.',
+          pt: '⚡ [$1] Conexão SSE estabelecida! Aguardando eventos instantâneos.',
+          de: '⚡ [$1] SSE-Verbindung hergestellt! Lausche auf Sofort-Ereignisse.',
+          it: '⚡ [$1] Connessione SSE stabilita! In ascolto di eventi istantanei.',
+          ru: '⚡ [$1] SSE-соединение установлено! Ожидание мгновенных событий.',
+          tr: '⚡ [$1] SSE bağlantısı kuruldu! Anlık olaylar dinleniyor.',
+          ur: '⚡ [$1] SSE کنکشن قائم ہو گیا! فوری ایونٹس کا انتظار ہے.',
+        }
+      },
+      {
+        pattern: /🔔\s*\[(.*?)\s*SSE\s*抢单成功\]\s*成功锁定待渲染任务:\s*\[(.*?)\]\s*(.*)/i,
+        templates: {
+          zh: '🔔 [$1 SSE 抢单成功] 成功锁定待渲染任务: [$2] $3',
+          en: '🔔 [$1 SSE Claimed] Locked pending render task: [$2] $3',
+          ja: '🔔 [$1 SSE 取得成功] レンダリング待ちタスクを確保: [$2] $3',
+          ko: '🔔 [$1 SSE 작업 확보] 렌더링 대기 작업 잠금 완료: [$2] $3',
+          vi: '🔔 [$1 SSE Nhận thành công] Đã khóa tác vụ chờ kết xuất: [$2] $3',
+          th: '🔔 [$1 SSE รับงานสำเร็จ] ล็อกงานเรนเดอร์ที่รอแล้ว: [$2] $3',
+          bn: '🔔 [$1 SSE দাবি সফল] অপেক্ষমাণ রেন্ডার কাজ লক হয়েছে: [$2] $3',
+          id: '🔔 [$1 SSE Diklaim] Mengunci tugas render tertunda: [$2] $3',
+          es: '🔔 [$1 SSE Reclamado] Tarea de renderizado bloqueada: [$2] $3',
+          fr: '🔔 [$1 SSE Réclamé] Tâche de rendu verrouillée : [$2] $3',
+          pt: '🔔 [$1 SSE Reivindicado] Tarefa de renderização bloqueada: [$2] $3',
+          de: '🔔 [$1 SSE Übernommen] Render-Aufgabe reserviert: [$2] $3',
+          it: '🔔 [$1 SSE Acquisito] Attività di rendering bloccata: [$2] $3',
+          ru: '🔔 [$1 SSE Захвачено] Задача на рендеринг заблокирована: [$2] $3',
+          tr: '🔔 [$1 SSE Alındı] Bekleyen işleme görevi kilitlendi: [$2] $3',
+          ur: '🔔 [$1 SSE کلیم کامیاب] زیر التوا رینڈر ٹاسک لاک ہو گیا: [$2] $3',
+        }
+      },
+      {
+        pattern: /🔔\s*\[(.*?)\s*SSE\s*消息触发\]\s*任务已被其他\s*Worker\s*提前锁定或非当前用户任务，跳过/i,
+        templates: {
+          zh: '🔔 [$1 SSE 消息触发] 任务已被其他 Worker 提前锁定或非当前用户任务，跳过',
+          en: '🔔 [$1 SSE Triggered] Task already claimed by another worker or belongs to another user, skipping',
+          ja: '🔔 [$1 SSE トリガー] タスクは他のワーカーに取得済みまたは別ユーザーのためスキップ',
+          ko: '🔔 [$1 SSE 트리거] 다른 워커가 먼저 선점했거나 다른 사용자의 작업이므로 건너뜁니다',
+          vi: '🔔 [$1 SSE Kích hoạt] Tác vụ đã bị Worker khác nhận hoặc không thuộc người dùng hiện tại, bỏ qua',
+          th: '🔔 [$1 SSE ทริกเกอร์] งานถูกล็อกโดย Worker อื่นแล้วหรือเป็นของใช้อื่น ข้าม',
+          bn: '🔔 [$1 SSE ট্রিগার] কাজটি ইতিমধ্যে অন্য ওয়ার্কার নিয়েছে বা অন্য ব্যবহারকারীর, এড়ানো হচ্ছে',
+          id: '🔔 [$1 SSE Pemicu] Tugas sudah diambil worker lain atau milik pengguna lain, lewati',
+          es: '🔔 [$1 SSE Activado] Tarea ya tomada por otro worker o de otro usuario, omitiendo',
+          fr: '🔔 [$1 SSE Déclenché] Tâche déjà prise par un autre worker ou un autre utilisateur, ignorée',
+          pt: '🔔 [$1 SSE Acionado] Tarefa já obtida por outro worker ou de outro usuário, ignorando',
+          de: '🔔 [$1 SSE Ausgelöst] Aufgabe bereits vergeben oder gehört anderem Benutzer, übersprungen',
+          it: '🔔 [$1 SSE Attivato] Attività già acquisita da un altro worker o di un altro utente, salto',
+          ru: '🔔 [$1 SSE Триггер] Задача уже занята другим воркером или принадлежит другому пользователю, пропуск',
+          tr: '🔔 [$1 SSE Tetiklendi] Görev başka bir worker tarafından alınmış veya başka kullanıcıya ait, atlanıyor',
+          ur: '🔔 [$1 SSE ٹریگر] ٹاسک پہلے ہی کسی اور ورکر نے لے لیا ہے یا دوسرے صارف کا ہے، چھوڑا جا رہا ہے',
+        }
+      },
+      {
+        pattern: /📡\s*服务端确认\s*\[(.*?)\]\s*长连接就绪\s*\(SSE Ready\)/i,
+        templates: {
+          zh: '📡 服务端确认 [$1] 长连接就绪 (SSE Ready)',
+          en: '📡 Server confirmed [$1] connection ready (SSE Ready)',
+          ja: '📡 サーバーが [$1] 接続準備完了を確認 (SSE Ready)',
+          ko: '📡 서버 [$1] 연결 준비 완료 확인 (SSE Ready)',
+          vi: '📡 Máy chủ xác nhận [$1] đã sẵn sàng (SSE Ready)',
+          th: '📡 เซิร์ฟเวอร์ยืนยันการเชื่อมต่อ [$1] พร้อมแล้ว (SSE Ready)',
+          bn: '📡 সার্ভার নিশ্চিত করেছে [$1] সংযোগ প্রস্তুত (SSE Ready)',
+          id: '📡 Server mengonfirmasi [$1] koneksi siap (SSE Ready)',
+          es: '📡 Servidor confirmó conexión [$1] lista (SSE Ready)',
+          fr: '📡 Serveur a confirmé [$1] prêt (SSE Ready)',
+          pt: '📡 Servidor confirmou conexão [$1] pronta (SSE Ready)',
+          de: '📡 Server bestätigte [$1] Bereitschaft (SSE Ready)',
+          it: '📡 Server confermato [$1] pronto (SSE Ready)',
+          ru: '📡 Сервер подтвердил готовность [$1] (SSE Ready)',
+          tr: '📡 Sunucu [$1] bağlantısının hazır olduğunu onayladı (SSE Ready)',
+          ur: '📡 سرور نے [$1] کنکشن تیار ہونے کی تصدیق کی (SSE Ready)',
+        }
+      },
+      {
+        pattern: /\[(.*?)\]\s*SSE\s*长连接中断:\s*(.*?)，5秒后自动重连\.\.\./i,
+        templates: {
+          zh: '[$1] SSE 长连接中断: $2，5秒后自动重连...',
+          en: '[$1] SSE connection interrupted: $2, reconnecting in 5s...',
+          ja: '[$1] SSE 接続が中断: $2、5秒後に自動再接続...',
+          ko: '[$1] SSE 연결 끊김: $2, 5초 후 재연결...',
+          vi: '[$1] Kết nối SSE bị ngắt: $2, tự kết nối lại sau 5 giây...',
+          th: '[$1] การเชื่อมต่อ SSE ขัดข้อง: $2 กำลังเชื่อมต่อใหม่ใน 5 วินาที...',
+          bn: '[$1] SSE সংযোগ বিচ্ছিন্ন: $2, ৫ সেকেন্ডে পুনরায় সংযোগ হচ্ছে...',
+          id: '[$1] Koneksi SSE terputus: $2, menyambung ulang dalam 5 dtk...',
+          es: '[$1] Conexión SSE interrumpida: $2, reconectando en 5s...',
+          fr: '[$1] Connexion SSE interrompue : $2, reconnexion dans 5s...',
+          pt: '[$1] Conexão SSE interrompida: $2, reconectando em 5s...',
+          de: '[$1] SSE-Verbindung unterbrochen: $2, Neuverbindung in 5s...',
+          it: '[$1] Connessione SSE interrotta: $2, riconnessione in 5s...',
+          ru: '[$1] Соединение SSE прервано: $2, переподключение через 5 сек...',
+          tr: '[$1] SSE bağlantısı kesildi: $2, 5 sn içinde yeniden bağlanılıyor...',
+          ur: '[$1] SSE کنکشن منقطع: $2، 5 سیکنڈ میں دوبارہ جڑ رہا ہے...',
+        }
+      },
+      {
+        pattern: /⏳\s*渲染调度服务端连接正常，当前队列中没有待渲染视频任务，静默等待中\.\.\./i,
+        templates: {
+          zh: '⏳ 渲染调度服务端连接正常，当前队列中没有待渲染视频任务，静默等待中...',
+          en: '⏳ Scheduler server connected; no pending render tasks in queue, waiting quietly...',
+          ja: '⏳ スケジューラー接続正常。待機中の動画タスクはありません。静かに待機中...',
+          ko: '⏳ 스케줄러 서버 연결 정상, 대기 중인 작업 없음. 대기 중...',
+          vi: '⏳ Đã kết nối máy chủ điều phối; không có tác vụ chờ, đang âm thầm chờ...',
+          th: '⏳ เชื่อมต่อเซิร์ฟเวอร์จัดคิวปกติ ไม่มีงานที่รอดำเนินการ กำลังรอ...',
+          bn: '⏳ শিডিউলার সার্ভার সংযুক্ত; কিউতে কোনো অপেক্ষমাণ কাজ নেই, নীরবে অপেক্ষা করছে...',
+          id: '⏳ Server penjadwal terhubung normal; belum ada tugas render dalam antrean, menunggu...',
+          es: '⏳ Servidor de programación conectado; no hay tareas pendientes en la cola, esperando...',
+          fr: '⏳ Serveur planificateur connecté ; aucune tâche en attente, en attente...',
+          pt: '⏳ Servidor agendador conectado; sem tarefas pendentes na fila, aguardando...',
+          de: '⏳ Planer-Server verbunden; keine ausstehenden Aufgaben in der Warteschlange, warte...',
+          it: '⏳ Server scheduler connesso; nessuna attività in coda, in attesa...',
+          ru: '⏳ Сервер планировщика подключен; очередь пуста, ожидание...',
+          tr: '⏳ Zamanlayıcı sunucu bağlantısı normal; kuyrukta bekleyen görev yok, bekleniyor...',
+          ur: '⏳ شیڈولر سرور جڑا ہوا ہے؛ قطار میں کوئی رینڈر ٹاسک نہیں، خاموشی سے انتظار ہے...',
+        }
+      },
+      {
+        pattern: /更新状态为\s*(\S+)/i,
+        templates: {
+          zh: '更新状态为 $1',
+          en: 'update status to $1',
+          ja: 'ステータスを $1 に更新',
+          ko: '상태를 $1(으)로 업데이트',
+          vi: 'cập nhật trạng thái thành $1',
+          th: 'อัปเดตสถานะเป็น $1',
+          bn: 'স্ট্যাটাস $1-এ আপডেট',
+          id: 'perbarui status ke $1',
+          es: 'actualizar estado a $1',
+          fr: 'mettre à jour le statut vers $1',
+          pt: 'atualizar status para $1',
+          de: 'Status auf $1 aktualisieren',
+          it: 'aggiorna stato a $1',
+          ru: 'обновление статуса до $1',
+          tr: 'durumu $1 olarak güncelle',
+          ur: 'حیثیت $1 پر اپ ڈیٹ کریں',
+        }
+      },
+      {
+        pattern: /服务端代理上传视频\s*\((.*?)\)/i,
+        templates: {
+          zh: '服务端代理上传视频 ($1)',
+          en: 'server proxy upload video ($1)',
+          ja: 'サーバープロキシ動画アップロード ($1)',
+          ko: '서버 프록시 비디오 업로드 ($1)',
+          vi: 'tải video qua proxy máy chủ ($1)',
+          th: 'อัปโหลดวิดีโอผ่านพร็อกซีเซิร์ฟเวอร์ ($1)',
+          bn: 'সার্ভার প্রক্সি ভিডিও আপলোড ($1)',
+          id: 'unggah video proksi server ($1)',
+          es: 'subida proxy de video ($1)',
+          fr: 'téléversement vidéo via proxy ($1)',
+          pt: 'upload proxy de vídeo ($1)',
+          de: 'Server-Proxy-Video-Upload ($1)',
+          it: 'caricamento proxy video ($1)',
+          ru: 'загрузка видео через прокси сервера ($1)',
+          tr: 'sunucu proxy video yükleme ($1)',
+          ur: 'سرور پراکسی ویڈیو اپ لوڈ ($1)',
+        }
+      },
+      {
+        pattern: /微积分 FRQ/g,
+        templates: {
+          zh: '微积分 FRQ',
+          en: 'AP Calculus FRQ',
+          ja: '微積分 FRQ',
+          ko: '미적분 FRQ',
+          vi: 'Giải tích FRQ',
+          th: 'แคลคูลัส FRQ',
+          bn: 'AP ক্যালকুলাস FRQ',
+          id: 'Kalkulus FRQ',
+          es: 'Cálculo AP FRQ',
+          fr: 'Calcul AP FRQ',
+          pt: 'Cálculo AP FRQ',
+          de: 'Analysis FRQ',
+          it: 'Calcolo AP FRQ',
+          ru: 'Матан AP FRQ',
+          tr: 'Kalkülüs FRQ',
+          ur: 'کیلکولس FRQ',
+        }
+      },
+      {
+        pattern: /微积分 MCQ/g,
+        templates: {
+          zh: '微积分 MCQ',
+          en: 'AP Calculus MCQ',
+          ja: '微積分 MCQ',
+          ko: '미적분 MCQ',
+          vi: 'Giải tích MCQ',
+          th: 'แคลคูลัส MCQ',
+          bn: 'AP ক্যালকুলাস MCQ',
+          id: 'Kalkulus MCQ',
+          es: 'Cálculo AP MCQ',
+          fr: 'Calcul AP MCQ',
+          pt: 'Cálculo AP MCQ',
+          de: 'Analysis MCQ',
+          it: 'Calcolo AP MCQ',
+          ru: 'Матан AP MCQ',
+          tr: 'Kalkülüs MCQ',
+          ur: 'کیلکولس MCQ',
+        }
+      },
+      {
+        pattern: /对比学单词/g,
+        templates: {
+          zh: '对比学单词',
+          en: 'Compare English Word',
+          ja: '英単語比較',
+          ko: '영단어 비교',
+          vi: 'So sánh từ tiếng Anh',
+          th: 'เปรียบเทียบคำศัพท์อังกฤษ',
+          bn: 'শব্দ তুলনা',
+          id: 'Bandingkan Kata Inggris',
+          es: 'Comparar Palabras',
+          fr: 'Comparaison de mots',
+          pt: 'Comparar Palavras',
+          de: 'Wortvergleich',
+          it: 'Confronto Parole',
+          ru: 'Сравнение слов',
+          tr: 'İngilizce Kelime Karşılaştır',
+          ur: 'الفاظ کا موازنہ',
+        }
       }
     ];
 
-    // 智能渲染日志本地化翻译器 (支持时间戳自动剥离重拼与 14 种语言)
+    // 智能渲染日志本地化翻译器 (支持时间戳自动剥离重拼与 16 种语言嵌套替换)
     function localizeRenderLog(rawText, lang) {
       if (!rawText || typeof rawText !== 'string') return '';
       const targetLang = (lang || 'zh').toLowerCase();
+      if (targetLang === 'zh') return rawText;
 
       // 提取可选的前置时间戳，如 [21:11:49]
       const timeMatch = rawText.match(/^(\[\d{2}:\d{2}:\d{2}\]\s*)(.*)$/);
       const prefix = timeMatch ? timeMatch[1] : '';
-      const body = timeMatch ? timeMatch[2] : rawText;
+      let body = timeMatch ? timeMatch[2] : rawText;
 
       for (const rule of RENDER_LOG_RULES) {
+        if (rule.pattern.global) rule.pattern.lastIndex = 0;
         if (rule.pattern.test(body)) {
           const tpl = rule.templates[targetLang] || rule.templates.en || rule.templates.zh;
           if (tpl) {
-            return prefix + body.replace(rule.pattern, tpl);
+            if (rule.pattern.global) rule.pattern.lastIndex = 0;
+            body = body.replace(rule.pattern, tpl);
           }
         }
       }
-      return rawText;
+      return prefix + body;
     }
 
     function createLogElement(entry) {
@@ -3189,8 +3969,11 @@
 
     // IPC 监听
     ipcRenderer.on('render:init', (_event, data) => {
-      if (data.state) updateStatus(data.state);
-      if (Array.isArray(data.logs)) {
+      if (data && data.language) {
+        applyLanguage(data.language);
+      }
+      if (data && data.state) updateStatus(data.state);
+      if (data && Array.isArray(data.logs)) {
         allLogs = data.logs;
         renderLogs();
         const lastWithProg = [...data.logs].reverse().find(l => l.progress);
@@ -3240,6 +4023,9 @@
 
     // 页面初次加载时拉取一次当前状态
     ipcRenderer.invoke('render:get-state').then((res) => {
+      if (res && res.language) {
+        applyLanguage(res.language);
+      }
       if (res && res.state) {
         updateStatus(res.state);
       }

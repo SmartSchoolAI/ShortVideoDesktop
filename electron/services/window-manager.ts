@@ -116,11 +116,15 @@ export class WindowManager {
     return tab?.title || tabId;
   }
 
-  public setLanguage(lang: string): void {
+  /**
+   * 统一向所有桌面视图、窗口、标题和菜单广播语言变更
+   */
+  private broadcastLanguageChange(lang: string, syncMainWeb: boolean = false): void {
     if (!lang) return;
     const targetLang = lang.toLowerCase();
     const item = SUPPORTED_LANGUAGES.find((l) => l.code === targetLang);
     if (!item && targetLang !== 'zh') return;
+
     this.currentLanguage = targetLang;
     this.persistLanguage(this.currentLanguage);
     console.log(`[WindowManager] 切换客户端语言至: ${this.currentLanguage} (${item?.name || '中文'})`);
@@ -135,64 +139,65 @@ export class WindowManager {
       this.loadingView.webContents.send('loading:language-change', this.currentLanguage);
     }
 
-    // 2. 同步通知主站 Web (Next.js) 页面切换路由与本地缓存
-    const mainTab = this.tabs.get('main');
-    if (mainTab && !mainTab.view.webContents.isDestroyed()) {
-      mainTab.view.webContents.send('app:language-change', this.currentLanguage);
-      mainTab.view.webContents
-        .executeJavaScript(`
-          (function() {
-            try {
-              if (typeof window === 'undefined') return;
-              const targetLang = '${this.currentLanguage}';
-              localStorage.setItem('appLang', targetLang);
-              localStorage.setItem('i18nextLng', targetLang);
-              localStorage.setItem('oauth_redirect_lang', targetLang);
-              const curPath = window.location.pathname;
-              const langCodes = ['zh', 'en', 'ja', 'ko', 'vi', 'th', 'id', 'es', 'fr', 'pt', 'de', 'it', 'ru', 'tr'];
-              const regex = new RegExp('^/(' + langCodes.join('|') + ')([/\\\\?#]|$)', 'i');
-              let targetPath = curPath;
-              if (regex.test(curPath)) {
-                targetPath = curPath.replace(regex, '/' + targetLang + '$2');
-              } else {
-                targetPath = '/' + targetLang + (curPath.startsWith('/') ? curPath : '/' + curPath);
+    // 3. 同步通知主站 Web (Next.js) 页面切换路由与本地缓存（仅当主动由桌面端触发切换时导航，避免反向跳转死循环）
+    if (syncMainWeb) {
+      const mainTab = this.tabs.get('main');
+      if (mainTab && !mainTab.view.webContents.isDestroyed()) {
+        mainTab.view.webContents.send('app:language-change', this.currentLanguage);
+        mainTab.view.webContents
+          .executeJavaScript(`
+            (function() {
+              try {
+                if (typeof window === 'undefined') return;
+                const targetLang = '${this.currentLanguage}';
+                localStorage.setItem('appLang', targetLang);
+                localStorage.setItem('i18nextLng', targetLang);
+                localStorage.setItem('oauth_redirect_lang', targetLang);
+                const curPath = window.location.pathname;
+                const langCodes = ['zh', 'en', 'ja', 'ko', 'vi', 'th', 'id', 'es', 'fr', 'pt', 'de', 'it', 'ru', 'tr'];
+                const regex = new RegExp('^/(' + langCodes.join('|') + ')([/\\\\?#]|$)', 'i');
+                let targetPath = curPath;
+                if (regex.test(curPath)) {
+                  targetPath = curPath.replace(regex, '/' + targetLang + '$2');
+                } else {
+                  targetPath = '/' + targetLang + (curPath.startsWith('/') ? curPath : '/' + curPath);
+                }
+                if (window.location.pathname !== targetPath) {
+                  window.location.href = targetPath + window.location.search + window.location.hash;
+                }
+              } catch (err) {
+                console.warn('[Electron LangSync] failed:', err);
               }
-              if (window.location.pathname !== targetPath) {
-                window.location.href = targetPath + window.location.search + window.location.hash;
-              }
-            } catch (err) {
-              console.warn('[Electron LangSync] failed:', err);
-            }
-          })();
-        `)
-        .catch(() => { });
+            })();
+          `)
+          .catch(() => { });
+      }
     }
 
-    // 3. 同步系统日志 Tab
+    // 4. 同步系统日志 Tab
     const syslogTab = this.tabs.get('syslogs');
     if (syslogTab && !syslogTab.view.webContents.isDestroyed()) {
       syslogTab.view.webContents.send('syslog:language-change', this.currentLanguage);
     }
 
-    // 4. 同步视频渲染 Tab
+    // 5. 同步视频渲染 Tab
     const renderTab = this.tabs.get('render');
     if (renderTab && !renderTab.view.webContents.isDestroyed()) {
       renderTab.view.webContents.send('render:language-change', this.currentLanguage);
     }
 
-    // 5. 同步关于/系统说明窗口
+    // 6. 同步关于/系统说明窗口
     if (this.aboutWindow && !this.aboutWindow.isDestroyed()) {
       this.aboutWindow.webContents.send('app:language-change', this.currentLanguage);
     }
 
-    // 6. 更新所有现有 Tab 的 title 标题
-    const loc = getLocale(this.currentLanguage);
+    // 7. 更新所有现有 Tab 的 title 标题
     for (const [id, tab] of this.tabs.entries()) {
       tab.title = this.getTabDisplayTitle(id, this.currentLanguage);
     }
     this.notifyTabBarState();
 
-    // 动态同步更新系统原生窗口标题（包含当前激活功能模块多语言名称）
+    // 8. 动态同步更新系统原生窗口标题（包含当前激活功能模块多语言名称）
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
       const activeTitle = this.getTabDisplayTitle(this.activeTabId, this.currentLanguage);
       const windowTitle = activeTitle && this.activeTabId !== 'main'
@@ -201,7 +206,7 @@ export class WindowManager {
       this.mainWindow.setTitle(windowTitle);
     }
 
-    // 7. 触发所有注册的应用级语言变更监听器 (如动态刷新原生系统菜单)
+    // 9. 触发所有注册的应用级语言变更监听器 (如动态刷新原生系统菜单)
     for (const listener of this.languageChangeListeners) {
       try {
         listener(this.currentLanguage);
@@ -209,6 +214,10 @@ export class WindowManager {
         console.error('[WindowManager] 触发语言变更监听器异常:', err?.message || err);
       }
     }
+  }
+
+  public setLanguage(lang: string): void {
+    this.broadcastLanguageChange(lang, true);
   }
 
   /**
@@ -713,6 +722,13 @@ export class WindowManager {
 
       this.bindDevToolsShortcut(view.webContents);
       view.webContents.loadFile(logHtml);
+      view.webContents.on('did-finish-load', () => {
+        try {
+          if (!view.webContents.isDestroyed()) {
+            view.webContents.send('syslog:language-change', this.currentLanguage || 'zh');
+          }
+        } catch { }
+      });
 
       // 订阅全局系统日志实时广播
       systemLogger.subscribe(view.webContents);
@@ -726,6 +742,7 @@ export class WindowManager {
 
       this.tabs.set(tabId, tabData);
     } else {
+      tabData.title = getLocale(this.currentLanguage).menu.help.syslogs || tabData.title;
       // 若 Tab 已存在且当前已处于此页面，平滑刷新以保证最新样式与功能生效
       try {
         tabData.view.webContents.reload();
@@ -733,6 +750,8 @@ export class WindowManager {
         // ignore
       }
     }
+
+    this.notifyTabBarState();
 
     if (activate) {
       this.switchTab(tabId);
@@ -778,6 +797,13 @@ export class WindowManager {
 
       this.bindDevToolsShortcut(view.webContents);
       view.webContents.loadFile(renderHtml);
+      view.webContents.on('did-finish-load', () => {
+        try {
+          if (!view.webContents.isDestroyed()) {
+            view.webContents.send('render:language-change', this.currentLanguage || 'zh');
+          }
+        } catch { }
+      });
 
       // 订阅渲染管理器实时广播
       renderManager.subscribe(view.webContents);
@@ -791,12 +817,15 @@ export class WindowManager {
 
       this.tabs.set(tabId, tabData);
     } else {
+      tabData.title = getLocale(this.currentLanguage).menu.help.render || tabData.title;
       try {
         tabData.view.webContents.reload();
       } catch (e) {
         // ignore
       }
     }
+
+    this.notifyTabBarState();
 
     if (activate) {
       this.switchTab(tabId);
@@ -883,16 +912,19 @@ export class WindowManager {
    * 向 TabBar 发送最新状态更新
    */
   /**
-   * 从主站当前 URL 中提取语言代码 (如 zh, en, ja, ko, vi, th, bn, id, ur)
+   * 从主站当前 URL 中提取受支持的语言代码（仅在 URL 明确包含语言前缀时更新，避免无前缀路由误重置已选语言）
    */
   private extractMainAppLanguage(): string {
     const mainTab = this.tabs.get('main');
-    if (!mainTab || !mainTab.view || !mainTab.view.webContents || mainTab.view.webContents.isDestroyed()) return 'zh';
+    if (!mainTab || !mainTab.view || !mainTab.view.webContents || mainTab.view.webContents.isDestroyed()) {
+      return this.currentLanguage || 'zh';
+    }
     const currentUrl = mainTab.view.webContents.getURL() || '';
     try {
       if (currentUrl) {
         const u = new URL(currentUrl);
-        const match = u.pathname.match(/^\/([a-zA-Z]{2})/);
+        const supportedRegex = new RegExp(`^/(${SUPPORTED_LANGUAGES.map((item) => item.code).join('|')})(?:/|$)`, 'i');
+        const match = u.pathname.match(supportedRegex);
         if (match) {
           const l = match[1].toLowerCase();
           this.currentLanguage = l;
@@ -1019,20 +1051,19 @@ export class WindowManager {
       } catch { }
     });
 
-    // 监听主站页面内路由导航，实时向顶部 TabBar 同步多语言环境
+    // 监听主站页面内路由导航，实时向所有桌面端视图与组件同步多语言环境
+    const supportedLangRegex = new RegExp(
+      `^/(${SUPPORTED_LANGUAGES.map((item) => item.code).join('|')})(?:/|$)`,
+      'i'
+    );
     const notifyLanguageChange = (url: string) => {
       try {
         const u = new URL(url);
-        const match = u.pathname.match(/^\/([a-zA-Z]{2})/);
-        const lang = match ? match[1].toLowerCase() : 'zh';
-        if (SUPPORTED_LANGUAGES.some((item) => item.code === lang)) {
-          this.currentLanguage = lang;
-          if (this.tabBarView && !this.tabBarView.webContents.isDestroyed()) {
-            this.tabBarView.webContents.send('tabbar:language-change', lang);
-          }
-          if (this.loadingView && !this.loadingView.webContents.isDestroyed()) {
-            this.loadingView.webContents.send('loading:language-change', lang);
-          }
+        const match = u.pathname.match(supportedLangRegex);
+        if (!match) return;
+        const lang = match[1].toLowerCase();
+        if (SUPPORTED_LANGUAGES.some((item) => item.code === lang) && lang !== this.currentLanguage) {
+          this.broadcastLanguageChange(lang, false);
         }
       } catch { }
     };
@@ -1075,7 +1106,7 @@ export class WindowManager {
       if (this.currentLanguage && this.currentLanguage !== 'zh') {
         try {
           const u = new URL(startUrl);
-          const match = u.pathname.match(/^\/([a-zA-Z]{2})/);
+          const match = u.pathname.match(supportedLangRegex);
           if (!match) {
             u.pathname = `/${this.currentLanguage}${u.pathname}`;
             startUrl = u.toString();
