@@ -6011,10 +6011,13 @@ function interruptibleSleep(ms: number): Promise<void> {
   });
 }
 
-export function resetErrorCircuitBreaker() {
+export function resetErrorCircuitBreaker(resetTripped = false) {
   if (consecutiveSameErrorCount > 0 || lastErrorCategory !== null) {
     consecutiveSameErrorCount = 0;
     lastErrorCategory = null;
+  }
+  if (resetTripped) {
+    isCircuitBreakerTripped = false;
   }
 }
 
