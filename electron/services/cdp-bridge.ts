@@ -3,7 +3,7 @@ import WebSocket from 'ws';
 import { WebContents } from 'electron';
 import { STEALTH_SCRIPT } from '../stealth/anti-detection';
 
-import { APP_CONFIG } from '../config';
+import { APP_CONFIG, isOwnSiteUrl } from '../config';
 
 const CHANNEL_PORT_OFFSET: Record<string, number> = { A: 0, B: 1, C: 2 };
 const channelOffset = CHANNEL_PORT_OFFSET[APP_CONFIG?.channel || 'A'] || 0;
@@ -708,7 +708,7 @@ export class CdpBridgeService {
       if (!match && targets.length > 0 && webContents && !webContents.isDestroyed()) {
         const candidatePages = targets.filter((t) =>
           t.webSocketDebuggerUrl &&
-          !t.url.includes('shortvideo.ca') &&
+          !isOwnSiteUrl(t.url) &&
           !t.url.includes('localhost') &&
           !t.url.startsWith('file://') &&
           !t.url.startsWith('devtools://')

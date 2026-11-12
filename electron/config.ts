@@ -62,15 +62,44 @@ function loadDesktopEnv(): void {
 
 loadDesktopEnv();
 
-const defaultSiteOrigin =
+const defaultSiteOrigin = (
   process.env.NEXT_PUBLIC_APP_SITE_URL ||
   process.env.NEXT_PUBLIC_SITE_ORIGIN ||
-  'https://app.shortvideo.ca';
+  ''
+).trim().replace(/\/+$/, '');
 
-const defaultDownloadBaseUrl =
+const defaultDownloadBaseUrl = (
   process.env.NEXT_PUBLIC_DOWNLOAD_BASE_URL ||
   process.env.DOWNLOAD_BASE_URL ||
-  'https://download.shortvideo.ca';
+  ''
+).trim().replace(/\/+$/, '');
+
+export function getConfiguredRootDomain(): string {
+  const candidates = [defaultSiteOrigin, process.env.NEXT_PUBLIC_SITE_ORIGIN || '', defaultDownloadBaseUrl].filter(Boolean);
+  for (const raw of candidates) {
+    try {
+      const host = new URL(raw).hostname.toLowerCase();
+      const parts = host.split('.');
+      if (parts.length >= 2) {
+        return parts.slice(-2).join('.');
+      }
+      if (host) return host;
+    } catch {}
+  }
+  return '';
+}
+
+export function isOwnSiteUrl(url: string): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const root = getConfiguredRootDomain();
+  if (!root) return false;
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host === root || host.endsWith('.' + root);
+  } catch {
+    return url.toLowerCase().includes(root);
+  }
+}
 
 export function getAppTagVersion(): string {
   if (process.env.APP_VERSION) {
